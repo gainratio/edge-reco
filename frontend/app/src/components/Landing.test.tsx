@@ -1,7 +1,11 @@
 import { cleanup, render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { BUNDLE_SIZE } from "../metrics/landing-figures";
+import {
+	BUNDLE_SIZE,
+	LANDING_MEASURED_ON,
+	LANDING_METRICS,
+} from "../metrics/landing-figures";
 import { Landing } from "./Landing";
 
 afterEach(cleanup);
@@ -20,9 +24,9 @@ describe("Landing", () => {
 	it("renders all six representative metric tiles", () => {
 		render(<Landing onLaunch={() => {}} />);
 		const labels = [
-			"per recommendation",
+			"per search (median)",
 			"backend calls after sync",
-			"cold start to first results",
+			"first visit to first results",
 			"JS heap (Chromium)",
 			"inference / 1k recs",
 			"real products, in-tab",
@@ -67,6 +71,18 @@ describe("Landing", () => {
 		const bundleSize = BUNDLE_SIZE.replaceAll(".", "\\.");
 		expect(
 			screen.getByText(new RegExp(`~${bundleSize} signed bundle`)),
+		).toBeInTheDocument();
+	});
+
+	it("renders the measured first-visit time and the date it was measured", () => {
+		render(<Landing onLaunch={() => {}} />);
+		const cold = LANDING_METRICS.find((m) => m.id === "coldStart");
+		expect(screen.getByText(cold?.num ?? "missing")).toBeInTheDocument();
+		expect(
+			screen.getByText(`measured on edge-reco.com, ${LANDING_MEASURED_ON}`),
+		).toBeInTheDocument();
+		expect(
+			screen.getByText(new RegExp(`${cold?.vars?.warm} on return`)),
 		).toBeInTheDocument();
 	});
 

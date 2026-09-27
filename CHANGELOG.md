@@ -5,6 +5,16 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ## [Unreleased]
 
+### Fixed
+- **The landing no longer claims a ~1.2 s cold start.** That figure came from a local
+  headless run with the model served from localhost. Measured against the live site in
+  real Chromium (7 cold runs in fresh profiles, 7 warm), a first visit takes a median
+  ~2.6 s to first results on a fast connection and a return visit ~0.6 s. Every
+  performance tile (first visit, search latency, heap) is now computed from a recorded
+  measurement file, `frontend/app/src/metrics/live-measurement.json`, written by the new
+  `pnpm run measure:live`; `landing-figures.test.ts` recomputes each tile from the raw
+  runs and fails if the landing copy carries a timing or size of its own.
+
 ### Security
 - **Backend substrate bumped: edge-proc 0.2.0 → 0.5.0, edgeproc-core 0.2.1 → 0.4.3,
   avow 0.3.0 → 0.4.1** (floors in `backend/pyproject.toml`; `uv.lock` moves only those

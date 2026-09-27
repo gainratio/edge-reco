@@ -2,13 +2,14 @@ import { readdirSync, readFileSync, statSync } from "node:fs";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 import { describe, expect, it } from "vitest";
+import landingCopy from "../locales/en/landing.json";
 import {
 	BUNDLE_SIZE,
 	CATALOG_PRODUCTS,
+	LANDING_MEASURED_ON,
 	LANDING_METRICS,
-	REFERENCE_MEASUREMENT,
-	REFERENCE_TOLERANCE,
 } from "./landing-figures";
+import measurement from "./live-measurement.json";
 
 const here = dirname(fileURLToPath(import.meta.url)); // …/frontend/app/src/metrics
 const repoRoot = join(here, "../../../..");
@@ -32,17 +33,26 @@ const dirBytes = (dir: string): number =>
  */
 const BUNDLE_SIZE_TOLERANCE = 0.1;
 
-/** The tile's number as a plain figure: "~1.2" -> 1.2, "~36" -> 36. */
-const tileValue = (id: string): number => {
-	const tile = LANDING_METRICS.find((m) => m.id === id);
-	if (!tile) throw new Error(`no landing tile with id "${id}"`);
-	return Number.parseFloat(tile.num.replace("~", ""));
+const tile = (id: string) => {
+	const found = LANDING_METRICS.find((m) => m.id === id);
+	if (!found) throw new Error(`no landing tile with id "${id}"`);
+	return found;
 };
 
-/** Within a factor of REFERENCE_TOLERANCE in EITHER direction. */
-const withinBand = (claimed: number, measured: number): boolean =>
-	claimed <= measured * REFERENCE_TOLERANCE &&
-	claimed >= measured / REFERENCE_TOLERANCE;
+/** Median of the raw runs, computed here rather than trusted from the source. */
+const median = (xs: readonly number[]): number => {
+	const s = [...xs].sort((a, b) => a - b);
+	// Odd length: lo === hi. An empty list yields NaN, which no tile test accepts.
+	const lo = s[Math.floor((s.length - 1) / 2)] ?? Number.NaN;
+	const hi = s[Math.ceil((s.length - 1) / 2)] ?? Number.NaN;
+	return (lo + hi) / 2;
+};
+
+/** Every string leaf of a nested i18n catalog. */
+const strings = (node: unknown): string[] =>
+	typeof node === "string"
+		? [node]
+		: Object.values(node as Record<string, unknown>).flatMap(strings);
 
 // Guard the representative catalog count against the committed bundle source, so
 // the landing's "720" can't silently rot if the catalog ever changes. This is the
@@ -99,19 +109,52 @@ describe("performance figures live in exactly one place", () => {
 		// goes stale on the very next deploy; build.json is the live answer.
 		expect(readme().match(/\b[0-9a-f]{40}\b/g)).toBeNull();
 	});
+});
 
-	it("the landing tiles stay within an order of magnitude of a real run", () => {
-		expect(
-			withinBand(tileValue("latency"), REFERENCE_MEASUREMENT.searchP50Ms),
-		).toBe(true);
-		expect(
-			withinBand(
-				tileValue("coldStart") * 1000,
-				REFERENCE_MEASUREMENT.coldStartMs,
-			),
-		).toBe(true);
-		expect(withinBand(tileValue("heap"), REFERENCE_MEASUREMENT.heapMb)).toBe(
-			true,
-		);
+// The landing once said "~1.2 s" to first results. A real first visit to the live
+// site took over twice that, because the number came from a local headless run
+// serving the model from localhost. Now every performance tile is computed from
+// live-measurement.json (written by `pnpm run measure:live` against the deployed
+// site), and these tests recompute each figure from the raw runs.
+describe("landing performance tiles quote the recorded live measurement", () => {
+	it("the recording is a real multi-run measurement of the live site", () => {
+		expect(measurement.target).toBe("https://edge-reco.com/");
+		expect(measurement.coldStartMs.length).toBeGreaterThanOrEqual(5);
+		expect(measurement.warmStartMs.length).toBeGreaterThanOrEqual(5);
+		expect(measurement.searchP50Ms.length).toBeGreaterThanOrEqual(5);
+		expect(measurement.heapMb.length).toBeGreaterThanOrEqual(5);
+	});
+
+	it("the first-visit tile is the median cold run, in seconds", () => {
+		const coldS = median(measurement.coldStartMs) / 1000;
+		expect(tile("coldStart").num).toBe(`~${coldS.toFixed(1)}`);
+		expect(tile("coldStart").unit).toBe("s");
+	});
+
+	it("the first-visit tile's sub-line is the median warm run", () => {
+		const warmS = median(measurement.warmStartMs) / 1000;
+		expect(tile("coldStart").vars?.warm).toBe(`${warmS.toFixed(1)} s`);
+	});
+
+	it("the latency tile is the median per-session search p50", () => {
+		const p50 = Math.round(median(measurement.searchP50Ms));
+		expect(tile("latency").num).toBe(`~${p50}`);
+	});
+
+	it("the heap tile is the median heap reading", () => {
+		const heap = Math.round(median(measurement.heapMb));
+		expect(tile("heap").num).toBe(`~${heap}`);
+	});
+
+	it("the band names the date of the measurement it quotes", () => {
+		expect(LANDING_MEASURED_ON).toBe(measurement.measuredAt.slice(0, 10));
+	});
+
+	it("the landing copy hardcodes no timing or size of its own", () => {
+		// Numbers reach the page only through interpolation from this module.
+		const unitClaim = /\d+(\.\d+)?\s?(ms|s|MB|MiB)\b/;
+		for (const text of strings(landingCopy)) {
+			expect(text).not.toMatch(unitClaim);
+		}
 	});
 });

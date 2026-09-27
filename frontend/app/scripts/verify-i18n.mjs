@@ -26,7 +26,7 @@ const CASES = [
 		strings: [
 			"▶ Launch the live demo",
 			"brings their own device",
-			"representative figures",
+			"measured on edge-reco.com",
 			"How it works",
 			"JS heap (Chromium)",
 		],
