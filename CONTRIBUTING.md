@@ -4,21 +4,25 @@ Contributions are welcome. EdgeReco is small enough to read end-to-end in an aft
 
 ## Local setup
 
+Follow [docs/GETTING_STARTED.md](docs/GETTING_STARTED.md): the tools and versions, a fresh
+clone to a running store, the full check, a map of the code, and a first change. The
+short version, from the repo root:
+
 ```bash
-uv sync --group dev
+cd backend && uv sync --group dev --reinstall-package assay-engine && cd ..
+cd frontend && corepack enable && pnpm install && cd ..
 ```
 
 ## Quality gate (run before opening a PR)
 
 ```bash
-uv run ruff check src tests
-uv run mypy src
-uv run pytest --cov=edgereco --cov-fail-under=90
+make gate
 ```
 
-All three must pass. The Dagger module runs these commands through `dagger check`.
+This runs the backend `uv run poe gate` and the frontend `pnpm run gate`, the same checks
+CI runs through `dagger check`.
 
-## Test layout
+## Test layout (in `backend/`)
 
 - `tests/unit/` — fast, isolated unit tests
 - `tests/bdd/` — pytest-bdd step impls (features live in `features/`, decoupled by design)

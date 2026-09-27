@@ -18,9 +18,9 @@ The whole system is four repositories that compose as one stack:
 | [**edge-reco**](https://github.com/hseshadr/edge-reco) (this repo) | the product brain — scoring formula, session signals, session-aware reranker, the Nimbus demo storefront. |
 | [**edge-proc**](https://github.com/hseshadr/edge-proc) | the reusable local-compute substrate — signed bundle sync, content-addressed OPFS/CAS cache, fail-closed Ed25519 + SHA-256 verification, BM25 ⊕ vector → RRF retrieval. |
 | [**edgeproc-browser**](https://github.com/hseshadr/edgeproc-browser) | the reusable browser substrate — signed sync, OPFS/CAS, Worker transport, integrity, and swappable vector indexes. |
-| [**shared-libs-python**](https://github.com/hseshadr/shared-libs-python) | the vector-partitioning protocol edge-proc builds its local vector index on. |
+| [**edgeproc-core**](https://github.com/hseshadr/edgeproc-core) | the vector-partitioning protocol edge-proc builds its local vector index on (formerly `shared-libs-python`). On PyPI as [`edgeproc-core`](https://pypi.org/project/edgeproc-core/). |
 
-The backend pulls both substrate repos from public GitHub automatically (git sources pinned to release tags) — see [`QUICKSTART.md`](QUICKSTART.md). You only clone edge-reco.
+The backend installs `edge-proc` and `edgeproc-core` from PyPI (`uv.lock` pins the exact releases), and the frontend installs `@edgeproc/browser` from a pinned GitHub commit — see [`GETTING_STARTED.md`](GETTING_STARTED.md). You only clone edge-reco. [privacy-core](https://github.com/hseshadr/privacy-core), by the same author, is unrelated: it redacts personal data from AI prompts and is not part of this stack.
 
 ## System context
 
@@ -231,7 +231,7 @@ edge-proc is the **signed-bundle delivery substrate**. EdgeReco depends on it fo
 1. **Publish** — `edgereco bundle` is a thin wrapper over `edgeproc publish`. Chunks → manifest → signed pointer.
 2. **Sync** — both `ServiceContainer.from_synced` (Python) and `BrowserSync` (TypeScript) verify and pull bundles via the same content-addressed contract.
 
-edge-proc itself is a generic library; EdgeReco is one possible consumer. It in turn builds its local vector index on the vector-partitioning protocol in **[shared-libs-python](https://github.com/hseshadr/shared-libs-python)** — the bottom of the three-repo stack. See [edge-proc/docs/ARCHITECTURE.md](https://github.com/hseshadr/edge-proc/blob/main/docs/ARCHITECTURE.md).
+edge-proc itself is a generic library; EdgeReco is one possible consumer. It in turn builds its local vector index on the vector-partitioning protocol in **[edgeproc-core](https://github.com/hseshadr/edgeproc-core)** — the bottom of the stack. See [edge-proc/docs/ARCHITECTURE.md](https://github.com/hseshadr/edge-proc/blob/main/docs/ARCHITECTURE.md).
 
 ## Cross-tier parity
 
@@ -286,8 +286,225 @@ minified offline suite separately boots with model CDNs blocked, reloads after
 network cutoff, and proves signed-cache recovery. Production health additionally
 requires the exact-SHA and canonical-host checks in `.github/workflows/deploy.yml`.
 
+## The pipeline at a glance
+
+```mermaid
+flowchart TB
+  build["Your cloud<br>build + sign the catalog<br>720 products → one 1.5 MB file"]
+  sync["Download once, then check it<br>Ed25519 + SHA-256<br>any mismatch aborts the load"]
+  engine["Search + rank in the tab<br>keywords + meaning → fuse → personalize"]
+  recs["Results and recommendations<br>0 backend calls · works offline"]
+  learn["Optional, off by default<br>batched anonymous activity retrains<br>ranking and re-signs the catalog"]
+
+  build -->|"one small signed file, served by any CDN"| sync
+  sync --> engine --> recs
+  recs -.->|"only if you switch it on"| learn
+  learn -.-> build
+
+  classDef cloud fill:#f0e8f8,stroke:#9472b0,color:#171717;
+  classDef device fill:#e8f8e8,stroke:#5fa85f,color:#171717;
+  classDef opt fill:#e8f4f8,stroke:#5b9bbf,color:#171717;
+  class build cloud;
+  class sync,engine,recs device;
+  class learn opt;
+```
+
+Everything in green happens on the shopper's own device. Your cloud is touched only to
+publish a new catalog, never to answer a search.
+
+- **origin** serves a *signed, content-addressed bundle*: the products, the prebuilt
+  search index and the ranking weights. *Content-addressed* means every piece is named by
+  the hash of its own bytes, so it can be cached forever and cannot be changed without
+  detection. It is a `latest` version pointer plus immutable `manifest/<hash>` and
+  `chunk/<hash>` objects. A committed 720-product bundle lives in
+  `backend/examples/catalog/` (1.5 MB on disk).
+- **edge** is a Caddy reverse proxy (a small static web server standing in for a CDN)
+  with the cache policy: immutable chunks cached forever, a short-lived pointer.
+- **browser tier**: the Nimbus single-page app syncs the bundle (fetches it, checks its
+  signature, stores it) into **OPFS** (Origin Private File System, the browser's private
+  per-site disk). It verifies Ed25519 signatures and SHA-256 checksums against a key
+  built into the app and aborts on any mismatch, loads the `all-MiniLM-L6-v2` model, and
+  runs the whole pipeline in the tab. No application server is in the request path.
+- **edgereco runtime (Python)**: the same engine as a FastAPI app for the server-side
+  case. Same scoring formula, same sync and verify, same prebuilt index; the browser
+  engine is tested for parity against it.
+
+The Python side depends on [`edge-proc[localvec,bundles]`](../backend/pyproject.toml).
+The browser side depends on the standalone
+[`@edgeproc/browser`](https://github.com/hseshadr/edgeproc-browser) package for signed
+sync, integrity checks, Workers, OPFS and vector contracts, while this repo's
+[`@edgereco/browser`](../frontend/packages/edgereco-browser/) package owns only the
+recommendation-specific embedding, search, ranking and session logic.
+
+## Delivery and updates
+
+The whole engine ships as static files: the app code, plus the signed bundle holding the
+products, the prebuilt vector index, the ranking weights and the "also bought" map. The
+live demo serves all of it from Cloudflare Pages on its own origin; any static host
+works.
+
+Updates are a patch, not a re-download. Because every piece is named by the hash of its
+bytes, a client compares the new manifest with what it already has and fetches only the
+pieces that changed, reusing the rest (notably the large vector index). A retrain that
+only moves popularity scores and "also bought" links re-fetches a few small pieces. As
+[DEPLOY.md](DEPLOY.md) puts it: *"a one-line edit re-publishes one chunk; every consumer
+fetches one chunk and reuses the rest."*
+
+## Offline use and install
+
+Nimbus is a PWA (Progressive Web App: a site the browser can install like an app). After
+the first visit it works with no network. A service worker precaches the app shell on
+first load; the language model and its runtime stay in the browser's own caches. The
+signed catalog is already in OPFS, and the service worker deliberately never touches it,
+so its signature checks are unchanged.
+
+Product photos are copied into the build and served from the demo's own address
+(`/images/`), so browsing never tells an image CDN what you looked at. They are not
+precached, so offline a photo shows only if the browser still has it cached. Search,
+browsing and every recommendation row work without a connection.
+
+`pnpm -F frontend test:e2e:offline` warms the app online, cuts the network, reloads, and
+checks that the store still mounts and ranks. A second test serves the build with
+Cloudflare Pages' reserved files withheld, which catches a missing service worker that a
+plain local file server cannot see.
+
+## Security and trust model
+
+- **Checked:** the catalog's `latest` pointer, manifest and every chunk (Ed25519 signature
+  and SHA-256 hashes) against the public key built into the app
+  (`frontend/app/public/public.key`), never a key carried in the catalog. The ranking
+  "why?" panel separately checks a signed ranking proof against the same key. The 23 MB
+  model and its runtime are pinned by SHA-256 at build time.
+- **Refuses rather than warns:** a bad signature, a hash mismatch, a truncated chunk, or
+  an older release than one already seen (rollback) aborts the load and shows a sync
+  failure. Nothing falls back to unchecked data. A stuck returning shopper gets an
+  explicit **Clear cached catalog and retry** button; it never clears on its own.
+- **Not protected:** a compromised app origin (it could replace both the code and the
+  key), a compromised device or browser extension, or someone with access to the browser
+  profile (the catalog is public and the taste log is readable locally). The model files
+  are pinned but not covered by the catalog signature. A key revocation reaches a
+  returning shopper one page load late; see
+  [DEPLOY.md](DEPLOY.md#revocation-lag-the-service-worker-serves-the-trust-root-from-its-precache).
+- **Check a release:** [`edge-reco.com/build.json`](https://edge-reco.com/build.json)
+  names the exact deployed commit, version and catalog bundle. The Python example in
+  [USAGE.md](USAGE.md) syncs and verifies the committed catalog against
+  `backend/examples/keys/public.key`.
+
+Full threat model and data inventory: [SECURITY-PRIVACY.md](SECURITY-PRIVACY.md).
+
+## What the tests prove, and what they do not
+
+| Claim | Backed by |
+| --- | --- |
+| Zero backend calls after sync, and no third-party CDN at runtime | `pnpm -F frontend run test:e2e:offline` (including `cold-blocked.spec.ts`, which boots the store with every external CDN blocked) |
+| Works offline after one visit, including on the real host's rules | `test:e2e:offline` (`offline.spec.ts`, `pages-advanced-mode.spec.ts`) |
+| A tampered catalog is refused in a real browser | `test:e2e:c1` (`sync.spec.ts`) |
+| The browser engine returns the same results as the Python engine | parity fixtures under `frontend/packages/edgereco-browser/src/engine/__fixtures__/` and their tests |
+| Cold start, search speed and memory stay inside release budgets | `test:e2e:c1` prints them for your machine and enforces the budgets above |
+| The README screenshot is real | taken from the live edge-reco.com demo after searching "something for my aching back" |
+| The README keeps its plain-English shape | [`backend/tests/unit/test_readme_contract.py`](../backend/tests/unit/test_readme_contract.py) |
+
+They do not prove recommendation quality for your store or shoppers, behaviour on a
+particular low-memory phone (no physical-device measurements yet), or that a displayed
+result was computed from the signed ranking config.
+
+## Known limits in detail
+
+**Resource floor.** A first launch downloads a roughly 23 MB quantized language model and
+a roughly 23 MB ONNX/WASM runtime, then uses more memory while compiling and running
+them. The engine starts only after the shopper clicks Launch; simultaneous first
+searches share one model load, a failed boot releases both Workers, and the release test
+enforces cold-start, search and heap budgets. This is still a real cost on low-memory
+phones and laptops, and no minimum device is claimed until physical-device measurements
+exist.
+
+**Bundle-sync verification is not displayed.** Signature checking runs on every sync and
+a tampered file is refused. The implementation comes from the standalone
+[`@edgeproc/browser`](https://github.com/hseshadr/edgeproc-browser) dependency; EdgeReco
+keeps no private copy. What does not exist is a screen showing that sync outcome. The
+landing page's "verify (Ed25519 + SHA-256, fail-closed)" step is static copy, not a live
+result.
+
+**The ranking proof is narrower than result truth.** The "why?" panel has two parts.
+**How calculated (Assay)** shows the live formula for that result: every raw signal,
+weight, contribution and the final score. **Config provenance (Avow)** reports whether
+the publisher signature on a static `edgereco.ranking-proof/v1` payload verifies, whether
+its hash matches the complete `ranking_config.json`, and whether its probes (one fixed
+synthetic input per strategy, plus search) reproduce their signed outputs. That shows
+which config and formula shipped, not that a displayed result was computed from them. It
+never signs a shopper's personalized result and does not prove input truth, freshness,
+fairness or quality. The committed catalog carries the older receipt shape, which the
+browser labels **unavailable**, never verified; a v1 proof appears only after a catalog
+republish with the maintainer key.
+
+**The language model is not inside the signed catalog.** It ships as ordinary
+same-origin static files (`/models/` and `/ort/`), each pinned to its content hash, so a
+first visit fetches everything from the app's own address. Those files are not covered
+by the catalog signature. The catalog format could carry the model, signed and patched
+like the products; that is a possible next step.
+
+**No origin-to-device handoff.** Because the same engine runs on both sides, a deployment
+could serve recommendations from a server while the device downloads its copy in the
+background, then switch over. That handoff is not built. Today the browser boot blocks
+until ready, and the two shapes are separate deployment choices.
+
+**Not planned yet:** folding the model into the signed catalog, the automatic handoff,
+and an approximate index for large catalogs are ideas, not scheduled work.
+
+## When to use something else
+
+| Option | Where it is the better choice | What you give up |
+| --- | --- | --- |
+| A hosted search/recommendation service (pay per query) | Huge catalogs, merchandising dashboards, A/B testing, and a vendor who runs it | Cost that grows with traffic, and every keystroke crosses the network |
+| Your platform's built-in keyword search | Shoppers search by exact product names | Meaning: "aching back" returns a parking sign |
+| Your own search server (for example a vector database behind an API) | Millions of products, or data that must never ship to the browser | A server to run, scale and pay for on the busiest day |
+| EdgeReco | Thousands of products, cost that doesn't grow with traffic, and offline use | A one-time download on first visit, and the whole catalog is public |
+
+## CI and release pipeline
+
+`make gate` runs the backend `poe gate` and the frontend `pnpm gate`, the same commands
+CI runs through Dagger:
+
+```bash
+dagger check                      # full check: same graph locally and on GitHub
+dagger check backend-quality      # run one independently cached check
+dagger check -l                   # list the checks
+dagger call build --commit-sha "$(git rev-parse HEAD)" export --path /tmp/edge-reco-dist
+dagger call release-preflight --commit-sha "$(git rev-parse HEAD)" # pinned Wrangler, no creds
+```
+
+Dagger owns the repository's release graph. EdgeReco keeps its product build, audits,
+CodeQL, parity, browser journeys, signed bundle and model identity, and the live
+zero-egress proof. Exact-SHA modules in `hseshadr/ci` own the common repository checks,
+artifact envelope, exact-green evidence and Cloudflare Pages delivery. GitHub workflows
+only check out the source, select the protected `production` environment for
+deployment, and call the pinned Dagger engine. See
+[dagger-lego-adoption.md](dagger-lego-adoption.md). GitHub CodeQL Default Setup stays
+enabled until the Dagger SARIF check is green on hosted pull requests and can replace it
+without a coverage gap.
+
+## Repo layout
+
+- `.github/`: exact-head CI, security scans, and serialized Cloudflare deployment.
+- `backend/`: Python project root (`pyproject.toml`, `uv.lock`).
+  - `backend/src/edgereco/`: runtime: `catalog/` `embeddings/` `search/` `reco/` `edge/` `telemetry/` `api/` `cli.py` `config.py`
+  - `backend/features/`: Gherkin behaviour specs, decoupled from step implementations
+  - `backend/tests/`: `unit/` `bdd/` `integration/` `e2e/`
+  - `backend/deploy/`: `Dockerfile`, `docker-compose.yml`, Caddy edge config
+  - `backend/examples/catalog/`: committed signed 720-product bundle (`latest` + `manifest/` + `chunk/`)
+  - `backend/examples/source/catalog.csv`: committed, reproducible build source (12 balanced categories)
+  - `backend/examples/keys/public.key`: pinned Ed25519 verify key for the bundle
+  - `backend/demo_server/`: optional FastAPI launcher (not in the main checks); ships the synthetic fixture
+  - `backend/scripts/`: `curate_demo_catalog.py` and browser parity-fixture generators
+- `frontend/`: pnpm workspace root (`package.json`, `pnpm-workspace.yaml`, `pnpm-lock.yaml`).
+  - `frontend/app/`: Nimbus React storefront (syncs and runs the engine in the browser)
+  - `frontend/packages/edgereco-browser/`: `@edgereco/browser`, EdgeReco-specific embedding, hybrid search, ranking and session logic
+- `docs/`: this file, `GETTING_STARTED.md`, `USAGE.md`, `QUICKSTART.md`, `DEPLOY.md`, `SECURITY-PRIVACY.md`
+
 ## Further reading
 
+- [`GETTING_STARTED.md`](GETTING_STARTED.md) — developer setup, the full check, a first change.
+- [`USAGE.md`](USAGE.md) — the Python library, CLI, learning loop and configuration.
 - [`QUICKSTART.md`](QUICKSTART.md) — clone → run.
 - [`DEPLOY.md`](DEPLOY.md) — backend-free in-browser vs edge-origin shapes.
 - [`SECURITY-PRIVACY.md`](SECURITY-PRIVACY.md) — threat boundaries, data flow,
