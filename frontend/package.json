@@ -15,7 +15,7 @@
 		"gate:e2e": "pnpm -F frontend run test:e2e && pnpm -F frontend run test:e2e:c1 && pnpm -F frontend run test:e2e:offline"
 	},
 	"devDependencies": {
-		"jsdom": "^30.1.0",
-		"wrangler": "4.135.0"
+		"jsdom": "^30.1.1",
+		"wrangler": "4.139.0"
 	}
 }
