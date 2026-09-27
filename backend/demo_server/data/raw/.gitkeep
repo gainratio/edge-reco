@@ -1,2 +1,2 @@
-# Drop the raw Kaggle Amazon product dataset here (CSV/JSON). Git-ignored.
+# Drop a raw product CSV here (CSV/JSON). Git-ignored.
 # Then build_catalog.py maps it into ../catalog/products.jsonl.

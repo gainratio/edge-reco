@@ -29,7 +29,7 @@ describe("Landing", () => {
 			"first visit to first results",
 			"JS heap (Chromium)",
 			"inference / 1k recs",
-			"real products, in-tab",
+			"demo products, in-tab",
 		];
 		for (const label of labels) {
 			expect(screen.getByText(label)).toBeInTheDocument();

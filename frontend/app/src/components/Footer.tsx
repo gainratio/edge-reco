@@ -1,11 +1,12 @@
 import { useTranslation } from "react-i18next";
+import attribution from "../catalog-attribution.json";
 
 /**
  * Small, always-visible site footer. Anchors the site's internal links: it states
  * plainly that EdgeReco is open source and runs on-device, points at the GitHub
  * repos and the entity pages (/edgeproc, /faq) so both shoppers and crawlers can
  * follow the link graph, and keeps the honest disclaimers (Nimbus is a fictional
- * demo store; the catalog data is attributed).
+ * demo store; the catalog is synthetic, and says so from catalog-attribution.json).
  *
  * It also carries the only outbound edges this site has: aml-filter.com and
  * almamesh.com are separate domains by the same maintainer, and until these links
@@ -55,7 +56,7 @@ export function Footer() {
 				{t("footer.demoAfter")}
 			</p>
 			<p className="nimbus-footer__line nimbus-footer__line--muted">
-				{t("footer.attribution")}
+				{t("footer.attribution", { statement: attribution.statement })}
 			</p>
 			<p className="nimbus-footer__line nimbus-footer__line--muted nimbus-footer__line--lead">
 				{t("footer.moreLead")}

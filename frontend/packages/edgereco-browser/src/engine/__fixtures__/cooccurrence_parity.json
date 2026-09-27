@@ -1,57 +1,45 @@
 {
 	"description": "Phase-3 co-occurrence recommendation parity fixture: for each co-occurrence strategy around a fixed seed, the ordered top-k (id, score) edge-reco Python recommend() returns over the real examples/catalog bundle + its signed cooccurrence.json. Regenerate with scripts/gen_cooccurrence_fixture.py.",
 	"limit": 10,
-	"seed_product": "B07N8R6YFV",
+	"seed_product": "NB-00593",
 	"cases": [
 		{
 			"strategy": "also_bought",
-			"seed": "B07N8R6YFV",
+			"seed": "NB-00593",
 			"expected": [
 				{
-					"id": "B0C6VXXLQJ",
-					"score": 0.578635487891887
+					"id": "NB-00592",
+					"score": 0.5715538618751245
 				},
 				{
-					"id": "B0C1VXVBQ6",
-					"score": 0.4328892467132588
+					"id": "NB-00595",
+					"score": 0.479523046554686
 				},
 				{
-					"id": "B0CD3496HP",
-					"score": 0.41469183215443894
+					"id": "NB-00591",
+					"score": 0.31850497953359447
 				},
 				{
-					"id": "B0C7HS3LXM",
-					"score": 0.3754666312610973
-				},
-				{
-					"id": "B0BTHDTV5Z",
-					"score": 0.18083854592808113
-				},
-				{
-					"id": "B0CDPQQDR8",
-					"score": 0.17132812340491943
-				},
-				{
-					"id": "B0BYNS9LGW",
-					"score": 0.13014365380386655
+					"id": "NB-00594",
+					"score": 0.11470026370846136
 				}
 			]
 		},
 		{
 			"strategy": "frequently_bought_together",
-			"seed": "B07N8R6YFV",
+			"seed": "NB-00593",
 			"expected": [
 				{
-					"id": "B0C6VXXLQJ",
-					"score": 0.6058830003229774
+					"id": "NB-00592",
+					"score": 0.6054674274621297
 				},
 				{
-					"id": "B0C1VXVBQ6",
-					"score": 0.4419251994344323
+					"id": "NB-00595",
+					"score": 0.5096089073507442
 				},
 				{
-					"id": "B0CD3496HP",
-					"score": 0.434589659568888
+					"id": "NB-00591",
+					"score": 0.289284765840118
 				}
 			]
 		}

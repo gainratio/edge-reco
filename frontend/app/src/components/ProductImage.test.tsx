@@ -10,7 +10,7 @@ const product: Product = {
 	category: "Sports",
 	subcategories: [],
 	tags: [],
-	brand: "Timberland",
+	brand: "Juniperline",
 	price: 100,
 	currency: "USD",
 	popularity_score: 0.8,

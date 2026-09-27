@@ -30,7 +30,7 @@ const CONFIRM = "Yes, clear and retry";
 const EMBEDDING_DIM = 384;
 
 /** The committed bundle's live pointer sequence (backend/examples/catalog/latest). */
-const LIVE_SEQUENCE = 5;
+const LIVE_SEQUENCE = 12;
 
 /** The library's IndexedDB rollback floor (resolveIndexedDbLayout() default). */
 const FLOOR_DB = "edgeproc-browser-cache";

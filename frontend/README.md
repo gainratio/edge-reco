@@ -86,7 +86,7 @@ The dev SPA reads `VITE_BUNDLE_BASE_URL` (default `http://localhost:8081`, the e
 ## Demo flow (the realistic one)
 
 1. **Open the store** at http://localhost:5174. After the boot screen, the grid shows the
-   720-product Amazon catalog; the "Recommended for you" rail starts cold (no signals yet).
+   720-product synthetic catalog; the "Recommended for you" rail starts cold (no signals yet).
 2. **Search** for something — e.g. `wireless headphones`. The query is embedded **in your
    tab**; the grid swaps to fused BM25 + vector results.
 3. **Click 2–3 products in one category** (say, audio gear). Each click folds into the in-tab

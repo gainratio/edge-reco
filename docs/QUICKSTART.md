@@ -105,7 +105,7 @@ page — click **Launch the live demo** to watch the boot screen step through:
 2. *Reassembling the index* — into OPFS.
 3. *Loading the model* — transformers.js fetches `Xenova/all-MiniLM-L6-v2`.
 
-Then the 720-product Amazon storefront (12 categories, 60 products each). Click a few products in one category: the "Recommended for you" rail visibly re-ranks toward that category, **no network round trip per click**. The home page also stacks *Trending* and *New arrivals* rails; click into any product to open its product page (a `#/p/<id>` history entry — browser Back stays in the app) with *Similar items*, *Because you viewed*, *Customers also bought*, and *Frequently bought together* — all seven rails are named strategies carried in the signed bundle (`ranking_config.json` + `cooccurrence.json`), computed in-tab. Your taste survives a reload too: interactions land in a small on-device log (OPFS, product ids only, newest 500) that replays through the same fold at boot — press **Reset taste** next to the For-You badge to clear it. Stop `origin` + `edge` and reload: the bundle is in OPFS and the model is cached, so it keeps working offline — personalization included.
+Then the 720-product synthetic storefront (12 categories, 60 products each; every brand and product is invented). Click a few products in one category: the "Recommended for you" rail visibly re-ranks toward that category, **no network round trip per click**. The home page also stacks *Trending* and *New arrivals* rails; click into any product to open its product page (a `#/p/<id>` history entry — browser Back stays in the app) with *Similar items*, *Because you viewed*, *Customers also bought*, and *Frequently bought together* — all seven rails are named strategies carried in the signed bundle (`ranking_config.json` + `cooccurrence.json`), computed in-tab. Your taste survives a reload too: interactions land in a small on-device log (OPFS, product ids only, newest 500) that replays through the same fold at boot — press **Reset taste** next to the For-You badge to clear it. Stop `origin` + `edge` and reload: the bundle is in OPFS and the model is cached, so it keeps working offline — personalization included.
 
 ## 4. Iterate on the SPA locally
 
@@ -127,7 +127,7 @@ a small, committed, reproducible source (no external download needed):
 ```bash
 cd backend
 
-# Scraped Amazon CSV → products.jsonl  (the committed demo source; or your own CSV)
+# Catalog CSV → products.jsonl  (the committed synthetic demo source; or your own CSV)
 uv run edgereco build-catalog examples/source/catalog.csv /tmp/cache/products.jsonl
 
 # Build the FAISS index (reads /tmp/cache/products.jsonl, writes /tmp/staging/).
@@ -150,12 +150,14 @@ Because the browser verifies fail-closed against a **pinned** key, publishing yo
 origin also means pinning your `public.key` in the SPA (`frontend/app/public/public.key`;
 the API-server path reads `EDGERECO_VERIFY_KEY_PATH`).
 
-To regenerate `examples/source/catalog.csv` itself — a balanced 12-category subset of
-a real Amazon dataset — run the streaming curation script (memory-bounded; never
-loads the source's embeddings column):
+To regenerate `examples/source/catalog.csv` itself, run the synthetic catalog
+generator. It is deterministic (same seed, same bytes) and uses only the committed
+vocabulary in `src/edgereco/catalog/synthetic_vocab.json`, with no downloads:
 
 ```bash
-uv run python scripts/curate_demo_catalog.py --source /path/to/amazon_products.parquet
+uv run python scripts/generate_catalog.py
+uv run python scripts/gen_demo_sessions.py
+uv run python scripts/rebuild_example_bundle.py --from-source   # needs examples/keys/private.key
 ```
 
 ## 6. Run as an API server (optional)

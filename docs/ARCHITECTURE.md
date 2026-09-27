@@ -290,7 +290,7 @@ requires the exact-SHA and canonical-host checks in `.github/workflows/deploy.ym
 
 ```mermaid
 flowchart TB
-  build["Your cloud<br>build + sign the catalog<br>720 products → one 1.5 MB file"]
+  build["Your cloud<br>build + sign the catalog<br>720 products → one 1.8 MB file"]
   sync["Download once, then check it<br>Ed25519 + SHA-256<br>any mismatch aborts the load"]
   engine["Search + rank in the tab<br>keywords + meaning → fuse → personalize"]
   recs["Results and recommendations<br>0 backend calls · works offline"]
@@ -317,7 +317,7 @@ publish a new catalog, never to answer a search.
   the hash of its own bytes, so it can be cached forever and cannot be changed without
   detection. It is a `latest` version pointer plus immutable `manifest/<hash>` and
   `chunk/<hash>` objects. A committed 720-product bundle lives in
-  `backend/examples/catalog/` (1.5 MB on disk).
+  `backend/examples/catalog/` (1.8 MB on disk).
 - **edge** is a Caddy reverse proxy (a small static web server standing in for a CDN)
   with the cache policy: immutable chunks cached forever, a short-lived pointer.
 - **browser tier**: the Nimbus single-page app syncs the bundle (fetches it, checks its
@@ -401,7 +401,7 @@ Full threat model and data inventory: [SECURITY-PRIVACY.md](SECURITY-PRIVACY.md)
 | A tampered catalog is refused in a real browser | `test:e2e:c1` (`sync.spec.ts`) |
 | The browser engine returns the same results as the Python engine | parity fixtures under `frontend/packages/edgereco-browser/src/engine/__fixtures__/` and their tests |
 | Cold start, search speed and memory stay inside release budgets | `test:e2e:c1` prints them for your machine and enforces the budgets above |
-| The README screenshot is real | taken from the live edge-reco.com demo after searching "something for my aching back" |
+| The README screenshot is real | taken from a production build (`build:pages` + `vite preview`) of the synthetic catalog after searching "something for my aching back"; refresh it from edge-reco.com once this catalog is deployed |
 | The README keeps its plain-English shape | [`backend/tests/unit/test_readme_contract.py`](../backend/tests/unit/test_readme_contract.py) |
 
 They do not prove recommendation quality for your store or shoppers, behaviour on a
@@ -456,7 +456,7 @@ and an approximate index for large catalogs are ideas, not scheduled work.
 | Option | Where it is the better choice | What you give up |
 | --- | --- | --- |
 | A hosted search/recommendation service (pay per query) | Huge catalogs, merchandising dashboards, A/B testing, and a vendor who runs it | Cost that grows with traffic, and every keystroke crosses the network |
-| Your platform's built-in keyword search | Shoppers search by exact product names | Meaning: "aching back" returns a parking sign |
+| Your platform's built-in keyword search | Shoppers search by exact product names | Meaning: "aching back" only finds titles that contain "back" |
 | Your own search server (for example a vector database behind an API) | Millions of products, or data that must never ship to the browser | A server to run, scale and pay for on the busiest day |
 | EdgeReco | Thousands of products, cost that doesn't grow with traffic, and offline use | A one-time download on first visit, and the whole catalog is public |
 

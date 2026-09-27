@@ -38,14 +38,14 @@ pnpm -F frontend exec vite preview
 ```
 
 Open http://localhost:4173, click **Launch the live demo**, and search for
-`something for my aching back`. Success looks like this, from a headless Chromium run
-against that preview:
+`something for my aching back`. Success looks like this, from a Chromium run against that preview
+(synthetic catalog, 26 Sep 2026):
 
 ```text
-1. Massage Gun Deep Tissue - Back Muscle Massager w/High Torque Motor for Back Pain, ...
-2. Sheenive Stadium Seats for Bleachers with Back Support, ...
-3. EINSKEY Sun Hat for Men/Women, Waterproof Wide Brim Bucket Hat ...
-strip: 46 ms latency · 0 backend calls · 3.8 s cold start · 17.4 MB js heap · 720 catalog
+1. Vitalune Neck and Back Massager | 4 Heads | 20 Speeds | Quiet Motor
+2. Kestrow Stadium Seat with Back Support | Extra Wide | Armrests | Red
+3. Vitalune Neck and Back Massager | 6 Heads | 20 Speeds | Carry Case
+strip: 41 ms latency · 0 backend calls · 2.5 s cold start · 15.8 MB js heap · 720 catalog
 console errors: 0
 ```
 

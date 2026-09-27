@@ -190,6 +190,7 @@ module = [
   "edgereco.api.routes.events",
   "edgereco.catalog.models",
   "edgereco.catalog.publish",
+  "edgereco.catalog.synthetic",
   "edgereco.config",
   "edgereco.reco.audit",
   "edgereco.reco.cooccurrence",

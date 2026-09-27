@@ -36,6 +36,13 @@ Run from backend/ (regenerate the demo sessions first if they changed)::
     .venv/bin/python3 scripts/gen_demo_sessions.py
     .venv/bin/python3 scripts/rebuild_example_bundle.py
 
+After the CATALOG changed (``scripts/generate_catalog.py``), pass ``--from-source`` so
+products.jsonl and the FAISS ``vector/`` are rebuilt from ``examples/source/catalog.csv``
+through ``edgereco build-catalog`` + ``edgereco index`` (needs the embedding model:
+``EDGEPROC_ALLOW_MODEL_DOWNLOAD=1`` or ``EDGEPROC_MODEL_PATH``)::
+
+    .venv/bin/python3 scripts/rebuild_example_bundle.py --from-source
+
 Then mirror the result into the browser parity fixture (the browser syncs this copy)::
 
     rm -rf ../frontend/packages/edgereco-browser/src/engine/__fixtures__/bundle/catalog
@@ -62,6 +69,7 @@ import zstandard as zstd
 from edgereco.catalog.image_download import ProductPhoto, fetch_product_photo
 from edgereco.catalog.product_image import ImageMode
 from edgereco.catalog.publish import publish_bundle
+from edgereco.cli import build_catalog, index
 from edgereco.reco.cooccurrence import (
     CooccurrenceMatrix,
     SessionLog,
@@ -118,8 +126,13 @@ def _parse_image_list(raw: str) -> list[str]:
 
 
 def _download_photos(product_ids: list[str]) -> dict[str, ProductPhoto]:
-    """Localize every product's real photo. Failures are skipped, never fatal."""
+    """Localize every product's real photo. Failures are skipped, never fatal.
+
+    A product with no source photo (the synthetic catalog has none) makes no request;
+    it simply gets its generated card.
+    """
     urls = _source_image_urls()
+    product_ids = [pid for pid in product_ids if urls.get(pid)]
     with (
         httpx.Client(timeout=httpx.Timeout(20.0), follow_redirects=True) as client,
         ThreadPoolExecutor(max_workers=FETCH_WORKERS) as pool,
@@ -160,12 +173,31 @@ def _materialize(path: str) -> bytes:
     return blob
 
 
-def _stage(staging: Path) -> int:
-    """Materialize vector verbatim; render local images + rewrite products; return count."""
+def _build_from_source(workdir: Path) -> None:
+    """Run the real pipeline on the source csv: ``build-catalog`` then ``index``.
+
+    Used when the catalog itself changed (``--from-source``): products.jsonl and the
+    FAISS ``vector/`` are rebuilt from ``examples/source/catalog.csv`` instead of being
+    carried over from the currently published bundle.
+    """
+    cache, built = workdir / "cache", workdir / "built"
+    build_catalog(SOURCE_CSV, cache / "products.jsonl")
+    index(cache, built)
+
+
+def _stage(staging: Path, *, from_source: bool) -> int:
+    """Stage products, vector, images, ranking config and co-occurrence; return count."""
     (staging / "vector").mkdir(parents=True, exist_ok=True)
-    count = _stage_products_and_images(staging, _materialize("products.jsonl"))
+    read = _materialize
+    if from_source:
+        workdir = staging.parent / "_source_build"
+        shutil.rmtree(workdir, ignore_errors=True)
+        _build_from_source(workdir)
+        read = lambda path: (workdir / "built" / path).read_bytes()  # noqa: E731
+    count = _stage_products_and_images(staging, read("products.jsonl"))
     for name in ("embeddings.f32", "index.faiss", "state.json"):
-        (staging / "vector" / name).write_bytes(_materialize(f"vector/{name}"))
+        (staging / "vector" / name).write_bytes(read(f"vector/{name}"))
+    shutil.rmtree(staging.parent / "_source_build", ignore_errors=True)
     # Drop in the CURRENT default ranking config (carries the Phase-2/3 strategy map).
     (staging / "ranking_config.json").write_text(
         DEFAULT_RANKING_CONFIG.model_dump_json(), encoding="utf-8"
@@ -268,7 +300,7 @@ def main() -> None:
     if staging.exists():
         shutil.rmtree(staging)
     sequence = _next_sequence()
-    count = _stage(staging)
+    count = _stage(staging, from_source="--from-source" in sys.argv[1:])
     for sub in ("manifest", "chunk"):
         shutil.rmtree(CATALOG / sub, ignore_errors=True)
     (CATALOG / "latest").unlink(missing_ok=True)

@@ -45,7 +45,7 @@ export const CATALOG_CATEGORIES = 12;
  * On-disk size of the committed signed bundle (backend/examples/catalog).
  * Guarded against the bundle's real byte count in landing-figures.test.ts.
  */
-export const BUNDLE_SIZE = "1.5 MB";
+export const BUNDLE_SIZE = "1.8 MB";
 
 export interface RepresentativeMetric {
 	/** Stable key into the `landing` namespace: `metrics.<id>.{label,sub}`. */

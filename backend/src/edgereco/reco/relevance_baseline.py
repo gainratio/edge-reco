@@ -54,7 +54,8 @@ RELEVANCE_EXPORT: Final[Path] = (
 class ExportedQuery(BaseModel):
     """One golden query as the engine answered it.
 
-    ``relevant_ids`` is ground truth cut from the product's Amazon breadcrumb path,
+    ``relevant_ids`` is ground truth cut from the product's breadcrumb path (assigned by the catalog
+    generator),
     upstream of BM25, the embeddings and the reranker. ``ranked_ids`` is the engine's
     output in rank order — positions, not scores.
     """

@@ -44,7 +44,7 @@ FIXTURE = (
 )
 DIM = 384
 LIMIT = 10
-SEED_PRODUCT = "B07N8R6YFV"  # a stable seed with several co-occurrence neighbours
+SEED_PRODUCT = "NB-00593"  # a stable seed with several co-occurrence neighbours
 STRATEGIES = ("also_bought", "frequently_bought_together")
 
 

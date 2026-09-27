@@ -143,12 +143,12 @@ describe.skipIf(SKIP)(
 		);
 
 		it(
-			"keeps the exact hiking boot above personalized apparel in the browser model",
+			"keeps a hiking boot above personalized apparel in the browser model",
 			async () => {
 				const engine = await browserModelEngine();
 				const shirt = engine
 					.catalog()
-					.find((product) => product.id === "B0BZDLXKTS");
+					.find((product) => product.id === "NB-00062");
 				expect(shirt).toBeDefined();
 				const profile = buildProfile(
 					Array.from(
@@ -156,7 +156,7 @@ describe.skipIf(SKIP)(
 						(_, index) =>
 							({
 								event_type: "favorite",
-								product_id: "B0BZDLXKTS",
+								product_id: "NB-00062",
 								timestamp: `2026-07-15T00:00:${String(index).padStart(2, "0")}Z`,
 							}) as const,
 					),
@@ -165,7 +165,12 @@ describe.skipIf(SKIP)(
 
 				for (const query of ["waterproof hiking boot", "hiking boots"]) {
 					const response = await engine.search(query, { limit: 10, profile });
-					expect(response.results[0]?.product.id).toBe("B0C62MD9JY");
+					// The synthetic catalog stocks seven hiking boots, several of them
+					// waterproof, so the pin is the shelf, not one id: a personalized
+					// apparel profile must not push a T-shirt above the boots.
+					expect(response.results[0]?.product.subcategories).toContain(
+						"Hiking Boots",
+					);
 				}
 			},
 			TIMEOUT_MS,

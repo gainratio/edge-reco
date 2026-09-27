@@ -11,7 +11,7 @@
 		"launch": "▶ Launch the live demo",
 		"source": "View source on GitHub"
 	},
-	"demoNote": "What you're about to open is Nimbus — our example storefront, built on {{products}} real products to show the engine running in a real shop.",
+	"demoNote": "What you're about to open is Nimbus — our example storefront, stocked with {{products}} made-up products to show the engine running in a real shop.",
 	"band": {
 		"ariaLabel": "Performance",
 		"titleLead": "Why it's",
@@ -41,7 +41,7 @@
 			"sub": "illustrative · only CDN bandwidth"
 		},
 		"catalog": {
-			"label": "real products, in-tab",
+			"label": "demo products, in-tab",
 			"sub": "{{categories}} categories · {{bundle}} bundle"
 		}
 	},

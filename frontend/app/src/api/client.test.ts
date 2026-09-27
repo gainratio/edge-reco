@@ -131,12 +131,16 @@ describe("backend-free data layer", () => {
 		expect(info.count).toBe((await browse({ limit: 10_000 })).total);
 	});
 
-	it("marks the committed legacy ranking receipt unavailable, never verified", () => {
+	// The committed bundle used to carry a legacy receipt ("legacy", unverifiable).
+	// Rebuilding it for the synthetic catalog wrote a current edgereco.ranking-proof/v1
+	// receipt. This harness supplies no trusted key, so the honest answer is still
+	// "unavailable" — now because the key is missing, and never "verified" without one.
+	it("never reports the committed ranking receipt verified without a trusted key", () => {
 		expect(rankingProofEvidence()).toEqual({
 			status: "unavailable",
 			publisherSignature: "not_checked",
 			configHash: "not_checked",
-			reason: "legacy",
+			reason: "key_unavailable",
 		});
 	});
 
