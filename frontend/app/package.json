@@ -6,7 +6,7 @@
 	"type": "module",
 	"scripts": {
 		"dev": "vite",
-		"prebuild": "node scripts/download-model.mjs && node scripts/stage-ort-wasm.mjs",
+		"prebuild": "node scripts/check-product-images.mjs && node scripts/download-model.mjs && node scripts/stage-ort-wasm.mjs",
 		"build": "tsc -b && vite build",
 		"build:pages": "node scripts/build-pages.mjs",
 		"lint": "biome check .",

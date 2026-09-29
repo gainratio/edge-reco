@@ -3,9 +3,10 @@
 The Nimbus demo ships product images INSIDE the signed, offline catalog bundle.
 Remote CDN images (the raw Amazon URLs) would leak every visitor's IP on page
 load and break the "one signed file, then zero backend calls" promise, so each
-product is rendered here as a small, tasteful SVG card derived purely from the
-product's own fields. Same catalog in -> byte-identical SVGs out (no timestamps,
-no randomness), so the bundle hash stays stable.
+product is rendered here as a small SVG card: the Lucide icon for its shelf
+(``product_icons``) on a pastel backdrop coloured from its id, with the brand in
+small type. Same catalog in -> byte-identical SVGs out (no timestamps, no
+randomness), so the bundle hash stays stable.
 
 Seam: ``generate_product_image`` is the single, swappable renderer, and
 ``localize_catalog`` is the single place a catalog's images become local. A
@@ -15,6 +16,7 @@ exact signature without touching the publish or serve paths.
 
 from __future__ import annotations
 
+import colorsys
 import hashlib
 import json
 import re
@@ -23,6 +25,7 @@ from enum import StrEnum
 from xml.sax.saxutils import escape, quoteattr
 
 from .models import Product
+from .product_icons import icon_body, icon_for
 
 
 class ImageMode(StrEnum):
@@ -44,21 +47,11 @@ class ImageMode(StrEnum):
 
 _SAFE_ID = re.compile(r"^[A-Za-z0-9._-]+$")
 _FONT = "system-ui,-apple-system,'Segoe UI',Roboto,Helvetica,Arial,sans-serif"
-
-#: Tasteful two-stop gradients, chosen deterministically per category. Muted,
-#: high-contrast-with-white palette so the card reads as intentional editorial art.
-_PALETTE: tuple[tuple[str, str], ...] = (
-    ("#4f46e5", "#7c3aed"),
-    ("#0ea5e9", "#2563eb"),
-    ("#059669", "#0d9488"),
-    ("#d97706", "#dc2626"),
-    ("#db2777", "#9d174d"),
-    ("#0891b2", "#0e7490"),
-    ("#7c3aed", "#c026d3"),
-    ("#ea580c", "#b45309"),
-    ("#16a34a", "#65a30d"),
-    ("#e11d48", "#be123c"),
-)
+#: Lucide draws on a 24x24 grid; 7x makes a 168 px icon on the 600 px card.
+_ICON_SCALE = 7
+#: Centre of the icon. The storefront grid crops the square card to a ~2:1 strip
+#: (``object-fit: cover``), so everything that matters sits in the middle band.
+_ICON_CY = 278
 
 
 def _require_safe_id(product_id: str) -> str:
@@ -142,66 +135,35 @@ def _localize_records(raw: str, staged: Mapping[str, str]) -> tuple[str, dict[st
     return "".join(f"{line}\n" for line in lines), cards
 
 
-def _gradient(category: str) -> tuple[str, str]:
-    digest = hashlib.sha256(category.strip().lower().encode("utf-8")).digest()
-    return _PALETTE[digest[0] % len(_PALETTE)]
+def _hex(hue: float, lightness: float, saturation: float) -> str:
+    red, green, blue = colorsys.hls_to_rgb(hue % 1.0, lightness, saturation)
+    return f"#{round(red * 255):02x}{round(green * 255):02x}{round(blue * 255):02x}"
 
 
-def _monogram_source(product: Product) -> str:
-    return (product.brand or product.category or product.title).strip()
+def _hue(product_id: str) -> float:
+    """A stable hue per product, so neighbours on one shelf still look different."""
+    digest = hashlib.sha256(product_id.encode("utf-8")).digest()
+    return int.from_bytes(digest[:2], "big") / 65536
 
 
-def _monogram(product: Product) -> str:
-    words = _monogram_source(product).split()[:2]
-    initials = "".join(word[0] for word in words if word)
-    return escape(initials.upper() or "•")
-
-
-def _price_text(product: Product) -> str:
-    if product.price is None:
-        return ""
-    symbol = "$" if product.currency == "USD" else f"{escape(product.currency)} "
-    return f"{symbol}{product.price:.2f}"
-
-
-def _wrap(text: str, *, width: int = 22, max_lines: int = 3) -> list[str]:
-    lines: list[str] = []
-    for word in text.split():
-        if lines and len(lines[-1]) + 1 + len(word) <= width:
-            lines[-1] = f"{lines[-1]} {word}"
-        else:
-            lines.append(word)
-    return _clamp(lines, max_lines)
-
-
-def _clamp(lines: list[str], max_lines: int) -> list[str]:
-    if len(lines) <= max_lines:
-        return lines
-    kept = lines[:max_lines]
-    kept[-1] = f"{kept[-1][:20].rstrip()}…"
-    return kept
-
-
-def _title_tspans(title: str) -> str:
-    lines = _wrap(title) or ["Product"]
-    return "".join(
-        f'<tspan x="60" dy="{0 if i == 0 else 46}">{escape(line)}</tspan>'
-        for i, line in enumerate(lines)
-    )
+def _colors(product_id: str) -> tuple[str, str, str]:
+    """(light stop, deeper stop, ink): a pastel backdrop and a dark tone for the icon."""
+    hue = _hue(product_id)
+    return _hex(hue, 0.95, 0.7), _hex(hue + 0.06, 0.86, 0.55), _hex(hue, 0.3, 0.55)
 
 
 def generate_product_image(product: Product) -> str:
-    """Render one product as a deterministic, self-contained SVG card."""
-    start, end = _gradient(product.category)
-    grad_id = f"g{hashlib.sha256(product.category.strip().lower().encode()).hexdigest()[:8]}"
+    """Render one product as a deterministic, self-contained SVG card.
+
+    A pastel backdrop (colour from the product id), the Lucide icon for the
+    product's shelf (``product_icons``), and the brand in small type underneath.
+    """
+    light, deep, ink = _colors(product.id)
     body = "".join(
         (
-            _defs(grad_id, start, end),
-            f'<rect width="600" height="600" fill="url(#{grad_id})"/>',
-            _monogram_badge(product),
-            _category_label(product),
-            _title_block(product),
-            _footer(product),
+            _backdrop(light, deep),
+            _icon(icon_for(product).name, ink),
+            _brand(product.brand, ink),
         )
     )
     return (
@@ -211,51 +173,29 @@ def generate_product_image(product: Product) -> str:
     )
 
 
-def _defs(grad_id: str, start: str, end: str) -> str:
+def _backdrop(light: str, deep: str) -> str:
     return (
-        f'<defs><linearGradient id="{grad_id}" x1="0" y1="0" x2="1" y2="1">'
-        f'<stop offset="0" stop-color="{start}"/>'
-        f'<stop offset="1" stop-color="{end}"/></linearGradient></defs>'
+        '<defs><linearGradient id="bg" x1="0" y1="0" x2="1" y2="1">'
+        f'<stop offset="0" stop-color="{light}"/><stop offset="1" stop-color="{deep}"/>'
+        '</linearGradient></defs><rect width="600" height="600" fill="url(#bg)"/>'
+        f'<circle cx="300" cy="{_ICON_CY}" r="118" fill="#fff" fill-opacity="0.55"/>'
     )
 
 
-def _monogram_badge(product: Product) -> str:
+def _icon(name: str, ink: str) -> str:
     return (
-        '<circle cx="300" cy="212" r="96" fill="#ffffff" fill-opacity="0.16"/>'
-        f'<text x="300" y="212" font-family="{_FONT}" font-size="96" '
-        'font-weight="700" fill="#ffffff" text-anchor="middle" '
-        f'dominant-baseline="central">{_monogram(product)}</text>'
+        f'<g data-icon="{escape(name)}" '
+        f'transform="translate(300 {_ICON_CY}) scale({_ICON_SCALE}) translate(-12 -12)" '
+        f'fill="none" stroke="{ink}" stroke-width="1.5" '
+        f'stroke-linecap="round" stroke-linejoin="round">{icon_body(name)}</g>'
     )
 
 
-def _category_label(product: Product) -> str:
+def _brand(brand: str, ink: str) -> str:
+    if not brand.strip():
+        return ""
     return (
-        f'<text x="300" y="70" font-family="{_FONT}" font-size="24" '
-        'letter-spacing="3" fill="#ffffff" fill-opacity="0.85" '
-        f'text-anchor="middle">{escape(product.category.upper())}</text>'
+        f'<text x="300" y="432" font-family="{_FONT}" font-size="24" '
+        f'letter-spacing="4" fill="{ink}" fill-opacity="0.75" '
+        f'text-anchor="middle">{escape(brand.strip().upper())}</text>'
     )
-
-
-def _title_block(product: Product) -> str:
-    return (
-        f'<text x="60" y="392" font-family="{_FONT}" font-size="38" '
-        f'font-weight="600" fill="#ffffff">{_title_tspans(product.title)}</text>'
-    )
-
-
-def _footer(product: Product) -> str:
-    brand = (
-        f'<text x="60" y="548" font-family="{_FONT}" font-size="26" '
-        f'fill="#ffffff" fill-opacity="0.9">{escape(product.brand)}</text>'
-        if product.brand
-        else ""
-    )
-    price = _price_text(product)
-    price_el = (
-        f'<text x="540" y="548" font-family="{_FONT}" font-size="34" '
-        f'font-weight="700" fill="#ffffff" text-anchor="end">{price}</text>'
-        if price
-        else ""
-    )
-    rule = '<line x1="60" y1="500" x2="540" y2="500" stroke="#ffffff" stroke-opacity="0.35"/>'
-    return f"{rule}{brand}{price_el}"

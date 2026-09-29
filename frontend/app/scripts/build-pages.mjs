@@ -27,6 +27,7 @@ import {
 import { dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 
+import { findProductImageProblems } from "./check-product-images.mjs";
 import { imgSrcForMode, REMOTE_IMAGE_HOSTS } from "./imageCsp.mjs";
 
 const APP_DIR = dirname(dirname(fileURLToPath(import.meta.url)));
@@ -80,6 +81,26 @@ function applyImageModeCsp(env) {
 	writeFileSync(headersPath, after, "utf8");
 	process.stdout.write(
 		`>> image mode: ${mode} (img-src ${after === before ? "unchanged" : "widened"})\n`,
+	);
+}
+
+/**
+ * The same guard `prebuild` runs on public/images, re-run on what actually ships:
+ * dist/images, against the bundle just copied. REMOTE mode serves no local cards.
+ */
+function requireShippedProductImages(env) {
+	if ((env.EDGERECO_IMAGE_MODE ?? "local") !== "local") {
+		return;
+	}
+	const { productCount, problems } = findProductImageProblems({
+		catalogDir: DIST_BUNDLE_DIR,
+		imagesDir: join(DIST_DIR, "images"),
+	});
+	if (problems.length > 0) {
+		die(`dist is missing product images:\n   ${problems.join("\n   ")}`);
+	}
+	process.stdout.write(
+		`>> dist product images: ${productCount}/${productCount}\n`,
 	);
 }
 
@@ -144,6 +165,7 @@ function main() {
 	if (!existsSync(join(DIST_BUNDLE_DIR, "latest"))) {
 		die("bundle copy failed — dist/bundle/latest missing.");
 	}
+	requireShippedProductImages(env);
 	writeBuildIdentity(env);
 	applyImageModeCsp(env);
 	process.stdout.write(
