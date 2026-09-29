@@ -12,6 +12,7 @@ import {
 	loadVectorIndex,
 	VectorIndexError,
 	type VectorIndexFiles,
+	VectorStoreUnavailableError,
 } from "./vectorIndex";
 
 const acceptVerify: Verify = () => Promise.resolve();
@@ -105,6 +106,32 @@ describe("loadVectorIndex synthetic correctness", () => {
 			persistence: "opfs",
 		});
 		await index.dispose();
+	});
+
+	it("reports a store that cannot be opened as a local-storage failure, never a malformed bundle", async () => {
+		// Regression: another tab holding the OPFS database surfaced on screen as
+		// "malformed catalog bundle", which reads as a tampered or corrupt catalog.
+		const busy = new Error(
+			"could not open the local vector database — this index may already be open in another tab (Access Handles cannot be created)",
+		);
+		const load = loadVectorIndex(encoder([[1, 0]]), () => Promise.reject(busy));
+
+		await expect(load).rejects.toBeInstanceOf(VectorStoreUnavailableError);
+		await expect(load).rejects.not.toBeInstanceOf(VectorIndexError);
+		await expect(load).rejects.toMatchObject({
+			name: "VectorStoreUnavailableError",
+			cause: busy,
+		});
+		await expect(load).rejects.not.toThrow(/malformed/);
+	});
+
+	it("still reports vectors the store rejects on import as a malformed bundle", async () => {
+		const shared = new FlatVectorIndex({ name: "test", dimension: 2 });
+		vi.spyOn(shared, "insert").mockRejectedValue(new Error("non-finite"));
+
+		await expect(
+			loadVectorIndex(encoder([[1, 0]]), () => shared),
+		).rejects.toThrow(/^malformed catalog bundle: .*non-finite/);
 	});
 
 	it("cosine top-k ordering is exact over a known matrix", async () => {
