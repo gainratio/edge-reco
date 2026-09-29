@@ -26,13 +26,13 @@
 	"dependencies": {
 		"@edgeproc/browser": "github:hseshadr/edgeproc-browser#02171df60afc8b09d6439112ea7ea3202338d46a",
 		"@edgereco/browser": "workspace:*",
-		"@edgeproc/errors": "^0.1.1",
+		"@edgeproc/errors": "^0.1.3",
 		"@huggingface/transformers": "^4.2.0",
 		"i18next": "^26.4.2",
-		"motion": "^13.4.0",
+		"motion": "^13.4.3",
 		"react": "^19.3.0",
 		"react-dom": "^19.3.0",
-		"react-i18next": "^17.0.14"
+		"react-i18next": "^17.0.15"
 	},
 	"devDependencies": {
 		"@biomejs/biome": "^2.5.14",
@@ -45,10 +45,10 @@
 		"@types/react-dom": "^19.3.0",
 		"@vitejs/plugin-react": "^6.1.1",
 		"@vitest/coverage-v8": "^5.0.1",
-		"jsdom": "^30.1.0",
+		"jsdom": "^30.1.1",
 		"sharp": "^0.35.4",
 		"typescript": "~7.0.2",
-		"vite": "^8.3.0",
+		"vite": "^8.3.1",
 		"vite-plugin-pwa": "^1.3.0",
 		"vitest": "^5.0.1",
 		"workbox-window": "7.4.1"
