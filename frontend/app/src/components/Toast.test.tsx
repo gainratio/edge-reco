@@ -21,7 +21,7 @@ describe("Toast", () => {
 		// line-clamped; the CSS clamp binds to .toast__msg, so the message text must
 		// render inside that element rather than as a bare text node.
 		const long =
-			"Added “mDesign Plastic Portable Craft Storage Organizer Caddy Tote with Divided Basket Bin” to your taste";
+			"Added “Crafthollow Portable Craft Caddy, Clear, With Handle, Single” to your taste";
 		render(<Toast message={long} />);
 		const message = screen.getByText(long);
 		expect(message).toHaveClass("toast__msg");

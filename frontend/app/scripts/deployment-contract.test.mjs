@@ -83,18 +83,26 @@ test("deploy workflow is only a pinned checkout and Dagger invocation", async ()
 	);
 	assert.match(workflow, /dagger\/dagger-for-github@[0-9a-f]{40}/u);
 	assert.match(workflow, /environment: production/u);
+	// Inverted contract (was: the call must contain `--commit-sha=${{ github.event.
+	// workflow_run.head_sha }}` and friends, which pasted event text into
+	// dagger-for-github's bash). Event values now arrive only through `env:` and the
+	// call references them as double-quoted shell variables.
 	assert.match(
 		workflow,
-		/--commit-sha=\$\{\{ github\.event\.workflow_run\.head_sha \}\}/u,
+		/HEAD_SHA: \$\{\{ github\.event\.workflow_run\.head_sha \}\}/u,
 	);
 	assert.match(
 		workflow,
-		/--workflow-run-id=\$\{\{ github\.event\.workflow_run\.id \}\}/u,
+		/RUN_ID: \$\{\{ github\.event\.workflow_run\.id \}\}/u,
 	);
 	assert.match(
 		workflow,
-		/--run-attempt=\$\{\{ github\.event\.workflow_run\.run_attempt \}\}/u,
+		/RUN_ATTEMPT: \$\{\{ github\.event\.workflow_run\.run_attempt \}\}/u,
 	);
+	assert.match(workflow, /--commit-sha="\$HEAD_SHA"/u);
+	assert.match(workflow, /--workflow-run-id="\$RUN_ID"/u);
+	assert.match(workflow, /--run-attempt="\$RUN_ATTEMPT"/u);
+	assert.doesNotMatch(workflow, /--[a-z-]+=\$\{\{/u);
 	assert.match(workflow, /cloudflare-api-token=env:CLOUDFLARE_API_TOKEN/u);
 	assert.match(workflow, /cloudflare-account-id=env:CLOUDFLARE_ACCOUNT_ID/u);
 	assert.match(workflow, /github-token=env:GITHUB_TOKEN/u);

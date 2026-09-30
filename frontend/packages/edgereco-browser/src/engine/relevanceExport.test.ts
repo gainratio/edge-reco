@@ -71,8 +71,8 @@ const EXPORT_PATH = join(
 );
 
 const EXPORT_DESCRIPTION =
-	"EdgeReco relevance baseline over the committed amazon-demo bundle (720 products). " +
-	"relevant_ids are ground truth derived from each product's Amazon breadcrumb path " +
+	"EdgeReco relevance baseline over the committed amazon-demo bundle (720 synthetic products). " +
+	"relevant_ids are ground truth derived from each product's generated breadcrumb path " +
 	"(catalog/preprocessor.py::_split_breadcrumbs) — upstream of BM25, the embeddings and " +
 	"the reranker, so the labels cannot be satisfied by the ranker's own scores. ranked_ids " +
 	"is the engine's output in rank order at k. Queries are segmented: `natural` wording is " +

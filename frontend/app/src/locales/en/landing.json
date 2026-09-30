@@ -11,17 +11,17 @@
 		"launch": "▶ Launch the live demo",
 		"source": "View source on GitHub"
 	},
-	"demoNote": "What you're about to open is Nimbus — our example storefront, built on {{products}} real products to show the engine running in a real shop.",
+	"demoNote": "What you're about to open is Nimbus — our example storefront, stocked with {{products}} made-up products to show the engine running in a real shop.",
 	"band": {
 		"ariaLabel": "Performance",
 		"titleLead": "Why it's",
 		"titleAccent": "fast",
 		"titleTrail": "— and what it costs",
-		"live": "representative figures"
+		"live": "measured on edge-reco.com, {{date}}"
 	},
 	"metrics": {
 		"latency": {
-			"label": "per recommendation",
+			"label": "per search (median)",
 			"sub": "in-tab, no network hop"
 		},
 		"backendCalls": {
@@ -29,8 +29,8 @@
 			"sub": "search · recommend · rerank — all local"
 		},
 		"coldStart": {
-			"label": "cold start to first results",
-			"sub": "verify + load {{products}} products"
+			"label": "first visit to first results",
+			"sub": "download + verify {{products}} products · {{warm}} on return"
 		},
 		"heap": {
 			"label": "JS heap (Chromium)",
@@ -41,11 +41,11 @@
 			"sub": "illustrative · only CDN bandwidth"
 		},
 		"catalog": {
-			"label": "real products, in-tab",
+			"label": "demo products, in-tab",
 			"sub": "{{categories}} categories · {{bundle}} bundle"
 		}
 	},
-	"footnote": "First load fetches a ~{{bundle}} signed bundle + a one-time embedding model, then everything is cached and offline.",
+	"footnote": "First load fetches a ~{{bundle}} signed bundle + a one-time ~{{model}} embedding model, then everything is cached and offline. Timings are medians of real Chromium runs on a fast connection; a slower network adds download time.",
 	"whys": {
 		"ariaLabel": "Why",
 		"private": {

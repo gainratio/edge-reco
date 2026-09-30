@@ -2,7 +2,9 @@ import { useTranslation } from "react-i18next";
 import {
 	BUNDLE_SIZE,
 	CATALOG_PRODUCTS,
+	LANDING_MEASURED_ON,
 	LANDING_METRICS,
+	MODEL_DOWNLOAD,
 	type RepresentativeMetric,
 } from "../metrics/landing-figures";
 
@@ -46,9 +48,10 @@ function MetricTile({ metric }: { metric: RepresentativeMetric }) {
 /**
  * Landing is a pure presentational intro shown BEFORE the engine boots. It never
  * imports or starts the engine — the only interactivity is the Launch CTA, which
- * lifts a callback so App can flip into the boot path. The metric band shows
- * REPRESENTATIVE figures (the engine isn't running here yet); honesty labels —
- * "JS heap (Chromium)", "illustrative" — keep the numbers truthful.
+ * lifts a callback so App can flip into the boot path. The engine isn't running
+ * here yet, so the metric band quotes a RECORDED, dated measurement of the live
+ * site (see metrics/landing-figures.ts); honesty labels — "JS heap (Chromium)",
+ * "illustrative" — keep the rest truthful.
  */
 export function Landing({ onLaunch }: LandingProps) {
 	const { t } = useTranslation("landing");
@@ -91,7 +94,7 @@ export function Landing({ onLaunch }: LandingProps) {
 						{t("demoNote", { products: CATALOG_PRODUCTS })}
 					</p>
 					<p className="landing__footnote">
-						{t("footnote", { bundle: BUNDLE_SIZE })}
+						{t("footnote", { bundle: BUNDLE_SIZE, model: MODEL_DOWNLOAD })}
 					</p>
 				</header>
 
@@ -101,7 +104,9 @@ export function Landing({ onLaunch }: LandingProps) {
 							{t("band.titleLead")} <em>{t("band.titleAccent")}</em>{" "}
 							{t("band.titleTrail")}
 						</div>
-						<div className="landing__band-live">{t("band.live")}</div>
+						<div className="landing__band-live">
+							{t("band.live", { date: LANDING_MEASURED_ON })}
+						</div>
 					</div>
 					<div className="landing__tiles">
 						{LANDING_METRICS.map((metric) => (

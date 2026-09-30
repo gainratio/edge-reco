@@ -1,0 +1,1723 @@
+{
+	"about": "Vocabulary for the synthetic Nimbus demo catalog (MIT, part of edge-reco). Every brand is invented; every title part and feature sentence was written for this file. Category paths are plain descriptive shelf names. Consumed by edgereco.catalog.synthetic; edit here, then run scripts/generate_catalog.py.",
+	"categories": [
+		{
+			"name": "Cell Phones & Accessories",
+			"brands": ["Voltrika", "Qelvo", "Nuvanta", "Brisklane", "Orbeck", "Tessaline", "Kyrrow", "Pellago"],
+			"generic_features": [
+				"WHAT YOU GET: Everything shown in the listing plus a quick-start card; backed by a 12-month replacement promise.",
+				"HASSLE-FREE SUPPORT: Our support team answers within one business day if anything arrives damaged or does not fit.",
+				"TRAVEL READY: Slim, light and easy to toss in a bag, a glovebox or a desk drawer."
+			],
+			"leaves": [
+				{
+					"path": ["Accessories", "Maintenance, Upkeep & Repairs", "Screen Protectors"],
+					"count": 12, "price": [6.99, 16.99],
+					"nouns": ["Tempered Glass Screen Protector", "Privacy Screen Protector", "Matte Anti-Glare Screen Protector"],
+					"variants": [["2-Pack", "3-Pack", "4-Pack"], ["Fits 6.1-inch Phones", "Fits 6.7-inch Phones", "Fits 6.4-inch Phones"], ["Bubble-Free Install", "Alignment Frame Included", "Case Friendly"]],
+					"features": [
+						"TOUGH GLASS: 9H hardness tempered glass takes the scratches and drops so the phone display underneath does not crack.",
+						"EASY ALIGNMENT: The included frame snaps over the phone so the glass lands straight on the first try.",
+						"CLEAR VIEW: 99% transparency keeps colors true and touch response fast.",
+						"SMUDGE RESISTANT: An oleophobic coating wipes clean of fingerprints and oil.",
+						"FULL KIT: Comes with wet wipes, dust stickers and a microfiber cloth for a clean install."
+					]
+				},
+				{
+					"path": ["Cases, Holsters & Sleeves", "Basic Cases"],
+					"count": 10, "price": [8.99, 24.99],
+					"nouns": ["Clear Shockproof Phone Case", "Slim Silicone Phone Case", "Rugged Grip Phone Case"],
+					"variants": [["Fits 6.1-inch Phones", "Fits 6.7-inch Phones", "Fits 6.4-inch Phones"], ["Crystal Clear", "Midnight Black", "Sage Green", "Blush Pink"], ["Raised Camera Lip", "Wireless Charging Compatible"]],
+					"features": [
+						"DROP PROTECTION: Air-cushion corners absorb the shock of a fall from pocket height.",
+						"STAYS CLEAR: An anti-yellowing back keeps the cover looking new for months.",
+						"PRECISE CUTOUTS: Every button, port and speaker opening lines up exactly with the phone.",
+						"GRIPPY SIDES: Textured edges help the phone stay in your hand instead of sliding off a table.",
+						"SLIM FIT: Adds almost no bulk and slips easily into jeans pockets."
+					]
+				},
+				{
+					"path": ["Accessories", "Smartwatch Accessories", "Smartwatch Bands"],
+					"count": 8, "price": [7.99, 19.99],
+					"nouns": ["Sport Silicone Watch Band", "Braided Nylon Watch Band", "Magnetic Mesh Watch Band"],
+					"variants": [["38/40/41mm", "42/44/45mm"], ["Charcoal", "Ocean Blue", "Sand", "Olive"], ["2-Pack", "Single Band"]],
+					"features": [
+						"QUICK SWAP: The replacement band clicks into the watch lugs in seconds, no tools needed.",
+						"ALL-DAY COMFORT: Soft, breathable material sits easily on the wrist during workouts and sleep.",
+						"ADJUSTABLE FIT: Fits wrists from roughly 5.5 to 8 inches.",
+						"SWEAT PROOF: Rinses clean under the tap after a run.",
+						"MATCHED HARDWARE: Connectors are finished to match common smartwatch cases."
+					]
+				},
+				{
+					"path": ["Cell Phones"],
+					"count": 5, "price": [129.99, 399.99],
+					"nouns": ["Unlocked Smartphone", "Dual SIM Smartphone", "5G Unlocked Smartphone"],
+					"variants": [["128GB", "256GB", "64GB"], ["6.5-inch Display", "6.7-inch Display", "6.1-inch Display"], ["50MP Camera", "Triple Camera", "5000mAh Battery"]],
+					"features": [
+						"UNLOCKED: Works with major carriers; pop in a SIM card and go.",
+						"DUAL SIM: Keep a work number and a personal number on one smartphone.",
+						"BIG BATTERY: Lasts a full day of streaming, maps and messages on one charge.",
+						"SHARP CAMERA: The main camera captures detailed photos, even indoors.",
+						"FAST AND SMOOTH: An octa-core processor and a 90Hz screen keep apps responsive."
+					]
+				},
+				{
+					"path": ["Accessories", "Chargers & Power Adapters", "Wall Chargers"],
+					"count": 7, "price": [9.99, 29.99],
+					"nouns": ["USB-C Fast Charger Block", "Dual Port Wall Charger", "GaN Compact Wall Charger"],
+					"variants": [["20W", "30W", "45W", "65W"], ["1-Pack", "2-Pack"], ["Foldable Plug", "With 6ft Cable"]],
+					"features": [
+						"FAST CHARGING: Brings a phone from empty to half full in about thirty minutes.",
+						"PLUGS INTO THE WALL: A compact brick that leaves the neighboring outlet free.",
+						"TWO DEVICES: Charge a phone and earbuds at the same time from one plug.",
+						"COOL RUNNING: Built-in protection guards against overheating and overcharging.",
+						"FOLDING PRONGS: The plug folds flat so it will not scratch things in your bag."
+					]
+				},
+				{
+					"path": ["Accessories", "Car Accessories", "Car Cradles & Mounts"],
+					"count": 7, "price": [12.99, 34.99],
+					"nouns": ["Dashboard Phone Mount", "Air Vent Phone Holder", "Magnetic Car Phone Mount"],
+					"variants": [["One-Hand Release", "360-Degree Rotation"], ["Fits 4.7-7 inch Phones", "Fits Most Phones"], ["Strong Suction Base", "Metal Plates Included"]],
+					"features": [
+						"HOLDS STEADY: The grip stays put over potholes and speed bumps.",
+						"ONE-HAND USE: Press the phone in and the arms close automatically.",
+						"EASY VIEWING: Rotate between portrait and landscape for navigation.",
+						"NO RESIDUE: The reusable gel pad lifts off the dashboard cleanly.",
+						"QUICK INSTALL: Mounts in under a minute with no tools."
+					]
+				},
+				{
+					"path": ["Accessories", "Batteries & Battery Packs", "Power Banks"],
+					"count": 6, "price": [17.99, 49.99],
+					"nouns": ["Portable Power Bank", "Slim Battery Pack", "Magnetic Wireless Power Bank"],
+					"variants": [["10000mAh", "20000mAh", "5000mAh"], ["USB-C In and Out", "Dual Output"], ["LED Charge Display", "Built-In Cable"]],
+					"features": [
+						"EXTRA CHARGES: Refills a typical phone two to four times away from an outlet.",
+						"POCKET SIZE: About the size of a deck of cards.",
+						"CHARGE TWO: Power a phone and a smartwatch at once.",
+						"KNOW YOUR LEVEL: A digital readout shows exactly how much charge is left.",
+						"FLIGHT FRIENDLY: Under the capacity limit for carry-on bags."
+					]
+				},
+				{
+					"path": ["Accessories", "Cables", "USB Cables"],
+					"count": 5, "price": [6.99, 15.99],
+					"nouns": ["USB-C to USB-C Cable", "Braided Charging Cable", "Right Angle Charging Cable"],
+					"variants": [["3ft", "6ft", "10ft"], ["2-Pack", "3-Pack"], ["60W Fast Charge", "Data Sync"]],
+					"features": [
+						"BUILT TO BEND: A braided jacket survives thousands of bends.",
+						"LONG REACH: Extra length reaches from the outlet to the bed or couch.",
+						"FAST CHARGE: Carries up to 60W for phones, tablets and many laptops.",
+						"SNUG CONNECTORS: Aluminum shells click in firmly and do not wobble.",
+						"TANGLE FREE: A hook-and-loop strap keeps the cable coiled in a bag."
+					]
+				}
+			]
+		},
+		{
+			"name": "Clothing, Shoes & Jewelry",
+			"brands": ["Marrowfield", "Aurelle", "Tidewick", "Brambleton", "Cindera", "Halloway Row", "Fennimore", "Juniperline"],
+			"generic_features": [
+				"EASY CARE: Machine wash cold and tumble dry low.",
+				"TRUE TO SIZE: Check the size chart in the photos; most shoppers take their usual size.",
+				"GIFT READY: Arrives folded in a recyclable mailer, ready to wrap."
+			],
+			"leaves": [
+				{
+					"path": ["Men", "Clothing", "Shirts", "T-Shirts"],
+					"count": 8, "price": [12.99, 29.99],
+					"nouns": ["Men's Crew Neck Cotton Tee", "Men's Heavyweight T-Shirt", "Men's Pocket T-Shirt"],
+					"variants": [["3-Pack", "5-Pack", "Single"], ["Black", "Heather Gray", "Navy", "White", "Assorted Colors"], ["Tagless", "Pre-Shrunk"]],
+					"features": [
+						"SOFT COTTON: Ring-spun cotton feels soft from the first wear.",
+						"CLASSIC CREW NECK: A ribbed collar keeps its shape wash after wash.",
+						"MULTIPACK VALUE: Stock the drawer with everyday tees for work, the gym or lounging.",
+						"TAGLESS COMFORT: The label is printed inside so nothing scratches your neck.",
+						"RELAXED FIT: Room through the chest and shoulders without looking boxy."
+					]
+				},
+				{
+					"path": ["Baby", "Baby Boys", "Clothing", "Bodysuits"],
+					"count": 4, "price": [14.99, 26.99],
+					"nouns": ["Baby Boys' Long Sleeve Onesie", "Baby Boys' Short Sleeve Onesie"],
+					"variants": [["5-Pack", "3-Pack"], ["0-3 Months", "3-6 Months", "6-12 Months"], ["Stripes and Solids", "Animal Prints"]],
+					"features": [
+						"SNAP BOTTOM: Three snaps at the bottom make diaper changes quick.",
+						"GENTLE ON SKIN: Soft cotton knit with no scratchy seams.",
+						"EASY ON: An envelope neckline stretches over the head.",
+						"CUTE PRINTS: A mix of stripes and prints that go with everything.",
+						"PACK VALUE: Enough onesies for a week of daycare."
+					]
+				},
+				{
+					"path": ["Baby", "Baby Girls", "Clothing", "Bodysuits"],
+					"count": 4, "price": [14.99, 26.99],
+					"nouns": ["Baby Girls' Long Sleeve Onesie", "Baby Girls' Ruffle Sleeve Onesie"],
+					"variants": [["5-Pack", "3-Pack"], ["0-3 Months", "3-6 Months", "6-12 Months"], ["Florals and Solids", "Pastel Mix"]],
+					"features": [
+						"SNAP BOTTOM: Three snaps at the bottom make diaper changes quick.",
+						"GENTLE ON SKIN: Soft cotton knit with no scratchy seams.",
+						"EASY ON: An envelope neckline stretches over the head.",
+						"SWEET DETAILS: Little ruffles and prints for photos and everyday wear.",
+						"PACK VALUE: Enough onesies for a week of daycare."
+					]
+				},
+				{
+					"path": ["Men", "Clothing", "Active", "Active Sweatshirts"],
+					"count": 6, "price": [24.99, 49.99],
+					"nouns": ["Men's Fleece Pullover Sweatshirt", "Men's Quarter-Zip Pullover", "Men's Performance Hoodie"],
+					"variants": [["Charcoal", "Forest Green", "Black", "Oatmeal"], ["Kangaroo Pocket", "Thumb Holes"], ["Regular Fit", "Athletic Fit"]],
+					"features": [
+						"BRUSHED FLEECE: A warm, fuzzy inside for cold mornings and the sidelines.",
+						"PULLOVER STYLE: Throw it on over a tee after a workout.",
+						"HOLDS SHAPE: Ribbed cuffs and hem stay snug without stretching out.",
+						"MOISTURE WICKING: The outer face moves sweat away while you move.",
+						"HANDY POCKET: Keeps keys and hands warm."
+					]
+				},
+				{
+					"path": ["Women", "Shoes", "Fashion Sneakers"],
+					"count": 7, "price": [39.99, 89.99],
+					"nouns": ["Women's Slip-On Sneaker", "Women's Knit Walking Sneaker", "Women's Platform Sneaker"],
+					"variants": [["White", "Black", "Blush", "Gray"], ["Memory Foam Insole", "Arch Support"], ["Lightweight", "Machine Washable"]],
+					"features": [
+						"ALL-DAY WALKING: A cushioned footbed keeps feet comfortable through errands and travel.",
+						"EASY ON: Slip the sneakers on without untying the laces.",
+						"BREATHABLE KNIT: The upper lets air through on warm days.",
+						"GRIPPY SOLE: A flexible rubber outsole grips sidewalks and store floors.",
+						"GOES WITH EVERYTHING: A clean everyday look for jeans, leggings or dresses."
+					]
+				},
+				{
+					"path": ["Men", "Shoes", "Outdoor", "Hiking & Trekking", "Hiking Boots"],
+					"count": 7, "price": [69.99, 149.99],
+					"nouns": ["Men's Waterproof Hiking Boot", "Men's Mid Trail Boot", "Men's Leather Hiking Boot"],
+					"variants": [["Brown", "Dark Olive", "Black", "Wheat"], ["Waterproof Membrane", "Seam-Sealed"], ["Lug Outsole", "Padded Collar"]],
+					"features": [
+						"WATERPROOF: A sealed membrane keeps feet dry through puddles and wet grass.",
+						"TRAIL GRIP: Deep lugs bite into mud, gravel and rock.",
+						"ANKLE SUPPORT: A mid-height collar steadies the ankle on uneven ground.",
+						"CUSHIONED STRIDE: A shock-absorbing midsole eases long days on the trail.",
+						"DURABLE UPPER: Leather and ripstop panels stand up to brush and scrapes."
+					]
+				},
+				{
+					"path": ["Women", "Clothing", "Dresses", "Casual Dresses"],
+					"count": 7, "price": [24.99, 54.99],
+					"nouns": ["Women's Cotton Summer Dress", "Women's Wrap Dress", "Women's Tiered Sundress"],
+					"variants": [["Floral Print", "Solid Navy", "Terracotta", "Sage"], ["With Pockets", "Adjustable Straps"], ["Midi Length", "Knee Length"]],
+					"features": [
+						"BREEZY COTTON: Light cotton fabric for hot summer days.",
+						"REAL POCKETS: Side pockets big enough for a phone.",
+						"FLATTERING FIT: A cinched waist and flowing skirt.",
+						"DAY TO NIGHT: Pair with sandals for brunch or a denim jacket for evening.",
+						"PACKS FLAT: Resists wrinkles in a suitcase."
+					]
+				},
+				{
+					"path": ["Women", "Jewelry", "Necklaces", "Pendant Necklaces"],
+					"count": 6, "price": [14.99, 59.99],
+					"nouns": ["Dainty Initial Pendant Necklace", "Birthstone Pendant Necklace", "Layered Pendant Necklace"],
+					"variants": [["14K Gold Plated", "Sterling Silver", "Rose Gold Plated"], ["16-inch Chain", "18-inch Chain"], ["Gift Box Included", "Adjustable Length"]],
+					"features": [
+						"EVERYDAY SPARKLE: A delicate pendant that layers well with other chains.",
+						"HYPOALLERGENIC: Nickel-free and gentle on sensitive skin.",
+						"THOUGHTFUL GIFT: Arrives in a gift box for birthdays and anniversaries.",
+						"LASTING SHINE: A thick plating resists tarnish.",
+						"SECURE CLASP: A sturdy lobster clasp keeps it on all day."
+					]
+				},
+				{
+					"path": ["Men", "Accessories", "Wallets, Card Cases & Money Organizers", "Wallets"],
+					"count": 5, "price": [15.99, 39.99],
+					"nouns": ["Men's Slim Bifold Wallet", "Men's RFID Blocking Wallet", "Men's Minimalist Card Wallet"],
+					"variants": [["Genuine Leather", "Vegan Leather"], ["Espresso", "Black", "Tan"], ["Gift Box", "ID Window"]],
+					"features": [
+						"SLIM PROFILE: Holds cards and cash without a bulky back pocket.",
+						"RFID BLOCKING: A shielding layer protects tap-to-pay cards.",
+						"ORGANIZED: Six card slots, a cash sleeve and a clear ID window.",
+						"AGES WELL: The leather softens and darkens with use.",
+						"STITCHED TO LAST: Tight edge stitching resists fraying."
+					]
+				},
+				{
+					"path": ["Men", "Clothing", "Socks", "Athletic Socks"],
+					"count": 6, "price": [11.99, 24.99],
+					"nouns": ["Men's Cushioned Crew Socks", "Men's Ankle Running Socks", "Men's Moisture Wicking Socks"],
+					"variants": [["6 Pairs", "10 Pairs", "12 Pairs"], ["White", "Black", "Mixed Gray"], ["Shoe Size 6-12", "Shoe Size 12-15"]],
+					"features": [
+						"CUSHIONED SOLE: Extra padding under the heel and toe for long days on your feet.",
+						"STAYS DRY: Moisture wicking yarn moves sweat away.",
+						"ARCH BAND: A snug band keeps the socks from sliding.",
+						"NO BLISTERS: A seamless toe avoids rubbing.",
+						"BULK PACK: Enough pairs to skip laundry day."
+					]
+				}
+			]
+		},
+		{
+			"name": "Electronics",
+			"brands": ["Sonnvar", "Halcyra", "Plexmoor", "Vantrel", "Quorrin", "Lumaxis", "Driftcove", "Zephrane"],
+			"generic_features": [
+				"WHAT IS INCLUDED: Device, charging cable and a printed quick-start guide.",
+				"WARRANTY: Covered by a one-year limited warranty with friendly email support.",
+				"SIMPLE SETUP: Works out of the box; no account or app sign-up required."
+			],
+			"leaves": [
+				{
+					"path": ["Computers & Accessories", "Computers & Tablets", "Laptops", "Traditional Laptops"],
+					"count": 3, "price": [449.99, 899.99],
+					"nouns": ["15.6-inch Laptop", "14-inch Thin and Light Laptop", "Everyday Laptop"],
+					"variants": [["8GB RAM", "16GB RAM"], ["256GB SSD", "512GB SSD"], ["Full HD Display", "Backlit Keyboard"]],
+					"features": [
+						"READY FOR SCHOOLWORK: A laptop that handles essays, video calls and research tabs with ease.",
+						"ALL-DAY BATTERY: Up to 10 hours away from the charger.",
+						"FAST STORAGE: A solid-state drive boots in seconds.",
+						"PORTS YOU NEED: USB-C, USB-A, HDMI and a headphone jack.",
+						"CRISP SCREEN: A full HD display for streaming and spreadsheets."
+					]
+				},
+				{
+					"path": ["Headphones, Earbuds & Accessories", "Headphones & Earbuds", "Earbud Headphones"],
+					"count": 10, "price": [19.99, 79.99],
+					"nouns": ["Wireless Earbuds", "Noise Cancelling Earbuds", "Sport Wireless Earbuds"],
+					"variants": [["40H Playtime", "32H Playtime", "50H Playtime"], ["Bluetooth 5.3", "Low Latency Mode"], ["IPX5 Water Resistant", "Charging Case with Display"]],
+					"features": [
+						"LONG PLAYTIME: The earbuds play for hours, and the case adds several full recharges.",
+						"NOISE CANCELLING: Active noise cancellation quiets buses, planes and open offices.",
+						"SECURE FIT: Three sizes of ear tips keep the earbuds in during runs.",
+						"CLEAR CALLS: Four microphones pick up your voice and cut wind noise.",
+						"QUICK PAIRING: Open the case and the earbuds connect to the last device automatically."
+					]
+				},
+				{
+					"path": ["Headphones, Earbuds & Accessories", "Headphones & Earbuds", "Over-Ear Headphones"],
+					"count": 5, "price": [39.99, 149.99],
+					"nouns": ["Wireless Over-Ear Headphones", "Noise Cancelling Headphones", "Foldable Studio Headphones"],
+					"variants": [["60H Playtime", "40H Playtime"], ["Bluetooth 5.3", "Wired and Wireless"], ["Memory Foam Cushions", "Travel Case Included"]],
+					"features": [
+						"DEEP SOUND: Large drivers deliver rich bass and clear vocals.",
+						"QUIET ANYWHERE: Noise cancelling blocks the hum of engines and air conditioners.",
+						"COMFORT FOR HOURS: Soft memory foam cushions and a padded headband.",
+						"LONG PLAYTIME: Days of listening on a single charge.",
+						"FOLD AND GO: Folds flat into the included travel case."
+					]
+				},
+				{
+					"path": ["Portable Audio & Video", "Portable Speakers & Docks", "Portable Bluetooth Speakers"],
+					"count": 6, "price": [24.99, 89.99],
+					"nouns": ["Portable Bluetooth Speaker", "Waterproof Outdoor Speaker", "Mini Bluetooth Speaker"],
+					"variants": [["20W", "30W", "10W"], ["IPX7 Waterproof", "Shockproof"], ["24H Playtime", "Stereo Pairing"]],
+					"features": [
+						"BIG SOUND: Room-filling audio from a speaker that fits in a backpack.",
+						"WATERPROOF: Survives splashes at the pool and rain at the campsite.",
+						"PARTY PAIRING: Link two speakers for true stereo.",
+						"LONG LASTING: Plays all day and into the night on one charge.",
+						"CARRY STRAP: A sturdy strap clips to bikes and bags."
+					]
+				},
+				{
+					"path": ["Camera & Photo", "Video Surveillance", "Surveillance Cameras", "Dome Cameras"],
+					"count": 4, "price": [29.99, 69.99],
+					"nouns": ["Indoor Security Camera", "Pan and Tilt Dome Camera", "2K Home Security Camera"],
+					"variants": [["2K Resolution", "1080p HD"], ["Night Vision", "Two-Way Audio"], ["Motion Alerts", "Local SD Storage"]],
+					"features": [
+						"SEE EVERY CORNER: Pan and tilt to watch the whole room from your phone.",
+						"NIGHT VISION: Infrared lets the surveillance camera see clearly in the dark.",
+						"TALK BACK: Built-in speaker and microphone for two-way audio.",
+						"SMART ALERTS: Get a notification when motion is detected at the front door or hallway.",
+						"PRIVATE STORAGE: Record to a local memory card with no required subscription."
+					]
+				},
+				{
+					"path": ["Camera & Photo", "Video Surveillance", "Surveillance Cameras", "Bullet Cameras"],
+					"count": 3, "price": [34.99, 79.99],
+					"nouns": ["Outdoor Security Camera", "Wireless Bullet Camera", "Floodlight Security Camera"],
+					"variants": [["2K Resolution", "1080p HD"], ["Color Night Vision", "Spotlight"], ["Weatherproof", "Solar Panel Option"]],
+					"features": [
+						"BUILT FOR OUTDOORS: A weatherproof housing handles rain, snow and summer heat.",
+						"COLOR NIGHT VISION: A built-in spotlight shows faces in color at night.",
+						"WATCH THE DRIVEWAY: A wide lens covers the front door, porch and driveway.",
+						"MOTION ZONES: Draw zones so passing cars do not trigger alerts.",
+						"EASY MOUNT: Screws, anchors and a drilling template included."
+					]
+				},
+				{
+					"path": ["Camera & Photo", "Film Photography", "Film Cameras", "Instant Cameras"],
+					"count": 3, "price": [59.99, 119.99],
+					"nouns": ["Instant Film Camera", "Instant Print Camera", "Retro Instant Camera"],
+					"variants": [["Pastel Blue", "Cream", "Mint", "Black"], ["Selfie Mirror", "Built-In Flash"], ["Bundle with 20 Sheets", "Camera Only"]],
+					"features": [
+						"PRINTS IN MINUTES: Snap a photo and watch the print develop in your hand.",
+						"AUTO EXPOSURE: The camera sets the flash and shutter for you.",
+						"SELFIE READY: A small mirror next to the lens frames group shots.",
+						"PARTY FAVORITE: Perfect for weddings, birthdays and scrapbooks.",
+						"USES STANDARD FILM: Takes widely available mini instant film packs."
+					]
+				},
+				{
+					"path": ["Computers & Accessories", "Computer Accessories & Peripherals", "Keyboards, Mice & Accessories", "Keyboards"],
+					"count": 8, "price": [24.99, 99.99],
+					"nouns": ["Mechanical Gaming Keyboard", "Wireless Keyboard", "Compact 75% Keyboard"],
+					"variants": [["RGB Backlit", "White Backlit"], ["Hot-Swappable Switches", "Quiet Keys"], ["USB-C Wired", "2.4G Wireless"]],
+					"features": [
+						"SATISFYING KEYS: Tactile mechanical switches with a crisp, even press.",
+						"CUSTOM LIGHTING: Per-key backlighting with dozens of effects.",
+						"SPACE SAVING: A compact layout leaves more room for the mouse.",
+						"BUILT TO LAST: Keys rated for tens of millions of presses.",
+						"PLUG AND PLAY: Works on Windows, Mac and Linux with no driver."
+					]
+				},
+				{
+					"path": ["Computers & Accessories", "Computer Accessories & Peripherals", "Keyboards, Mice & Accessories", "Mice"],
+					"count": 8, "price": [12.99, 49.99],
+					"nouns": ["Wireless Mouse", "Ergonomic Vertical Mouse", "Gaming Mouse"],
+					"variants": [["Silent Click", "Programmable Buttons"], ["2.4G USB Receiver", "Rechargeable"], ["Adjustable DPI", "Right-Handed"]],
+					"features": [
+						"QUIET CLICKS: Silent buttons will not bother anyone nearby.",
+						"WRIST FRIENDLY: A sculpted shape keeps the hand in a relaxed position.",
+						"PRECISE TRACKING: An adjustable sensor handles spreadsheets and games.",
+						"RECHARGEABLE: One charge lasts weeks of daily use.",
+						"PLUG AND PLAY: The tiny receiver stores inside the mouse."
+					]
+				},
+				{
+					"path": ["Computers & Accessories", "Data Storage", "USB Flash Drives"],
+					"count": 5, "price": [7.99, 29.99],
+					"nouns": ["USB Flash Drive", "Dual USB-C Flash Drive", "Metal Thumb Drive"],
+					"variants": [["64GB", "128GB", "256GB"], ["2-Pack", "Single"], ["USB 3.2", "Keyring Loop"]],
+					"features": [
+						"FAST TRANSFERS: Moves a full movie in seconds over USB 3.2.",
+						"TWO CONNECTORS: Plug into a laptop or a phone.",
+						"TOUGH SHELL: A metal body survives keychains and backpacks.",
+						"BACK UP ANYTHING: Photos, school projects and work files.",
+						"NO SOFTWARE: Drag and drop files on any computer."
+					]
+				},
+				{
+					"path": ["Television & Video", "Accessories", "TV Mounts"],
+					"count": 5, "price": [22.99, 59.99],
+					"nouns": ["Full Motion TV Wall Mount", "Low Profile TV Mount", "Tilting TV Wall Mount"],
+					"variants": [["Fits 32-65 inch TVs", "Fits 42-85 inch TVs"], ["Holds 99 lbs", "Holds 132 lbs"], ["Level Built In", "Hardware Kit Included"]],
+					"features": [
+						"FULL MOTION: Swivel, tilt and extend the TV for the best view.",
+						"SLIM PROFILE: Sits close to the wall for a clean look.",
+						"STRONG STEEL: Heavy-gauge steel holds large screens safely.",
+						"EASY INSTALL: A single-stud design and step-by-step guide.",
+						"CABLE TIDY: Built-in clips keep cords out of sight."
+					]
+				}
+			]
+		},
+		{
+			"name": "Health & Household",
+			"brands": ["Calmora", "Wellspire", "Purevane", "Nestwell", "Heronfield", "Solace & Sage", "Brightmoor", "Vitalune"],
+			"generic_features": [
+				"SATISFACTION PROMISE: If it does not work for you, contact us for a replacement or refund.",
+				"THOUGHTFUL PACKAGING: Ships in recyclable packaging with clear instructions.",
+				"QUALITY CHECKED: Every batch is inspected before it leaves the warehouse."
+			],
+			"leaves": [
+				{
+					"path": ["Health Care", "Sleep & Snoring", "Snore Reducing Aids"],
+					"count": 5, "price": [12.99, 29.99],
+					"nouns": ["Anti Snoring Nasal Dilators", "Snore Stopper Chin Strap", "Anti Snore Mouth Guard"],
+					"variants": [["4 Sizes", "Adjustable"], ["Reusable", "Travel Case Included"], ["8-Pack", "Single"]],
+					"features": [
+						"BREATHE EASIER: Gently opens the nose so air flows freely while you sleep.",
+						"QUIETER NIGHTS: Helps reduce snoring so both of you get rest.",
+						"SOFT SILICONE: Medical-grade silicone that is comfortable all night.",
+						"FIND YOUR FIT: Multiple sizes for a snug, secure device.",
+						"TRAVEL FRIENDLY: A small case keeps it clean in a toiletry bag."
+					]
+				},
+				{
+					"path": ["Household Supplies", "Indoor Insect & Pest Control", "Ultrasonic Repellers"],
+					"count": 5, "price": [15.99, 32.99],
+					"nouns": ["Ultrasonic Pest Repeller", "Plug In Mouse Repeller", "Ultrasonic Insect Repeller"],
+					"variants": [["4-Pack", "6-Pack", "2-Pack"], ["Night Light", "Adjustable Modes"], ["Indoor", "Covers 1200 sq ft"]],
+					"features": [
+						"PLUG IN AND FORGET: Plug the repeller into any outlet and it runs day and night.",
+						"ULTRASONIC WAVES: High-frequency sound drives mice, rodents and insects away.",
+						"NO CHEMICALS: No sprays, poisons or traps around kids and pets.",
+						"WHOLE ROOM: Each unit covers a kitchen, garage or basement.",
+						"QUIET FOR PEOPLE: The sound is above the range most people can hear."
+					]
+				},
+				{
+					"path": ["Household Supplies", "Paper & Plastic", "Disposable Food Storage", "Food Storage Bags"],
+					"count": 6, "price": [6.99, 17.99],
+					"nouns": ["Zipper Freezer Bags", "Reusable Food Storage Bags", "Double Zipper Storage Bags"],
+					"variants": [["Gallon Size", "Quart Size", "Sandwich Size"], ["100 Count", "60 Count", "12 Count"], ["Leakproof", "Write-On Label"]],
+					"features": [
+						"FREEZER TOUGH: Thick bags protect leftovers and meal prep from freezer burn.",
+						"SEALS TIGHT: A double zipper locks in freshness.",
+						"LABEL IT: A write-on panel for dates and contents.",
+						"STANDS UP: A gusseted bottom stands open for easy filling.",
+						"MANY USES: Great for lunches, marinating and organizing small items."
+					]
+				},
+				{
+					"path": ["Oral Care", "Toothpaste"],
+					"count": 5, "price": [4.99, 14.99],
+					"nouns": ["Whitening Toothpaste", "Purple Color Corrector Toothpaste", "Sensitive Toothpaste"],
+					"variants": [["Mint", "Fresh Spearmint"], ["2-Pack", "Single Tube"], ["Fluoride", "Enamel Safe"]],
+					"features": [
+						"BRIGHTER SMILE: Helps lift surface stains from coffee and tea.",
+						"COLOR CORRECTING: A purple formula cancels yellow tones for a whiter look after brushing.",
+						"GENTLE ON ENAMEL: Low-abrasion formula for everyday use.",
+						"FRESH BREATH: A cool mint flavor that lasts.",
+						"SENSITIVE RELIEF: Soothes teeth that react to hot and cold."
+					]
+				},
+				{
+					"path": ["Vision", "Reading Glasses"],
+					"count": 6, "price": [12.99, 29.99],
+					"nouns": ["Blue Light Blocking Reading Glasses", "Computer Readers", "Lightweight Reading Glasses"],
+					"variants": [["+1.0", "+1.5", "+2.0", "+2.5"], ["3-Pack", "5-Pack"], ["Spring Hinges", "Tortoise Frames"]],
+					"features": [
+						"BLUE LIGHT FILTER: Lenses cut glare from screens for comfortable evening reading.",
+						"CLEAR MAGNIFICATION: Sharp readers for books, menus and phones.",
+						"FLEXIBLE HINGES: Spring hinges bend without breaking.",
+						"LIGHTWEIGHT: Barely noticeable on the nose for hours.",
+						"PAIR FOR EVERY ROOM: A multipack for the desk, nightstand and car."
+					]
+				},
+				{
+					"path": ["Vitamins, Minerals & Supplements", "Collagen"],
+					"count": 5, "price": [19.99, 39.99],
+					"nouns": ["Collagen Peptides Powder", "Unflavored Collagen Powder", "Collagen Protein Powder"],
+					"variants": [["16 oz", "10 oz", "20 oz"], ["Unflavored", "Vanilla"], ["Types I and III", "Grass-Fed"]],
+					"features": [
+						"HAIR SKIN AND NAILS: Collagen peptides support healthy hair, skin and nails.",
+						"MIXES EASILY: The powder dissolves in coffee, smoothies or water.",
+						"SIMPLE INGREDIENTS: No added sugar, gluten or dairy.",
+						"JOINT SUPPORT: A daily scoop supports joints and recovery.",
+						"GENEROUS SUPPLY: About a month of daily servings per container."
+					]
+				},
+				{
+					"path": ["Wellness & Relaxation", "Massage Tools & Equipment", "Handheld Massagers"],
+					"count": 7, "price": [39.99, 129.99],
+					"nouns": ["Massage Gun Deep Tissue Massager", "Percussion Muscle Massager", "Neck and Back Massager"],
+					"variants": [["6 Heads", "8 Heads", "4 Heads"], ["30 Speeds", "20 Speeds"], ["Quiet Motor", "Carry Case"]],
+					"features": [
+						"MUSCLE RELIEF: Deep percussion eases sore back, neck and shoulder muscles.",
+						"AFTER WORKOUTS: Speeds up recovery after runs, lifting and long days at a desk.",
+						"QUIET MOTOR: Runs quietly enough to use while watching TV.",
+						"MANY HEADS: Swap heads for large muscle groups or pinpoint knots.",
+						"LONG BATTERY: Hours of use per charge."
+					]
+				},
+				{
+					"path": ["Health Care", "Pain Relief", "Hot & Cold Therapies"],
+					"count": 6, "price": [14.99, 39.99],
+					"nouns": ["Electric Heating Pad", "Reusable Ice Pack", "Microwavable Heat Wrap"],
+					"variants": [["Extra Large", "Neck and Shoulder", "Standard"], ["Auto Shut-Off", "Moist Heat Option"], ["Machine Washable Cover", "Gel Beads"]],
+					"features": [
+						"SOOTHING WARMTH: Fast heat for an aching back, cramps and stiff shoulders.",
+						"COLD THERAPY: Stays flexible when frozen to wrap around knees and ankles.",
+						"SAFE TO SNOOZE: Auto shut-off turns it off after two hours.",
+						"WASHABLE COVER: The plush cover comes off for the laundry.",
+						"TARGETED RELIEF: Shaped to hug the neck, back or joints."
+					]
+				},
+				{
+					"path": ["Health Care", "Health Monitors", "Blood Pressure Monitors"],
+					"count": 5, "price": [29.99, 59.99],
+					"nouns": ["Upper Arm Blood Pressure Monitor", "Wrist Blood Pressure Monitor"],
+					"variants": [["Large Cuff", "Standard Cuff"], ["2 User Memory", "Large Display"], ["Irregular Heartbeat Alert", "Carry Case"]],
+					"features": [
+						"ONE-BUTTON READING: Press start and get a reading in under a minute.",
+						"EASY TO READ: A large backlit display shows numbers clearly.",
+						"TRACK TRENDS: Stores readings for two people.",
+						"COMFORTABLE CUFF: Fits a wide range of arm sizes.",
+						"HEARTBEAT ALERT: Flags readings taken during an irregular heartbeat."
+					]
+				},
+				{
+					"path": ["Household Supplies", "Cleaning Tools", "Microfiber Cloths"],
+					"count": 5, "price": [9.99, 19.99],
+					"nouns": ["Microfiber Cleaning Cloths", "Lint-Free Glass Cloths", "Microfiber Dusting Cloths"],
+					"variants": [["12-Pack", "24-Pack", "50-Pack"], ["Assorted Colors", "Gray"], ["12 x 12 in", "16 x 16 in"]],
+					"features": [
+						"STREAK FREE: Leaves windows, mirrors and screens spotless.",
+						"TRAPS DUST: Split fibers grab dust instead of pushing it around.",
+						"CHEMICAL FREE: Cleans most surfaces with just water.",
+						"WASH AND REUSE: Hundreds of washes before they wear out.",
+						"COLOR CODED: Use different colors for the kitchen and the bathroom."
+					]
+				},
+				{
+					"path": ["Medical Supplies & Equipment", "First Aid", "First Aid Kits"],
+					"count": 5, "price": [14.99, 39.99],
+					"nouns": ["Home First Aid Kit", "Compact Travel First Aid Kit", "Car Emergency First Aid Kit"],
+					"variants": [["150 Pieces", "250 Pieces", "100 Pieces"], ["Waterproof Case", "Zip Bag"], ["Labeled Compartments", "Emergency Blanket"]],
+					"features": [
+						"READY FOR ANYTHING: Bandages, gauze, wipes and tape for everyday cuts and scrapes.",
+						"ORGANIZED: Labeled pockets help you find supplies fast.",
+						"GRAB AND GO: A compact case for the car, the office or a hiking pack.",
+						"REFILLABLE: Restock individual items as you use them.",
+						"FAMILY SIZE: Enough supplies for a busy household."
+					]
+				}
+			]
+		},
+		{
+			"name": "Home & Kitchen",
+			"brands": ["Hearthwell", "Linnemore", "Copperwren", "Ashgrove", "Mellowmere", "Kindlestone", "Tavira Home", "Oakhaven"],
+			"generic_features": [
+				"EASY TO LOVE: Designed to look good on the counter, the bed or the shelf.",
+				"CARE GUIDE: Care instructions are printed on the tag and in the box.",
+				"GIFT IDEA: A practical gift for housewarmings and weddings."
+			],
+			"leaves": [
+				{
+					"path": ["Kitchen & Dining", "Cookware", "Pots & Pans", "Frying Pans & Skillets"],
+					"count": 7, "price": [24.99, 69.99],
+					"nouns": ["Nonstick Frying Pan", "Ceramic Nonstick Skillet", "Cast Iron Skillet"],
+					"variants": [["10-inch", "12-inch", "8-inch"], ["Induction Compatible", "Oven Safe to 450F"], ["Stay-Cool Handle", "With Lid"]],
+					"features": [
+						"SLIDES RIGHT OFF: A nonstick cooking surface releases eggs and pancakes with little oil.",
+						"EVEN HEAT: A thick base spreads heat without hot spots.",
+						"ANY STOVETOP: Works on gas, electric and induction.",
+						"COOL HANDLE: A riveted handle stays comfortable to hold.",
+						"EASY CLEANUP: Wipes clean in seconds."
+					]
+				},
+				{
+					"path": ["Kitchen & Dining", "Cutlery & Knife Accessories", "Chef's Knives"],
+					"count": 6, "price": [19.99, 79.99],
+					"nouns": ["8-inch Chef Knife", "Santoku Knife", "Chef Knife Set"],
+					"variants": [["High Carbon Steel", "Damascus Pattern"], ["Ergonomic Handle", "Full Tang"], ["Gift Box", "Blade Guard"]],
+					"features": [
+						"RAZOR SHARP: Slices tomatoes and dices onions effortlessly.",
+						"BALANCED: A full-tang build feels steady in the hand.",
+						"HOLDS AN EDGE: Hardened steel stays sharp longer.",
+						"COMFORT GRIP: A contoured handle reduces fatigue.",
+						"GIFT READY: Arrives in a presentation box."
+					]
+				},
+				{
+					"path": ["Kitchen & Dining", "Storage & Organization", "Food Storage", "Food Storage Containers"],
+					"count": 6, "price": [17.99, 39.99],
+					"nouns": ["Glass Food Storage Containers", "Meal Prep Containers", "Airtight Pantry Containers"],
+					"variants": [["10-Piece Set", "24-Piece Set", "5-Piece Set"], ["Snap Lock Lids", "Bamboo Lids"], ["Microwave Safe", "Stackable"]],
+					"features": [
+						"LEAKPROOF LIDS: Four locking tabs keep soups and sauces inside.",
+						"OVEN TO TABLE: Glass bases go from the oven to the fridge.",
+						"STACKS NEATLY: Nesting design saves cabinet space.",
+						"FRESHER LONGER: Airtight seals keep flour, cereal and snacks crisp.",
+						"MEAL PREP: Portion lunches for the whole week."
+					]
+				},
+				{
+					"path": ["Kitchen & Dining", "Coffee, Tea & Espresso", "Pour-Over Coffee Makers"],
+					"count": 5, "price": [19.99, 44.99],
+					"nouns": ["Glass Pour Over Coffee Maker", "Ceramic Pour Over Dripper", "Pour Over Coffee Set"],
+					"variants": [["20 oz", "34 oz"], ["Stainless Filter", "Paper Filters Included"], ["Heat-Resistant Glass", "Wooden Collar"]],
+					"features": [
+						"BRIGHT FLAVOR: Pour-over brewing brings out the flavor of fresh beans.",
+						"NO PAPER NEEDED: A fine mesh filter is reusable.",
+						"SIMPLE RITUAL: Brew a great cup in about four minutes.",
+						"HEAT RESISTANT: Borosilicate glass handles boiling water.",
+						"EASY TO CLEAN: Rinses clean and is dishwasher safe."
+					]
+				},
+				{
+					"path": ["Kitchen & Dining", "Travel & To-Go Drinkware", "Insulated Tumblers"],
+					"count": 6, "price": [14.99, 34.99],
+					"nouns": ["Insulated Tumbler with Straw", "Stainless Steel Travel Mug", "Insulated Coffee Tumbler"],
+					"variants": [["20 oz", "30 oz", "40 oz"], ["Leakproof Lid", "Handle"], ["Sea Glass", "Charcoal", "Sunset Orange"]],
+					"features": [
+						"HOT OR COLD: Double-wall insulation keeps coffee hot and iced drinks cold for hours.",
+						"FITS CUP HOLDERS: A tapered base fits most car cup holders.",
+						"NO SWEAT: The outside stays dry and comfortable.",
+						"LEAKPROOF: A secure lid for commutes.",
+						"EASY CLEAN: Dishwasher-safe lid and straw."
+					]
+				},
+				{
+					"path": ["Bedding", "Sheets & Pillowcases", "Sheet & Pillowcase Sets"],
+					"count": 7, "price": [29.99, 79.99],
+					"nouns": ["Cotton Sheet Set", "Microfiber Bed Sheet Set", "Bamboo Viscose Sheet Set"],
+					"variants": [["Queen", "King", "Full", "Twin"], ["Deep Pocket", "4-Piece"], ["White", "Sage", "Slate Gray", "Sand"]],
+					"features": [
+						"SOFT AND COOL: A breathable weave that sleeps cool.",
+						"DEEP POCKETS: Fitted sheets hug mattresses up to 16 inches.",
+						"WRINKLE RESISTANT: Comes out of the dryer ready for the bed.",
+						"COMPLETE SET: Flat sheet, fitted sheet and two pillowcases.",
+						"FADE RESISTANT: Colors stay rich after many washes."
+					]
+				},
+				{
+					"path": ["Bedding", "Pillows", "Bed Pillows"],
+					"count": 5, "price": [24.99, 59.99],
+					"nouns": ["Cooling Bed Pillows", "Shredded Memory Foam Pillow", "Down Alternative Pillows"],
+					"variants": [["Queen 2-Pack", "King 2-Pack", "Standard Single"], ["Adjustable Fill", "Medium Firm"], ["Washable Cover", "Gusseted"]],
+					"features": [
+						"SUPPORTIVE: Keeps the neck aligned for back and side sleepers.",
+						"ADJUSTABLE: Remove fill to find your perfect height.",
+						"SLEEPS COOL: A breathable cover wicks heat away.",
+						"FLUFFS BACK: Recovers its shape every morning.",
+						"WASHABLE: The zippered cover goes in the machine."
+					]
+				},
+				{
+					"path": ["Bath", "Towels", "Bath Towels"],
+					"count": 6, "price": [19.99, 49.99],
+					"nouns": ["Cotton Bath Towel Set", "Quick Dry Bath Towels", "Oversized Bath Sheets"],
+					"variants": [["4-Pack", "6-Piece Set", "2-Pack"], ["White", "Spa Blue", "Charcoal", "Ivory"], ["600 GSM", "Waffle Weave"]],
+					"features": [
+						"PLUSH AND ABSORBENT: Thick cotton loops soak up water fast.",
+						"QUICK DRYING: Dries between showers without a musty smell.",
+						"HOTEL FEEL: A soft, fluffy hand that gets softer with washing.",
+						"GENEROUS SIZE: Big enough to wrap up in.",
+						"DOUBLE STITCHED: Hems that do not unravel."
+					]
+				},
+				{
+					"path": ["Home Décor Products", "Decorative Pillows, Inserts & Covers", "Throw Pillow Covers"],
+					"count": 6, "price": [12.99, 29.99],
+					"nouns": ["Throw Pillow Covers", "Boho Pillow Covers", "Velvet Pillow Covers"],
+					"variants": [["18 x 18 in", "20 x 20 in"], ["Set of 2", "Set of 4"], ["Rust", "Cream", "Teal", "Mustard"]],
+					"features": [
+						"INSTANT REFRESH: Update the sofa for a new season in minutes.",
+						"HIDDEN ZIPPER: A concealed zipper keeps the look clean.",
+						"SOFT TEXTURE: Plush velvet and woven textures.",
+						"MACHINE WASHABLE: Easy care for homes with kids and pets.",
+						"INSERTS NOT INCLUDED: Fits standard pillow inserts."
+					]
+				},
+				{
+					"path": ["Home Décor Products", "Candles & Holders", "Candles", "Jar Candles"],
+					"count": 6, "price": [12.99, 32.99],
+					"nouns": ["Scented Jar Candle", "Soy Wax Candle", "Three Wick Candle"],
+					"variants": [["Lavender and Cedar", "Vanilla Bean", "Sea Salt and Sage", "Fresh Linen"], ["8 oz", "14 oz"], ["Cotton Wick", "Wood Wick"]],
+					"features": [
+						"CLEAN BURN: A natural soy blend burns evenly with little soot.",
+						"ROOM FILLING: A rich scent that fills the living room.",
+						"LONG BURN TIME: Up to 50 hours of glow.",
+						"PRETTY JAR: The glass jar makes a nice planter afterward.",
+						"COZY GIFT: A thoughtful gift for hosts and teachers."
+					]
+				}
+			]
+		},
+		{
+			"name": "Office Products",
+			"brands": ["Inkwell & Oak", "Paperlark", "Deskwright", "Quillfield", "Stationaire", "Notary Lane", "Ledgerly", "Brightfolio"],
+			"generic_features": [
+				"OFFICE STAPLE: Useful at home, school or the office.",
+				"QUALITY FIRST: Checked for defects before it ships.",
+				"BULK FRIENDLY: Popular with teachers and small businesses."
+			],
+			"leaves": [
+				{
+					"path": ["Office & School Supplies", "Desk Accessories & Workspace Organizers", "Mouse Pads & Wrist Rests", "Mouse Pads"],
+					"count": 7, "price": [9.99, 29.99],
+					"nouns": ["Extended Gaming Mouse Pad", "Large Desk Mat", "Mouse Pad with Wrist Rest"],
+					"variants": [["31.5 x 11.8 in", "35 x 15.7 in", "10 x 8 in"], ["Stitched Edges", "Non-Slip Base"], ["Black", "Topographic Map", "Night Sky"]],
+					"features": [
+						"EXTRA LARGE: The desk mat holds the keyboard and mouse together.",
+						"SMOOTH GLIDE: A micro-woven surface for precise gaming and design work.",
+						"STAYS PUT: A rubber base grips the desk.",
+						"NO FRAYING: Stitched edges hold up to years of use.",
+						"WATER RESISTANT: Coffee spills wipe right off."
+					]
+				},
+				{
+					"path": ["Office & School Supplies", "Calendars, Planners & Personal Organizers", "Planners, Refills & Covers", "Planners"],
+					"count": 7, "price": [12.99, 29.99],
+					"nouns": ["Weekly and Monthly Planner", "Academic Year Planner", "Undated Daily Planner"],
+					"variants": [["2024-2025", "2025", "Undated"], ["A5 Size", "8.5 x 11 in"], ["Hardcover", "Spiral Bound"]],
+					"features": [
+						"PLAN THE WEEK: Weekly spreads plus monthly calendar tabs keep the agenda organized.",
+						"GOAL PAGES: Space for goals, habits and notes.",
+						"LAYS FLAT: Twin-wire binding opens flat for easy writing.",
+						"THICK PAPER: Pens do not bleed through.",
+						"POCKET FOLDER: Keep receipts and tickets in the back pocket."
+					]
+				},
+				{
+					"path": ["Office & School Supplies", "Paper", "Cards & Card Stock", "Greeting Cards"],
+					"count": 6, "price": [5.99, 16.99],
+					"nouns": ["Pop Up Birthday Card", "Assorted Greeting Cards", "Blank Note Cards"],
+					"variants": [["With Envelopes", "Kraft Envelopes"], ["Single Card", "Box of 24", "Box of 48"], ["Musical", "Handmade Look", "Watercolor Designs"]],
+					"features": [
+						"WOW MOMENT: A 3D pop up design unfolds when the card opens.",
+						"PLAYS A TUNE: A musical chip plays a happy melody.",
+						"FOR EVERY OCCASION: Birthday, thank you and sympathy designs.",
+						"BLANK INSIDE: Room to write your own message.",
+						"MATCHING ENVELOPES: Envelopes included."
+					]
+				},
+				{
+					"path": ["Office & School Supplies", "Writing & Correction Supplies", "Pens & Refills", "Gel Ink Pens"],
+					"count": 7, "price": [7.99, 19.99],
+					"nouns": ["Retractable Gel Pens", "Fine Point Gel Pens", "Colored Gel Pen Set"],
+					"variants": [["0.5mm", "0.7mm"], ["12-Pack", "24-Pack", "36 Colors"], ["Black Ink", "Assorted Ink"]],
+					"features": [
+						"SMOOTH WRITING: Quick-drying gel ink glides without skipping.",
+						"NO SMUDGE: Dries fast, great for left-handed writers.",
+						"COMFORT GRIP: A soft grip for long notes.",
+						"BOLD COLOR: Vivid ink for journals and planners.",
+						"CLICK TO WRITE: Retractable tips mean no lost caps."
+					]
+				},
+				{
+					"path": ["Office & School Supplies", "Writing & Correction Supplies", "Highlighters"],
+					"count": 5, "price": [5.99, 14.99],
+					"nouns": ["Pastel Highlighters", "Chisel Tip Highlighters", "Dual Tip Highlighters"],
+					"variants": [["6-Pack", "12-Pack", "24-Pack"], ["Assorted Colors", "Soft Hues"], ["No Bleed", "Quick Dry"]],
+					"features": [
+						"SOFT COLORS: Pastel shades that do not overpower the page.",
+						"CHISEL TIP: Draw broad strokes or fine underlines.",
+						"NO BLEED: Safe for thin textbook and bible pages.",
+						"STUDY AID: Color-code notes by topic.",
+						"LONG LASTING: Caps seal tight to keep tips from drying."
+					]
+				},
+				{
+					"path": ["Office & School Supplies", "Paper", "Notebooks & Writing Pads", "Notebooks"],
+					"count": 7, "price": [8.99, 22.99],
+					"nouns": ["College Ruled Notebooks", "Dotted Grid Journal", "Hardcover Lined Notebook"],
+					"variants": [["5-Pack", "Single", "3-Pack"], ["A5", "8.5 x 11 in"], ["120 Pages", "200 Pages"]],
+					"features": [
+						"THICK PAGES: Smooth paper for pens and pencils.",
+						"LAYS FLAT: Opens flat for comfortable writing.",
+						"FOR CLASS OR WORK: Lined pages for notes, lists and journaling.",
+						"DURABLE COVER: Stands up to a backpack.",
+						"BOOKMARK RIBBON: Keep your place."
+					]
+				},
+				{
+					"path": ["Office & School Supplies", "Labels, Indexes & Stamps", "Labels & Stickers", "Labels"],
+					"count": 5, "price": [9.99, 24.99],
+					"nouns": ["Printable Address Labels", "Round Sticker Labels", "Removable Storage Labels"],
+					"variants": [["750 Labels", "1500 Labels", "300 Labels"], ["White", "Kraft"], ["Laser and Inkjet", "Water Resistant"]],
+					"features": [
+						"PRINT AT HOME: Works with laser and inkjet printers.",
+						"STRONG HOLD: Sticks to envelopes, boxes and jars.",
+						"CLEAN REMOVAL: Removable labels peel off without residue.",
+						"FREE TEMPLATES: Standard sizes for common templates.",
+						"ORGANIZE: Label pantry jars, bins and files."
+					]
+				},
+				{
+					"path": ["Office Electronics", "Label Makers"],
+					"count": 5, "price": [24.99, 59.99],
+					"nouns": ["Portable Label Maker", "Handheld Label Printer", "Label Maker with Tape"],
+					"variants": [["QWERTY Keyboard", "Phone App"], ["3 Tapes Included", "1 Tape Included"], ["Rechargeable", "AAA Batteries"]],
+					"features": [
+						"LABEL ANYTHING: Pantry jars, cables, files and toy bins.",
+						"EASY TYPING: A full keyboard and clear screen.",
+						"MANY STYLES: Fonts, borders and symbols built in.",
+						"NO INK: Thermal printing never needs ink.",
+						"PORTABLE: Small enough to carry around the house."
+					]
+				},
+				{
+					"path": ["Office Electronics", "Calculators", "Desktop Calculators"],
+					"count": 5, "price": [9.99, 24.99],
+					"nouns": ["Desktop Calculator", "Large Display Calculator", "Solar Desk Calculator"],
+					"variants": [["12-Digit", "10-Digit"], ["Solar and Battery", "Battery"], ["Big Buttons", "Tilted Display"]],
+					"features": [
+						"EASY TO READ: A large, tilted display.",
+						"BIG KEYS: Responsive buttons for fast entry.",
+						"DUAL POWER: Solar with battery backup.",
+						"EVERYDAY MATH: Percent, square root and memory keys.",
+						"STURDY: Non-slip feet keep it still on the desk."
+					]
+				},
+				{
+					"path": ["Office Furniture & Lighting", "Desk Lamps"],
+					"count": 6, "price": [19.99, 49.99],
+					"nouns": ["LED Desk Lamp", "Architect Desk Lamp", "Clamp Desk Lamp"],
+					"variants": [["Dimmable", "5 Color Modes"], ["USB Charging Port", "Timer"], ["Black", "White", "Silver"]],
+					"features": [
+						"EYE FRIENDLY: Flicker-free light for late study sessions.",
+						"ADJUSTABLE: A flexible arm points light where you need it.",
+						"CHARGE YOUR PHONE: A USB port in the base.",
+						"TOUCH CONTROL: Tap to change brightness and color.",
+						"SAVES SPACE: A slim base or clamp mount."
+					]
+				}
+			]
+		},
+		{
+			"name": "Patio, Lawn & Garden",
+			"brands": ["Greenhollow", "Terrawick", "Sunbarrow", "Mossgate", "Fernhaven", "Rainhollow", "Birchway", "Loamsley"],
+			"generic_features": [
+				"BUILT FOR OUTDOORS: Weather-resistant materials handle sun and rain.",
+				"YARD TESTED: Tested through a full growing season before release.",
+				"GARDENER SUPPORT: Questions answered by our garden team."
+			],
+			"leaves": [
+				{
+					"path": ["Gardening & Lawn Care", "Watering Equipment", "Garden Hoses"],
+					"count": 8, "price": [24.99, 59.99],
+					"nouns": ["Expandable Garden Hose", "Kink Free Garden Hose", "Lightweight Hybrid Hose"],
+					"variants": [["50 ft", "75 ft", "100 ft", "25 ft"], ["10 Pattern Spray Nozzle", "Brass Fittings"], ["Leakproof", "Burst Resistant"]],
+					"features": [
+						"NO KINKS: A flexible core that will not kink or tangle around the yard.",
+						"EXPANDS AND SHRINKS: The hose stretches to full length with water and shrinks for storage.",
+						"SOLID BRASS: Brass connectors that do not leak or crack.",
+						"SPRAY NOZZLE: Ten patterns for plants, cars and patios.",
+						"LIGHTWEIGHT: Easy to carry and coil."
+					]
+				},
+				{
+					"path": ["Gardening & Lawn Care", "Watering Equipment", "Automatic Irrigation Equipment", "Drip Irrigation Kits"],
+					"count": 5, "price": [19.99, 44.99],
+					"nouns": ["Drip Irrigation Kit", "Garden Watering System", "Micro Drip Kit"],
+					"variants": [["50 ft Tubing", "100 ft Tubing"], ["Adjustable Emitters", "Timer Ready"], ["Raised Bed Kit", "Container Kit"]],
+					"features": [
+						"WATER AT THE ROOTS: Drip tubing delivers water where the vegetable bed needs it.",
+						"SAVE WATER: Uses far less than a sprinkler.",
+						"TOOL FREE: Push-fit connectors snap together.",
+						"CUSTOMIZABLE: Cut the tubing to fit any bed or planter.",
+						"ADD A TIMER: Connects to a standard hose timer."
+					]
+				},
+				{
+					"path": ["Patio Furniture & Accessories", "Umbrellas & Shade", "Umbrellas"],
+					"count": 6, "price": [49.99, 149.99],
+					"nouns": ["Patio Umbrella", "Offset Cantilever Umbrella", "Market Table Umbrella"],
+					"variants": [["9 ft", "10 ft", "7.5 ft"], ["Push Button Tilt", "Crank Lift"], ["Navy", "Tan", "Terracotta", "Forest Green"]],
+					"features": [
+						"SHADE THE DECK: A wide canopy shades the patio table or deck.",
+						"FADE RESISTANT: UV-protected fabric keeps its color.",
+						"TILT FOR SUN: Angle the canopy as the sun moves.",
+						"EASY OPEN: A smooth crank raises the umbrella.",
+						"AIR VENT: A top vent lets wind through."
+					]
+				},
+				{
+					"path": ["Pest Control", "Repellents", "Ultrasonic Repellers"],
+					"count": 5, "price": [19.99, 39.99],
+					"nouns": ["Solar Animal Repeller", "Ultrasonic Deer Repeller", "Outdoor Critter Repeller"],
+					"variants": [["2-Pack", "4-Pack"], ["Motion Activated", "Flashing Light"], ["Solar Powered", "USB Rechargeable"]],
+					"features": [
+						"SOLAR POWERED: Charges in the sun, no wiring.",
+						"ULTRASONIC SOUND: Sends deer, raccoons and cats out of the garden.",
+						"MOTION SENSOR: Activates when an animal comes close.",
+						"WEATHERPROOF: Stake it in the lawn through rain.",
+						"HUMANE: No traps or poisons."
+					]
+				},
+				{
+					"path": ["Gardening & Lawn Care", "Pots, Planters & Container Accessories", "Planters"],
+					"count": 7, "price": [14.99, 44.99],
+					"nouns": ["Ceramic Plant Pots", "Self Watering Planter", "Raised Garden Bed Planter"],
+					"variants": [["Set of 3", "Single", "Set of 2"], ["6 inch", "8 inch", "10 inch"], ["Drainage Hole", "Saucer Included"]],
+					"features": [
+						"HEALTHY ROOTS: A drainage hole prevents soggy soil.",
+						"SELF WATERING: A reservoir keeps plants watered while you travel.",
+						"INDOOR OR OUTDOOR: Durable enough for patios and windowsills.",
+						"MODERN LOOK: Clean shapes that suit any room.",
+						"GROW FOOD: Room for herbs and salad greens."
+					]
+				},
+				{
+					"path": ["Outdoor Décor", "Outdoor Lighting", "Pathway Lights"],
+					"count": 7, "price": [19.99, 49.99],
+					"nouns": ["Solar Pathway Lights", "Solar Garden Lights", "Outdoor Stake Lights"],
+					"variants": [["8-Pack", "12-Pack", "6-Pack"], ["Warm White", "Color Changing"], ["Auto On at Dusk", "Waterproof"]],
+					"features": [
+						"SOLAR POWERED: No wiring; lights charge in daylight.",
+						"AUTO ON: Turns on at dusk and off at dawn.",
+						"LIGHT THE WAY: Brightens walkways and driveways.",
+						"WEATHERPROOF: Handles rain and snow.",
+						"EASY INSTALL: Push the stakes into the ground."
+					]
+				},
+				{
+					"path": ["Gardening & Lawn Care", "Hand Tools", "Pruning Shears"],
+					"count": 6, "price": [12.99, 34.99],
+					"nouns": ["Bypass Pruning Shears", "Garden Pruners", "Heavy Duty Loppers"],
+					"variants": [["SK5 Steel Blade", "Titanium Coated"], ["Safety Lock", "Ergonomic Grip"], ["Single", "2-Pack"]],
+					"features": [
+						"CLEAN CUTS: A sharp bypass blade cuts stems without crushing them.",
+						"COMFORT GRIP: Cushioned handles reduce hand fatigue.",
+						"SAFETY LOCK: Locks closed for storage.",
+						"RUST RESISTANT: Coated blades.",
+						"FOR ROSES AND SHRUBS: Trim flowers, herbs and branches."
+					]
+				},
+				{
+					"path": ["Patio Furniture & Accessories", "Patio Seating", "Chair Cushions"],
+					"count": 5, "price": [24.99, 59.99],
+					"nouns": ["Outdoor Chair Cushions", "Patio Seat Cushions", "Deep Seat Cushion Set"],
+					"variants": [["Set of 2", "Set of 4"], ["Navy", "Stripe", "Sand"], ["Water Resistant", "Ties Included"]],
+					"features": [
+						"PLUSH COMFORT: Thick fill for long evenings on the patio.",
+						"WEATHER READY: Water-resistant fabric dries fast.",
+						"STAYS PUT: Ties keep cushions on the chairs.",
+						"FADE RESISTANT: UV-protected fabric.",
+						"EASY CARE: Spot clean with mild soap."
+					]
+				},
+				{
+					"path": ["Grills & Outdoor Cooking", "Grilling Tools & Accessories", "Grill Tool Sets"],
+					"count": 6, "price": [19.99, 49.99],
+					"nouns": ["BBQ Grill Tool Set", "Stainless Grill Utensils", "Grill Brush and Scraper"],
+					"variants": [["20-Piece", "5-Piece", "Single"], ["Carry Case", "Heat-Resistant Handles"], ["Stainless Steel", "Bristle Free"]],
+					"features": [
+						"BACKYARD READY: Spatula, tongs and fork for every cookout.",
+						"HEAVY DUTY: Thick stainless steel that will not bend.",
+						"LONG HANDLES: Keep hands away from the heat.",
+						"CARRY CASE: Keeps tools together for camping.",
+						"EASY CLEAN: Dishwasher safe."
+					]
+				},
+				{
+					"path": ["Gardening & Lawn Care", "Plants, Seeds & Bulbs", "Vegetable Seeds"],
+					"count": 5, "price": [8.99, 19.99],
+					"nouns": ["Heirloom Vegetable Seed Kit", "Salad Greens Seed Pack", "Herb Seed Variety Pack"],
+					"variants": [["15 Varieties", "30 Varieties", "10 Varieties"], ["Non-GMO", "Open Pollinated"], ["Planting Guide", "Plant Markers"]],
+					"features": [
+						"GROW YOUR OWN: Tomatoes, peppers, lettuce and more for the vegetable bed.",
+						"HIGH GERMINATION: Fresh seed tested for sprouting.",
+						"BEGINNER FRIENDLY: A simple planting guide is included.",
+						"HEIRLOOM: Save seeds for next season.",
+						"GIFT READY: A great gift for new gardeners."
+					]
+				}
+			]
+		},
+		{
+			"name": "Pet Supplies",
+			"brands": ["Pawvista", "Whiskerwell", "Barkhaven", "Furlough & Co", "Tailbright", "Snoutly", "Meadowpaw", "Kibblecrest"],
+			"generic_features": [
+				"PET PARENT APPROVED: Tested with our own dogs and cats.",
+				"SAFE MATERIALS: Non-toxic materials chosen for curious mouths.",
+				"HAPPY GUARANTEE: Not a fit for your pet? We will make it right."
+			],
+			"leaves": [
+				{
+					"path": ["Dogs", "Training & Behavior Aids", "Sonic Bark Deterrents"],
+					"count": 8, "price": [19.99, 39.99],
+					"nouns": ["Ultrasonic Bark Control Device", "Anti Barking Device", "Outdoor Bark Deterrent"],
+					"variants": [["3 Levels", "4 Modes"], ["Rechargeable", "Battery Powered"], ["Indoor and Outdoor", "50 ft Range"]],
+					"features": [
+						"STOP BARKING: A high-pitched tone the dog hears interrupts nuisance barking.",
+						"HUMANE: No shocks or sprays.",
+						"WORKS ON NEIGHBORS: Hang it on the fence to calm the dog next door.",
+						"AUTO DETECT: A microphone triggers the tone only when a dog barks.",
+						"WEATHERPROOF: Built for backyards."
+					]
+				},
+				{
+					"path": ["Dogs", "Health Supplies", "Dental Care", "Toothpaste"],
+					"count": 4, "price": [7.99, 15.99],
+					"nouns": ["Enzymatic Dog Toothpaste", "Dog Dental Kit", "Dog Toothpaste and Brush Set"],
+					"variants": [["Poultry Flavor", "Peanut Butter Flavor"], ["2.5 oz", "Kit"], ["No Rinse", "Finger Brush Included"]],
+					"features": [
+						"FRESH BREATH: Enzymes fight dog breath and plaque.",
+						"TASTY: A flavor dogs like, so brushing is easier.",
+						"SAFE TO SWALLOW: No foaming agents or fluoride.",
+						"COMPLETE KIT: Brush and finger brush included.",
+						"VET RECOMMENDED ROUTINE: Brush a few times a week."
+					]
+				},
+				{
+					"path": ["Dogs", "Beds & Furniture", "Beds"],
+					"count": 7, "price": [29.99, 79.99],
+					"nouns": ["Orthopedic Dog Bed", "Calming Donut Dog Bed", "Bolster Dog Bed"],
+					"variants": [["Medium", "Large", "Extra Large"], ["Removable Cover", "Waterproof Liner"], ["Gray", "Brown", "Cream"]],
+					"features": [
+						"JOINT SUPPORT: Egg-crate foam cushions older dogs.",
+						"CALMING: Raised rims give a sense of security.",
+						"WASHABLE: The cover zips off for the washer.",
+						"NON-SKID BASE: Stays in place on hard floors.",
+						"ROOM TO STRETCH: Sized for big sprawling sleepers."
+					]
+				},
+				{
+					"path": ["Dogs", "Collars, Harnesses & Leashes", "Harnesses"],
+					"count": 7, "price": [14.99, 34.99],
+					"nouns": ["No Pull Dog Harness", "Reflective Dog Harness", "Step In Dog Harness"],
+					"variants": [["Small", "Medium", "Large"], ["Front Clip", "Handle on Top"], ["Red", "Black", "Blue"]],
+					"features": [
+						"NO PULL: A front clip gently steers the dog on walks.",
+						"REFLECTIVE: Stitching glows in headlights.",
+						"PADDED: Soft mesh prevents chafing.",
+						"EASY ON: Quick-release buckles.",
+						"HANDLE: A top handle for quick control."
+					]
+				},
+				{
+					"path": ["Dogs", "Toys", "Chew Toys"],
+					"count": 6, "price": [9.99, 24.99],
+					"nouns": ["Tough Dog Chew Toy", "Rubber Chew Bone", "Treat Dispensing Toy"],
+					"variants": [["Medium Dogs", "Large Dogs"], ["Natural Rubber", "Nylon"], ["Bacon Scent", "Peppermint Scent"]],
+					"features": [
+						"FOR POWER CHEWERS: Dense rubber stands up to strong jaws.",
+						"KEEPS BUSY: Hide treats inside for a puzzle.",
+						"CLEANS TEETH: Ridges help clean while chewing.",
+						"BOUNCES: Unpredictable bounces for fetch.",
+						"SAFE: Non-toxic and free of BPA."
+					]
+				},
+				{
+					"path": ["Cats", "Litter & Housebreaking", "Litter Mats"],
+					"count": 5, "price": [14.99, 29.99],
+					"nouns": ["Cat Litter Mat", "Honeycomb Litter Trapping Mat", "Waterproof Litter Mat"],
+					"variants": [["24 x 16 in", "35 x 23 in"], ["Double Layer", "Soft Foam"], ["Gray", "Beige"]],
+					"features": [
+						"TRAPS LITTER: Honeycomb holes catch scattered litter.",
+						"WATERPROOF: A sealed bottom protects the floor.",
+						"EASY TO EMPTY: Open the layers and pour litter back.",
+						"SOFT ON PAWS: Comfortable for cats to walk on.",
+						"NON-SLIP: Stays flat in front of the box."
+					]
+				},
+				{
+					"path": ["Cats", "Toys", "Teaser Wands"],
+					"count": 6, "price": [7.99, 17.99],
+					"nouns": ["Cat Feather Wand Toy", "Interactive Cat Teaser", "Retractable Cat Wand"],
+					"variants": [["10 Refills", "5 Refills"], ["Bell Attached", "Crinkle Tail"], ["Telescoping", "Fixed Length"]],
+					"features": [
+						"INDOOR EXERCISE: Chasing keeps indoor cats active.",
+						"FEATHER REFILLS: Swap attachments to keep play fresh.",
+						"BONDING TIME: Interactive play with your cat.",
+						"TELESCOPING: Extends for long throws.",
+						"SAFE: Secure attachments."
+					]
+				},
+				{
+					"path": ["Cats", "Beds & Furniture", "Cat Trees"],
+					"count": 5, "price": [39.99, 99.99],
+					"nouns": ["Cat Tree Tower", "Small Cat Condo", "Cat Scratching Tree"],
+					"variants": [["36 in", "54 in", "60 in"], ["Sisal Posts", "Hammock"], ["Gray", "Beige"]],
+					"features": [
+						"CLIMB AND PERCH: Multiple levels to climb and lounge.",
+						"SCRATCH POSTS: Sisal posts save the furniture.",
+						"COZY CONDO: A hideaway for naps.",
+						"STABLE BASE: Wide base keeps the tower steady.",
+						"EASY ASSEMBLY: Tools included."
+					]
+				},
+				{
+					"path": ["Cats", "Feeding & Watering Supplies", "Fountains"],
+					"count": 5, "price": [22.99, 44.99],
+					"nouns": ["Cat Water Fountain", "Stainless Pet Fountain", "Quiet Pet Water Fountain"],
+					"variants": [["2L", "3L"], ["LED Light", "Low Water Alert"], ["Filters Included", "Stainless Steel"]],
+					"features": [
+						"FRESH WATER: Flowing water encourages cats to drink more.",
+						"FILTERED: Filters remove hair and debris.",
+						"WHISPER QUIET: A quiet pump.",
+						"EASY TO CLEAN: Dishwasher-safe parts.",
+						"LOW WATER ALERT: A light shows when it needs a refill."
+					]
+				},
+				{
+					"path": ["Fish & Aquatic Pets", "Aquarium Lights"],
+					"count": 4, "price": [24.99, 59.99],
+					"nouns": ["LED Aquarium Light", "Full Spectrum Fish Tank Light", "Clip On Aquarium Light"],
+					"variants": [["12-18 in Tanks", "24-36 in Tanks"], ["Timer", "Dimmable"], ["Blue and White", "Full Spectrum"]],
+					"features": [
+						"BRIGHT COLORS: Full spectrum makes fish and plants pop.",
+						"PLANT GROWTH: Supports live aquarium plants.",
+						"DAY AND NIGHT: Timer mimics sunrise and sunset.",
+						"ADJUSTABLE: Extendable brackets fit many tanks.",
+						"ENERGY SAVING: Low-power LEDs."
+					]
+				},
+				{
+					"path": ["Small Animals", "Chews & Toys"],
+					"count": 3, "price": [6.99, 14.99],
+					"nouns": ["Small Animal Chew Toys", "Rabbit Chew Sticks", "Hamster Chew Set"],
+					"variants": [["10-Pack", "20-Pack"], ["Applewood", "Willow"], ["Natural", "No Dyes"]],
+					"features": [
+						"HEALTHY TEETH: Chewing keeps growing teeth trim.",
+						"NATURAL WOOD: Untreated wood and grass.",
+						"BOREDOM BUSTER: Many shapes to explore.",
+						"FOR SMALL PETS: Rabbits, hamsters and guinea pigs.",
+						"SAFE: No glue or dyes."
+					]
+				}
+			]
+		},
+		{
+			"name": "Sports & Outdoors",
+			"brands": ["Ridgeline Gear", "Kestrow", "Northvale", "Summitra", "Coldwater Co", "Trailhenge", "Velocia", "Basinwood"],
+			"generic_features": [
+				"FIELD TESTED: Put through a season of real use before launch.",
+				"PACKS SMALL: Easy to carry to the park, trail or gym.",
+				"ACTIVE GUARANTEE: Covered against defects for a full year."
+			],
+			"leaves": [
+				{
+					"path": ["Fan Shop", "Clothing", "T-Shirts"],
+					"count": 6, "price": [19.99, 34.99],
+					"nouns": ["Harbor City Gulls Fan T-Shirt", "Pine Valley Rangers Fan Tee", "Ironbridge Foundry Fan Shirt"],
+					"variants": [["Adult Unisex", "Youth"], ["Navy", "Heather Gray", "Red"], ["Distressed Logo", "Vintage Print"]],
+					"features": [
+						"GAME DAY: Show support for the home team.",
+						"SOFT BLEND: A cotton blend that feels broken in.",
+						"CLASSIC FIT: Relaxed fit for tailgates and couches.",
+						"LASTING PRINT: The graphic holds up wash after wash.",
+						"FOR EVERY FAN: Sizes for adults and kids."
+					]
+				},
+				{
+					"path": ["Exercise & Fitness", "Yoga", "Yoga Mats"],
+					"count": 7, "price": [19.99, 49.99],
+					"nouns": ["Non Slip Yoga Mat", "Extra Thick Exercise Mat", "Travel Yoga Mat"],
+					"variants": [["6mm", "10mm", "4mm"], ["Carry Strap", "Alignment Lines"], ["Purple", "Teal", "Black"]],
+					"features": [
+						"GRIP: A textured surface stops slipping in downward dog.",
+						"CUSHIONED: Extra thickness protects knees and wrists.",
+						"LIGHTWEIGHT: Easy to carry to class.",
+						"EASY TO CLEAN: Wipe down after each session.",
+						"ALIGNMENT LINES: Guides for hand and foot placement."
+					]
+				},
+				{
+					"path": ["Exercise & Fitness", "Strength Training Equipment", "Dumbbells"],
+					"count": 6, "price": [29.99, 89.99],
+					"nouns": ["Adjustable Dumbbell Set", "Neoprene Dumbbells", "Hex Dumbbell Pair"],
+					"variants": [["5 lb Pair", "10 lb Pair", "25 lb Set", "52 lb Adjustable"], ["Anti Roll", "Rack Included"], ["Black", "Pink", "Teal"]],
+					"features": [
+						"HOME GYM: Strength workouts without a membership.",
+						"ANTI ROLL: Hex ends keep dumbbells from rolling away.",
+						"COMFORT GRIP: Knurled handles for a secure hold.",
+						"SAVES SPACE: Adjust weight instead of buying a rack.",
+						"DURABLE COATING: Protects floors."
+					]
+				},
+				{
+					"path": ["Outdoor Recreation", "Camping & Hiking", "Hydration & Filtration", "Water Bottles"],
+					"count": 7, "price": [14.99, 34.99],
+					"nouns": ["Stainless Steel Water Bottle", "Insulated Sports Bottle", "Wide Mouth Water Bottle"],
+					"variants": [["24 oz", "32 oz", "40 oz"], ["Straw Lid", "Chug Lid"], ["Glacier Blue", "Black", "Olive"]],
+					"features": [
+						"COLD FOR HOURS: Double-wall stainless steel keeps water cold all day.",
+						"LEAKPROOF: Toss it in a gym bag.",
+						"WIDE MOUTH: Fits ice cubes and cleans easily.",
+						"TOUGH: Powder coat resists dents and scratches.",
+						"BPA FREE: Food-grade materials."
+					]
+				},
+				{
+					"path": ["Hunting & Fishing", "Fishing", "Fishing Lures, Baits & Attractants", "Lures"],
+					"count": 7, "price": [9.99, 24.99],
+					"nouns": ["Fishing Lure Kit", "Soft Plastic Bait Set", "Topwater Lure Set"],
+					"variants": [["60 Pieces", "100 Pieces", "12 Pieces"], ["Tackle Box Included", "Hooks Included"], ["Bass", "Trout", "Freshwater"]],
+					"features": [
+						"CATCH MORE: Lifelike action draws strikes from bass and trout.",
+						"VARIETY: Crankbaits, spinners and soft baits in one kit.",
+						"SHARP HOOKS: Strong hooks that hold.",
+						"ORGANIZED: A tackle box keeps everything sorted.",
+						"GREAT GIFT: A starter kit for new anglers."
+					]
+				},
+				{
+					"path": ["Outdoor Recreation", "Camping & Hiking", "Backpacks & Bags", "Hiking Daypacks"],
+					"count": 7, "price": [29.99, 79.99],
+					"nouns": ["Lightweight Hiking Daypack", "Packable Travel Backpack", "Hydration Backpack"],
+					"variants": [["20L", "30L", "40L"], ["Water Resistant", "Rain Cover"], ["Laptop Sleeve", "Hip Belt"]],
+					"features": [
+						"LIGHTWEIGHT: Barely noticeable on the back.",
+						"PACKABLE: Folds into its own pocket for travel.",
+						"ORGANIZED: Many pockets for snacks, keys and a jacket.",
+						"COMFORT: Padded straps and a breathable back.",
+						"WATER RESISTANT: Keeps gear dry in drizzle."
+					]
+				},
+				{
+					"path": ["Outdoor Recreation", "Camping & Hiking", "Tents & Shelters", "Camping Tents"],
+					"count": 5, "price": [59.99, 179.99],
+					"nouns": ["Dome Camping Tent", "Instant Cabin Tent", "Backpacking Tent"],
+					"variants": [["2 Person", "4 Person", "6 Person"], ["Rainfly Included", "Instant Setup"], ["Mesh Roof", "Vestibule"]],
+					"features": [
+						"QUICK SETUP: Pitch the tent in minutes.",
+						"WEATHER READY: A full rainfly and taped seams.",
+						"ROOMY: Space for sleeping pads and gear.",
+						"VENTILATION: Mesh panels for summer nights.",
+						"CARRY BAG: Packs down for the trunk."
+					]
+				},
+				{
+					"path": ["Sports", "Team Sports", "Soccer", "Soccer Balls"],
+					"count": 5, "price": [14.99, 34.99],
+					"nouns": ["Soccer Ball", "Training Soccer Ball", "Match Soccer Ball"],
+					"variants": [["Size 5", "Size 4", "Size 3"], ["Pump Included", "Machine Stitched"], ["White and Blue", "Neon Yellow"]],
+					"features": [
+						"TRUE FLIGHT: A balanced build for accurate passes.",
+						"DURABLE: Holds up on grass and turf.",
+						"SOFT TOUCH: Comfortable to head and trap.",
+						"HOLDS AIR: A butyl bladder keeps its shape.",
+						"PUMP INCLUDED: Ready to play out of the box."
+					]
+				},
+				{
+					"path": ["Sports & Outdoor Recreation Accessories", "Stadium Seats"],
+					"count": 4, "price": [29.99, 59.99],
+					"nouns": ["Stadium Seat with Back Support", "Folding Bleacher Seat", "Wide Stadium Chair"],
+					"variants": [["Extra Wide", "Standard"], ["Armrests", "Cup Holder"], ["Navy", "Black", "Red"]],
+					"features": [
+						"BACK SUPPORT: A padded backrest makes long games comfortable.",
+						"CLIPS ON: Hooks onto bleachers.",
+						"FOLDS FLAT: Carry it with a shoulder strap.",
+						"POCKETS: Storage for a phone and snacks.",
+						"WATER RESISTANT: Wipes clean."
+					]
+				},
+				{
+					"path": ["Clothing", "Men", "Shorts", "Running Shorts"],
+					"count": 6, "price": [16.99, 32.99],
+					"nouns": ["Men's Running Shorts", "Men's 2-in-1 Running Shorts", "Men's Lightweight Gym Shorts"],
+					"variants": [["5 inch", "7 inch", "9 inch"], ["Zip Pocket", "Liner"], ["Black", "Navy", "Olive"]],
+					"features": [
+						"LIGHT AND QUICK: Lightweight fabric for fast miles.",
+						"ZIP POCKET: Holds keys and a phone securely.",
+						"BUILT-IN LINER: Supportive and chafe-free.",
+						"DRIES FAST: Wicks sweat away.",
+						"REFLECTIVE: Details for early morning runs."
+					]
+				}
+			]
+		},
+		{
+			"name": "Tools & Home Improvement",
+			"brands": ["Forgewell", "Stoutmere", "Ironquill", "Brackenworks", "Tallgrain", "Holdfast Tools", "Emberline", "Pivotcraft"],
+			"generic_features": [
+				"PRO GRADE: Built for daily use on job sites and at home.",
+				"CLEAR INSTRUCTIONS: Step-by-step guide included.",
+				"BACKED BY US: One-year warranty against defects."
+			],
+			"leaves": [
+				{
+					"path": ["Safety & Security", "Personal Protective Equipment", "Masks & Respirators", "Disposable Cup Dust Safety Masks"],
+					"count": 5, "price": [12.99, 29.99],
+					"nouns": ["Disposable Dust Masks", "Individually Wrapped Face Masks", "Cup Style Dust Masks"],
+					"variants": [["20-Pack", "50-Pack"], ["Individually Wrapped", "Valved"], ["Adjustable Nose Clip", "Soft Ear Loops"]],
+					"features": [
+						"INDIVIDUALLY WRAPPED: Each disposable face mask comes in its own sealed pouch.",
+						"COMFORT FIT: An adjustable nose clip and soft straps.",
+						"FOR DUSTY JOBS: Sanding, sweeping and yard work.",
+						"BREATHABLE: Easy breathing during long tasks.",
+						"BULK PACK: Plenty for the garage and workshop."
+					]
+				},
+				{
+					"path": ["Safety & Security", "Personal Protective Equipment", "Work Gloves"],
+					"count": 6, "price": [9.99, 24.99],
+					"nouns": ["Work Gloves", "Cut Resistant Gloves", "Leather Work Gloves"],
+					"variants": [["Medium", "Large", "X-Large"], ["3 Pairs", "1 Pair", "6 Pairs"], ["Touchscreen Tips", "Nitrile Coated"]],
+					"features": [
+						"GRIP: Coated palms hold tools and lumber.",
+						"PROTECTION: Guards against cuts and scrapes.",
+						"BREATHABLE: Knit backs keep hands cool.",
+						"TOUCHSCREEN: Use a phone without taking them off.",
+						"MULTIPACK: Keep spares in the truck."
+					]
+				},
+				{
+					"path": ["Light Bulbs", "LED Bulbs"],
+					"count": 7, "price": [9.99, 29.99],
+					"nouns": ["LED Light Bulbs", "Dimmable LED Bulbs", "Edison Style LED Bulbs"],
+					"variants": [["60W Equivalent", "100W Equivalent", "40W Equivalent"], ["Soft White 2700K", "Daylight 5000K"], ["6-Pack", "12-Pack", "4-Pack"]],
+					"features": [
+						"SAVE ENERGY: Uses a fraction of the power of old bulbs.",
+						"LONG LIFE: Rated for years of normal use.",
+						"DIMMABLE: Smooth dimming with most dimmers.",
+						"INSTANT ON: Full brightness right away.",
+						"STANDARD BASE: Fits common lamps and fixtures."
+					]
+				},
+				{
+					"path": ["Lighting & Ceiling Fans", "Ceiling Lights", "Flush Mount Ceiling Lights"],
+					"count": 6, "price": [29.99, 79.99],
+					"nouns": ["LED Flush Mount Ceiling Light", "Modern Ceiling Light Fixture", "Drum Flush Mount Light"],
+					"variants": [["12 inch", "15 inch"], ["3 Color Temperatures", "Dimmable"], ["Brushed Nickel", "Matte Black"]],
+					"features": [
+						"LOW PROFILE: Sits flush for low ceilings.",
+						"BRIGHT: Evenly lights bedrooms and hallways.",
+						"CHOOSE YOUR WHITE: Switch between warm and daylight.",
+						"EASY INSTALL: Mounting hardware included.",
+						"LONG LIFE LED: No bulbs to replace."
+					]
+				},
+				{
+					"path": ["Lighting & Ceiling Fans", "Night Lights"],
+					"count": 5, "price": [9.99, 21.99],
+					"nouns": ["Plug In Night Light", "Motion Sensor Night Light", "Dusk to Dawn Night Light"],
+					"variants": [["2-Pack", "4-Pack", "6-Pack"], ["Warm White", "Color Changing"], ["Dusk to Dawn Sensor", "Motion Sensor"]],
+					"features": [
+						"SOFT GLOW: Gentle light for hallways and nurseries.",
+						"AUTOMATIC: Turns on in the dark.",
+						"SLIM: Leaves the other outlet free.",
+						"LOW ENERGY: Costs pennies a year.",
+						"STICK ANYWHERE: Magnetic mounts for stairs and closets."
+					]
+				},
+				{
+					"path": ["Power & Hand Tools", "Hand Tools", "Screwdrivers & Nut Drivers", "Screwdriver Sets"],
+					"count": 6, "price": [14.99, 39.99],
+					"nouns": ["Precision Screwdriver Set", "Magnetic Screwdriver Set", "Ratcheting Screwdriver"],
+					"variants": [["32-Piece", "115-Piece", "12-Piece"], ["Magnetic Tips", "Storage Case"], ["S2 Steel Bits", "Soft Grip"]],
+					"features": [
+						"EVERY BIT: Phillips, flat, Torx and hex bits in one kit.",
+						"MAGNETIC: Tips hold screws in place.",
+						"FOR ELECTRONICS: Precision bits open phones and laptops.",
+						"ORGANIZED: A labeled case keeps bits in order.",
+						"HARD STEEL: Bits resist stripping."
+					]
+				},
+				{
+					"path": ["Power & Hand Tools", "Power Tools", "Drills", "Cordless Drills"],
+					"count": 5, "price": [49.99, 129.99],
+					"nouns": ["Cordless Drill Driver", "20V Cordless Drill Kit", "Compact Cordless Drill"],
+					"variants": [["20V", "12V"], ["2 Batteries", "1 Battery"], ["Bit Set Included", "LED Work Light"]],
+					"features": [
+						"POWERFUL: Drives screws into studs and hardwood.",
+						"TWO SPEEDS: Low for driving, high for drilling.",
+						"LIGHTWEIGHT: Comfortable overhead.",
+						"FAST CHARGE: Batteries recharge in about an hour.",
+						"KIT READY: Charger, bits and a case included."
+					]
+				},
+				{
+					"path": ["Measuring & Layout Tools", "Tape Measures"],
+					"count": 5, "price": [9.99, 24.99],
+					"nouns": ["25 ft Tape Measure", "Magnetic Tape Measure", "Digital Tape Measure"],
+					"variants": [["25 ft", "16 ft", "35 ft"], ["Magnetic Hook", "Belt Clip"], ["Fractional Markings", "Metric and Inch"]],
+					"features": [
+						"EASY READ: Bold markings on both sides.",
+						"MAGNETIC HOOK: Grabs steel studs.",
+						"LONG STANDOUT: Reaches far without bending.",
+						"TOUGH CASE: Survives drops from a ladder.",
+						"AUTO LOCK: Holds the blade in place."
+					]
+				},
+				{
+					"path": ["Safety & Security", "Home Security", "Door & Window Alarms"],
+					"count": 5, "price": [14.99, 34.99],
+					"nouns": ["Door and Window Alarm", "Magnetic Entry Alarm", "Pool Door Alarm"],
+					"variants": [["4-Pack", "8-Pack", "2-Pack"], ["Chime Mode", "Loud Alarm"], ["Batteries Included", "Wireless"]],
+					"features": [
+						"LOUD ALERT: A loud alarm sounds when a door opens.",
+						"CHIME MODE: A gentle chime when kids go outside.",
+						"PEEL AND STICK: Installs in seconds.",
+						"NO WIRING: Batteries included.",
+						"PEACE OF MIND: Protects doors, windows and cabinets."
+					]
+				},
+				{
+					"path": ["Hardware", "Hooks", "Adhesive Hooks"],
+					"count": 5, "price": [7.99, 16.99],
+					"nouns": ["Heavy Duty Adhesive Hooks", "Clear Wall Hooks", "Stainless Adhesive Hooks"],
+					"variants": [["10-Pack", "20-Pack", "6-Pack"], ["Holds 13 lb", "Holds 22 lb"], ["Waterproof", "Removable"]],
+					"features": [
+						"NO DRILLING: Stick hooks on tile, glass and painted walls.",
+						"STRONG HOLD: Hangs towels, keys and bags.",
+						"WATERPROOF: Works in bathrooms and kitchens.",
+						"CLEAN LOOK: Minimal design.",
+						"REMOVABLE: Comes off without damage when you move."
+					]
+				},
+				{
+					"path": ["Electrical", "Power Strips & Surge Protectors"],
+					"count": 5, "price": [14.99, 34.99],
+					"nouns": ["Surge Protector Power Strip", "Flat Plug Power Strip", "USB Power Strip"],
+					"variants": [["6 Outlets", "12 Outlets", "8 Outlets"], ["3 USB Ports", "USB-C Port"], ["6 ft Cord", "10 ft Cord"]],
+					"features": [
+						"SURGE PROTECTION: Guards electronics from power spikes.",
+						"FLAT PLUG: Fits behind furniture.",
+						"USB CHARGING: Charge phones without adapters.",
+						"WIDE SPACING: Room for bulky adapters.",
+						"MOUNTABLE: Keyhole slots for the wall or desk."
+					]
+				}
+			]
+		},
+		{
+			"name": "Arts, Crafts & Sewing",
+			"brands": ["Crafthollow", "Loomhart", "Brushwick", "Petalworks", "Yarnhaven", "Stitchmere", "Colorwell", "Paperwhim"],
+			"generic_features": [
+				"CREATIVE GIFT: A thoughtful gift for crafters of every age.",
+				"NON-TOXIC: Conforms to common safety standards for art materials.",
+				"MAKER SUPPORT: Ideas and how-to sheets included."
+			],
+			"leaves": [
+				{
+					"path": ["Painting, Drawing & Art Supplies", "Painting", "Paint-By-Number Kits", "Adults' Paint-By-Number Kits"],
+					"count": 7, "price": [12.99, 29.99],
+					"nouns": ["Adult Paint by Numbers Kit", "Adult Diamond Painting Kit", "Diamond Art Kit"],
+					"variants": [["16 x 20 in", "12 x 16 in"], ["Mountain Lake", "Sunflower Field", "Coastal Village", "Starry Harbor"], ["Framed Canvas", "Rolled Canvas"]],
+					"features": [
+						"RELAXING PROJECT: A calming evening activity for adults.",
+						"DIAMOND ART: Place sparkling resin diamonds by number for a shimmering picture.",
+						"EVERYTHING INCLUDED: Canvas, paints or diamonds, brushes and tools.",
+						"NUMBERED CANVAS: Clear printed numbers make it easy to follow.",
+						"WALL READY: Frame it or hang it when finished."
+					]
+				},
+				{
+					"path": ["Painting, Drawing & Art Supplies", "Painting", "Brushes"],
+					"count": 6, "price": [8.99, 19.99],
+					"nouns": ["Paint Brush Set", "Detail Paint Brushes", "Watercolor Brush Set"],
+					"variants": [["15-Piece", "10-Piece", "24-Piece"], ["Synthetic Bristles", "Round and Flat"], ["Carry Case", "Palette Knife"]],
+					"features": [
+						"FOR EVERY MEDIUM: Acrylic, oil and watercolor.",
+						"FINE DETAIL: Tiny tips for miniatures.",
+						"HOLDS PAINT: Bristles carry color smoothly.",
+						"STURDY FERRULES: No shedding.",
+						"CASE INCLUDED: Protects bristles."
+					]
+				},
+				{
+					"path": ["Painting, Drawing & Art Supplies", "Drawing", "Colored Pencils"],
+					"count": 6, "price": [9.99, 29.99],
+					"nouns": ["Colored Pencils Set", "Artist Colored Pencils", "Watercolor Pencils"],
+					"variants": [["72 Colors", "48 Colors", "120 Colors"], ["Tin Case", "Zip Case"], ["Soft Core", "Sharpener Included"]],
+					"features": [
+						"RICH COLOR: Soft cores lay down vivid color.",
+						"BLENDS WELL: Layer and blend for shading.",
+						"FOR COLORING BOOKS: Great for adults and kids.",
+						"BREAK RESISTANT: Strong cores survive sharpening.",
+						"ORGANIZED: A case with every color in view."
+					]
+				},
+				{
+					"path": ["Beading & Jewelry Making", "Beads"],
+					"count": 7, "price": [9.99, 24.99],
+					"nouns": ["Glass Seed Beads Kit", "Clay Bead Bracelet Kit", "Letter Beads Kit"],
+					"variants": [["24 Colors", "48 Colors"], ["Elastic Cord Included", "Organizer Box"], ["4mm", "6mm"]],
+					"features": [
+						"MAKE BRACELETS: Everything to make friendship bracelets.",
+						"ORGANIZED: A compartment box keeps colors apart.",
+						"LETTERS: Spell names and words.",
+						"GIFT FOR KIDS: A favorite craft for sleepovers.",
+						"ELASTIC CORD: Stretchy cord included."
+					]
+				},
+				{
+					"path": ["Crafting", "Paper & Paper Crafts", "Origami Paper"],
+					"count": 5, "price": [6.99, 15.99],
+					"nouns": ["Origami Paper Pack", "Double Sided Origami Paper", "Patterned Folding Paper"],
+					"variants": [["200 Sheets", "100 Sheets"], ["6 x 6 in", "3 x 3 in"], ["Vivid Colors", "Patterned"]],
+					"features": [
+						"CRISP FOLDS: Thin paper holds sharp creases.",
+						"DOUBLE SIDED: Color on both sides.",
+						"MANY COLORS: A rainbow of shades.",
+						"GUIDE INCLUDED: Step-by-step models for beginners.",
+						"CLASSROOM PACK: Enough for a whole class."
+					]
+				},
+				{
+					"path": ["Crafting", "Craft Supplies", "Hot Glue Guns"],
+					"count": 5, "price": [12.99, 29.99],
+					"nouns": ["Mini Hot Glue Gun", "Cordless Glue Gun", "Full Size Glue Gun Kit"],
+					"variants": [["30 Glue Sticks", "50 Glue Sticks"], ["Fast Heating", "Stand Included"], ["20W", "60W"]],
+					"features": [
+						"HEATS FAST: Ready to glue in minutes.",
+						"PRECISE: A fine nozzle for detailed work.",
+						"STICKS INCLUDED: A pack of glue sticks in the box.",
+						"SAFE STAND: A fold-out stand keeps it upright.",
+						"FOR CRAFTS AND REPAIRS: Wood, fabric, paper and plastic."
+					]
+				},
+				{
+					"path": ["Sewing", "Sewing Notions & Supplies", "Sewing Kits"],
+					"count": 6, "price": [12.99, 29.99],
+					"nouns": ["Adult Sewing Kit", "Travel Sewing Kit", "Deluxe Sewing Supplies Kit"],
+					"variants": [["130 Pieces", "90 Pieces", "200 Pieces"], ["Zip Case", "Storage Box"], ["24 Thread Colors", "38 Thread Colors"]],
+					"features": [
+						"QUICK FIXES: Mend seams and sew on buttons.",
+						"COMPLETE: Needles, thread, scissors and a tape measure.",
+						"ORGANIZED: A zip case with elastic loops.",
+						"TRAVEL SIZE: Fits a suitcase.",
+						"GREAT GIFT: For students and new homeowners."
+					]
+				},
+				{
+					"path": ["Sewing", "Fabric", "Quilting Fabric"],
+					"count": 6, "price": [9.99, 24.99],
+					"nouns": ["Precut Fat Quarters", "Quilting Cotton Fabric Bundle", "Charm Pack Squares"],
+					"variants": [["10 Pieces", "20 Pieces", "40 Pieces"], ["Floral", "Batik", "Solids"], ["18 x 22 in", "5 x 5 in"]],
+					"features": [
+						"QUILTING COTTON: Soft, tightly woven cotton.",
+						"PRECUT: Ready to sew, no measuring.",
+						"COORDINATED: Prints that go together.",
+						"COLORFAST: Holds color in the wash.",
+						"MANY PROJECTS: Quilts, masks and pillows."
+					]
+				},
+				{
+					"path": ["Knitting & Crochet", "Yarn"],
+					"count": 7, "price": [11.99, 29.99],
+					"nouns": ["Acrylic Yarn Bundle", "Chunky Knitting Yarn", "Cotton Crochet Yarn"],
+					"variants": [["12 Skeins", "6 Skeins", "3 Skeins"], ["Worsted Weight", "Bulky Weight"], ["Pastels", "Earth Tones", "Rainbow"]],
+					"features": [
+						"SOFT TOUCH: Soft enough for scarves and baby blankets.",
+						"EASY TO WORK: Smooth strands do not split.",
+						"MANY COLORS: Coordinated shades.",
+						"MACHINE WASHABLE: Easy care finished pieces.",
+						"BEGINNER FRIENDLY: Great for learning to knit and crochet."
+					]
+				},
+				{
+					"path": ["Organization, Storage & Transport", "Storage Boxes & Organizers"],
+					"count": 5, "price": [14.99, 34.99],
+					"nouns": ["Craft Storage Organizer", "Portable Craft Caddy", "Stackable Bead Organizer"],
+					"variants": [["Clear", "Sand", "Mint"], ["With Handle", "Adjustable Dividers"], ["Single", "2-Pack"]],
+					"features": [
+						"TIDY SUPPLIES: Sort paint, beads, ribbons and markers.",
+						"CARRY IT: A handle for moving between rooms.",
+						"ADJUSTABLE: Move dividers to fit supplies.",
+						"SEE INSIDE: Clear sides show what is stored.",
+						"STACKABLE: Saves shelf space."
+					]
+				}
+			]
+		},
+		{
+			"name": "Automotive",
+			"brands": ["Roadwise", "Axlebright", "Motorvane", "Gearhollow", "Drivemere", "Carrowby", "Trackstone", "Voltmere Auto"],
+			"generic_features": [
+				"FITS MOST VEHICLES: Check the fit guide for cars, trucks and SUVs.",
+				"DRIVER TESTED: Tested on real commutes and road trips.",
+				"EASY RETURNS: Not the right fit? Return it within 30 days."
+			],
+			"leaves": [
+				{
+					"path": ["Interior Accessories", "Keychains"],
+					"count": 6, "price": [7.99, 16.99],
+					"nouns": ["Key Fob Cover with Keychain", "Leather Key Fob Case", "Silicone Key Fob Cover"],
+					"variants": [["2-Pack", "Single"], ["Black", "Tan", "Red"], ["Key Ring Included", "Lanyard"]],
+					"features": [
+						"PROTECTS THE FOB: The cover guards the remote from scratches and drops.",
+						"KEY RING: A sturdy ring keeps house keys together.",
+						"BUTTON ACCESS: Press every button through the cover.",
+						"SOFT TOUCH: Smooth leather feel.",
+						"EASY TO FIND: Bright colors stand out in a bag."
+					]
+				},
+				{
+					"path": ["Interior Accessories", "Seat Covers & Accessories", "Seat Covers"],
+					"count": 6, "price": [29.99, 79.99],
+					"nouns": ["Front Seat Covers", "Full Set Car Seat Covers", "Waterproof Seat Covers"],
+					"variants": [["Black", "Gray", "Beige"], ["Airbag Compatible", "Split Bench"], ["Leatherette", "Neoprene"]],
+					"features": [
+						"PROTECTS SEATS: Guards against spills, pets and wear.",
+						"AIRBAG SAFE: Side seams release for airbags.",
+						"EASY FIT: Straps and hooks install in minutes.",
+						"WATERPROOF: Wipe clean.",
+						"COMFORT: Padded foam for long drives."
+					]
+				},
+				{
+					"path": ["Interior Accessories", "Floor Mats & Cargo Liners", "Floor Mats"],
+					"count": 6, "price": [29.99, 69.99],
+					"nouns": ["All Weather Floor Mats", "Trim to Fit Car Mats", "Heavy Duty Rubber Floor Mats"],
+					"variants": [["4-Piece", "3-Piece"], ["Black", "Tan"], ["Trim to Fit", "Deep Channels"]],
+					"features": [
+						"ALL WEATHER: Deep channels trap snow, mud and rain.",
+						"TRIM TO FIT: Cut along guides to fit your car.",
+						"NON-SLIP: Nibs grip the carpet.",
+						"EASY CLEAN: Hose them off.",
+						"ODOR FREE: No rubber smell."
+					]
+				},
+				{
+					"path": ["Car Care", "Exterior Care", "Car Wash Kits"],
+					"count": 6, "price": [19.99, 44.99],
+					"nouns": ["Car Wash Kit", "Car Detailing Kit", "Foam Car Wash Set"],
+					"variants": [["9-Piece", "12-Piece"], ["Microfiber Mitt", "Foam Cannon"], ["pH Balanced Soap", "Wax Included"]],
+					"features": [
+						"SHOWROOM SHINE: Soap, mitt and towels for a clean finish.",
+						"SAFE ON PAINT: pH balanced soap.",
+						"THICK FOAM: Lifts dirt before you scrub.",
+						"MICROFIBER: Scratch-free drying.",
+						"COMPLETE KIT: Bucket-ready everything."
+					]
+				},
+				{
+					"path": ["Replacement Parts", "Wipers & Parts", "Wiper Blades"],
+					"count": 7, "price": [14.99, 34.99],
+					"nouns": ["Beam Wiper Blades", "All Season Wiper Blades", "Rear Wiper Blade"],
+					"variants": [["24 + 18 inch", "26 + 16 inch", "22 + 20 inch"], ["2-Pack", "Single"], ["J-Hook Adapter", "Multi Adapter"]],
+					"features": [
+						"STREAK FREE: Clears rain and snow in one sweep.",
+						"ALL SEASON: Resists ice buildup.",
+						"QUIET: Smooth, chatter-free wiping.",
+						"EASY INSTALL: Clicks onto most arms.",
+						"LONG LIFE: Durable rubber edge."
+					]
+				},
+				{
+					"path": ["Exterior Accessories", "Covers", "Car Covers"],
+					"count": 5, "price": [39.99, 89.99],
+					"nouns": ["Waterproof Car Cover", "All Weather Car Cover", "Sedan Car Cover"],
+					"variants": [["Fits Sedans", "Fits SUVs"], ["Zipper Door", "Windproof Straps"], ["Silver", "Gray"]],
+					"features": [
+						"ALL WEATHER: Keeps rain, snow and sun off the paint.",
+						"WINDPROOF: Straps hold it in a storm.",
+						"SOFT LINING: Protects paint.",
+						"DOOR ZIPPER: Reach inside without removing the cover.",
+						"STORAGE BAG: Folds into a bag for the trunk."
+					]
+				},
+				{
+					"path": ["Lights & Lighting Accessories", "Headlight Bulbs"],
+					"count": 6, "price": [19.99, 49.99],
+					"nouns": ["LED Headlight Bulbs", "Halogen Headlight Bulbs", "Fog Light Bulbs"],
+					"variants": [["H11", "9005", "H4"], ["6000K White", "3000K Yellow"], ["2-Pack", "Single"]],
+					"features": [
+						"BRIGHTER ROAD: More light for night driving.",
+						"PLUG AND PLAY: Swaps with the old bulb.",
+						"COOL RUNNING: A built-in fan.",
+						"LONG LIFE: Lasts for years.",
+						"CLEAN CUTOFF: A focused beam."
+					]
+				},
+				{
+					"path": ["Tools & Equipment", "Tire Inflators"],
+					"count": 6, "price": [29.99, 69.99],
+					"nouns": ["Portable Tire Inflator", "Cordless Air Compressor", "12V Tire Pump"],
+					"variants": [["Digital Gauge", "Auto Shut-Off"], ["Cordless", "12V Plug"], ["LED Light", "Carry Bag"]],
+					"features": [
+						"AUTO STOP: Set the pressure and it stops when reached.",
+						"CORDLESS: Inflate anywhere.",
+						"FAST: Tops off a tire in minutes.",
+						"MANY USES: Bikes, balls and pool floats.",
+						"BRIGHT LIGHT: For roadside use at night."
+					]
+				},
+				{
+					"path": ["Motorcycle & Powersports", "Protective Gear", "Riding Gloves"],
+					"count": 6, "price": [19.99, 49.99],
+					"nouns": ["Motorcycle Riding Gloves", "Touchscreen Motorcycle Gloves", "Summer Riding Gloves"],
+					"variants": [["Medium", "Large", "X-Large"], ["Knuckle Protection", "Vented Mesh"], ["Black", "Gray"]],
+					"features": [
+						"PROTECTION: Hard knuckles and padded palms.",
+						"GRIP: Firm hold on the throttle.",
+						"BREATHABLE: Mesh keeps hands cool.",
+						"TOUCHSCREEN: Use a phone at stops.",
+						"SECURE FIT: Hook-and-loop wrist strap."
+					]
+				},
+				{
+					"path": ["Tools & Equipment", "Jump Starters"],
+					"count": 6, "price": [59.99, 119.99],
+					"nouns": ["Portable Jump Starter", "Car Battery Jump Starter", "Jump Starter Power Pack"],
+					"variants": [["2000A", "1500A", "3000A"], ["USB Charging", "LED Light"], ["Smart Clamps", "Case Included"]],
+					"features": [
+						"START ANYWHERE: Jump a dead battery without another car.",
+						"SAFE CLAMPS: Protection against reverse polarity.",
+						"PHONE CHARGER: Doubles as a power bank.",
+						"COMPACT: Fits in the glovebox.",
+						"HOLDS CHARGE: Stays ready for months."
+					]
+				}
+			]
+		}
+	]
+}

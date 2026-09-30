@@ -1,7 +1,7 @@
 [project]
 name = "edgereco"
 version = "0.13.0"
-description = "Search and product recommendations that run in the shopper's own browser, for online stores tired of paying per search."
+description = "Search and product recommendations for small online stores, running in each shopper's browser instead of a paid server."
 requires-python = ">=3.13"
 license = "MIT"
 dependencies = [
@@ -190,6 +190,7 @@ module = [
   "edgereco.api.routes.events",
   "edgereco.catalog.models",
   "edgereco.catalog.publish",
+  "edgereco.catalog.synthetic",
   "edgereco.config",
   "edgereco.reco.audit",
   "edgereco.reco.cooccurrence",

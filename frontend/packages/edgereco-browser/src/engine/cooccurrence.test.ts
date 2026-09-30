@@ -44,7 +44,7 @@ describe("parseCooccurrence", () => {
 		expect(matrix.schema_version).toBe(1);
 		expect(Object.keys(matrix.neighbors).length).toBeGreaterThan(0);
 		// The fixed parity seed has a top-N neighbour list of {id, score} pairs.
-		const seed = matrix.neighbors.B07N8R6YFV;
+		const seed = matrix.neighbors["NB-00593"];
 		expect(seed).toBeDefined();
 		expect(seed?.length).toBeGreaterThan(0);
 		expect(seed?.[0]).toEqual(

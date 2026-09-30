@@ -15,6 +15,6 @@
 		"moreLead": "Built the same way — the heavy work runs in your browser, not on a server:",
 		"demoBefore": "Nimbus is a fictional demo store built to showcase",
 		"demoAfter": "— its entire search-and-recommend brain runs in this browser tab.",
-		"attribution": "Product data: Amazon E-commerce Products & Reviews Dataset (Kaggle, MIT). See the repo’s NOTICE for attribution."
+		"attribution": "Product data: {{statement}}"
 	}
 }

@@ -10,7 +10,7 @@ import { expect, test } from "@playwright/test";
  *
  *   boot screen → sync the signed bundle into OPFS (real ed25519 + sha256 +
  *   content-addressed chunks, in a Worker) → storefront mounts over the real
- *   720-product Amazon catalog → the home shows ≥3 labeled strategy rails →
+ *   720-product synthetic catalog → the home shows ≥3 labeled strategy rails →
  *   clicking a product folds the click into the in-tab session profile (NO
  *   network), opens a PDP seeded with vector rails, and the For-You rail
  *   re-ranks on return.

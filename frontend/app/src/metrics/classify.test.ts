@@ -8,7 +8,7 @@ describe("classifyResource", () => {
 	describe("image bucket", () => {
 		it("classifies a same-origin /images/<id>.svg local asset as image", () => {
 			expect(
-				classifyResource("http://localhost:5173/images/B0B1DZXBYY.svg", {
+				classifyResource("http://localhost:5173/images/NB-00001.svg", {
 					edgeOrigin: EDGE_ORIGIN,
 					appOrigin: "http://localhost:5173",
 				}),

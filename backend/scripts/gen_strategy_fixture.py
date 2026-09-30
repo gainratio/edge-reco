@@ -42,7 +42,7 @@ FIXTURE = (
 )
 DIM = 384
 LIMIT = 10
-SEED_PRODUCT = "B07FPCD8BM"  # faiss row 10 — a stable seed for the vector strategies
+SEED_PRODUCT = "NB-00011"  # faiss row 10 — a stable seed for the vector strategies
 STRATEGIES = ("for_you", "trending", "new_arrivals", "similar_items", "because_viewed")
 
 

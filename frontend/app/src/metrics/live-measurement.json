@@ -1,0 +1,20 @@
+{
+	"schema": "edgereco.live-measurement/v1",
+	"measuredAt": "2026-09-26T13:28:20.702Z",
+	"target": "https://edge-reco.com/",
+	"deployedCommit": "ca8cff98f8ceafda11743ca0a51ccffcbbd632d0",
+	"browser": "Chromium 153.0.8010.12, headed, fresh profile per cold run",
+	"machine": "darwin arm64, unthrottled network",
+	"command": "cd frontend/app && pnpm run measure:live",
+	"coldStartMs": [3294.9, 2583.6, 2607.2, 2365.2, 3633.7, 2546.2, 2689.3],
+	"warmStartMs": [814.2, 790.8, 630.7, 662.7, 532.3, 591.5, 575.8],
+	"searchP50Ms": [16.3, 14.3, 15.1, 13.3, 13.3, 16.6, 13.4],
+	"heapMb": [24, 17.5, 20.5, 20.4, 16, 13, 21.2],
+	"firstVisitDownloadMb": {
+		"other": 1.5,
+		"appCode": 5.9,
+		"signedBundle": 1.6,
+		"embeddingModel": 23.2,
+		"onnxRuntimeWasm": 5.1
+	}
+}

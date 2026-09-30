@@ -9,14 +9,14 @@
 // can be measured and a later ranking fix can be shown to have improved them.
 //
 // THE LABEL RULE (one rule, applied to every query)
-//   relevant(q) = { p : some node of p's Amazon breadcrumb path is a named node }
+//   relevant(q) = { p : some node of p's breadcrumb path is a named node }
 // where a product's breadcrumb path is `[category, ...subcategories]` — the tuple
 // `catalog/preprocessor.py::_split_breadcrumbs` splits out of the source CSV's
 // `breadcrumbs` column, long before any tokenizer, embedder or scorer runs.
 //
 // WHY THE LABELS ARE INDEPENDENT OF WHAT THEY MEASURE
-//   1. The labels are authored upstream (Amazon's own breadcrumbs), not by us and
-//      not by the engine. Building them reads products.jsonl and nothing else — no
+//   1. The labels are authored upstream (the category path the catalog generator,
+//      backend/scripts/generate_catalog.py, assigns each product), not by the engine. Building them reads products.jsonl and nothing else — no
 //      embedding, no BM25 score, no engine call. A golden set derived from the
 //      embeddings would always pass; this one cannot be satisfied by construction.
 //   2. Query wording is drawn from `description` and `title`, never from the
@@ -39,6 +39,16 @@
 // -transformer tokenizer does split on hyphens, so subcategory words do reach the
 // VECTOR side even for `natural` queries. The natural segment's scores are
 // therefore an upper bound on true generalization, not a clean measurement.
+//
+// PROVENANCE OF THE QUERIES
+// The 50 queries and their label nodes were written against an earlier catalog (a
+// third-party dataset since replaced by the synthetic one). The synthetic catalog
+// keeps every label node, so the labels still apply, but the natural wording was
+// picked from the OLD descriptions. Some anchors ("iphone", "apple", "android") name
+// real products the synthetic catalog deliberately never mentions. The rationale
+// counts below are recomputed from the current catalog; a 0% anchor is stated, not
+// hidden. Treat natural-segment scores as a comparison with that earlier baseline,
+// not as an absolute measure.
 //
 // SEGMENTS
 //   natural       — a shopping phrase a person would type; no query word is a BM25
@@ -103,7 +113,7 @@ export function breadcrumbNodes(product: Product): ReadonlyArray<string> {
 }
 
 /**
- * The label rule. A product is relevant when any node of its Amazon breadcrumb
+ * The label rule. A product is relevant when any node of its breadcrumb
  * path is one of the query's named nodes. Order follows products.jsonl, so the
  * exported ids are stable across runs.
  */
@@ -138,63 +148,63 @@ const NATURAL: ReadonlyArray<GoldenQuery> = [
 		segment: "natural",
 		labelNodes: ["Traditional Laptops", "Laptops"],
 		rationale:
-			"breadcrumb 'Laptops > Traditional Laptops' = 1 product; anchor 'laptop' is in 100% of its description and in no relevant category/tags",
+			"breadcrumbs 'Traditional Laptops' + 'Laptops' = 3 products; anchor 'laptop' is in 67% of their descriptions and in no relevant category/tags",
 	},
 	{
 		query: "tempered glass that keeps my phone from cracking",
 		segment: "natural",
 		labelNodes: ["Screen Protectors"],
 		rationale:
-			"breadcrumb 'Screen Protectors' = 26 products; anchor 'glass' is in 100% of their descriptions and in no relevant category/tags",
+			"breadcrumb 'Screen Protectors' = 12 products; anchor 'glass' is in 100% of their descriptions and in no relevant category/tags",
 	},
 	{
 		query: "stop the neighbors dog from barking",
 		segment: "natural",
 		labelNodes: ["Sonic Bark Deterrents"],
 		rationale:
-			"breadcrumb 'Sonic Bark Deterrents' = 12 products; anchor 'dog' is in 100% of their descriptions and in no relevant category/tags",
+			"breadcrumb 'Sonic Bark Deterrents' = 8 products; anchor 'dog' is in 100% of their descriptions and in no relevant category/tags",
 	},
 	{
 		query: "clear shockproof cover for iphone 14",
 		segment: "natural",
 		labelNodes: ["Basic Cases"],
 		rationale:
-			"breadcrumb 'Basic Cases' = 11 products; anchor 'iphone' is in 91% of their descriptions and in no relevant category/tags",
+			"breadcrumb 'Basic Cases' = 10 products; anchor 'iphone' is in 0% of their descriptions and in no relevant category/tags",
 	},
 	{
 		query: "wireless earbuds with long playtime",
 		segment: "natural",
 		labelNodes: ["Earbud Headphones", "Over-Ear Headphones"],
 		rationale:
-			"breadcrumbs 'Earbud Headphones' + 'Over-Ear Headphones' = 13 products; anchor 'earbuds' is in 69% of their descriptions and in no relevant category/tags",
+			"breadcrumbs 'Earbud Headphones' + 'Over-Ear Headphones' = 15 products; anchor 'earbuds' is in 67% of their descriptions and in no relevant category/tags",
 	},
 	{
 		query: "replacement band for my apple watch",
 		segment: "natural",
 		labelNodes: ["Smartwatch Bands"],
 		rationale:
-			"breadcrumb 'Smartwatch Bands' = 8 products; anchor 'band' is in 100% of their descriptions and in no relevant category/tags",
+			"breadcrumb 'Smartwatch Bands' = 8 products; anchor 'band' is in 88% of their descriptions and in no relevant category/tags",
 	},
 	{
 		query: "50 ft expandable hose that will not kink",
 		segment: "natural",
 		labelNodes: ["Garden Hoses"],
 		rationale:
-			"breadcrumb 'Garden Hoses' = 8 products; anchor 'hose' is in 100% of their descriptions and in no relevant category/tags",
+			"breadcrumb 'Garden Hoses' = 8 products; anchor 'hose' is in 75% of their descriptions and in no relevant category/tags",
 	},
 	{
 		query: "plug in ultrasonic mouse and rodent repeller",
 		segment: "natural",
 		labelNodes: ["Ultrasonic Repellers"],
 		rationale:
-			"breadcrumb 'Ultrasonic Repellers' = 7 products; anchor 'ultrasonic' is in 86% of their descriptions and in no relevant category/tags",
+			"breadcrumb 'Ultrasonic Repellers' = 10 products; anchor 'ultrasonic' is in 50% of their descriptions and in no relevant category/tags",
 	},
 	{
 		query: "diamond art kit for adults",
 		segment: "natural",
 		labelNodes: ["Adults' Paint-By-Number Kits"],
 		rationale:
-			"breadcrumb \"Adults' Paint-By-Number Kits\" = 7 products; anchor 'diamond' is in 100% of their descriptions and in no relevant category/tags",
+			"breadcrumb 'Adults' Paint-By-Number Kits' = 7 products; anchor 'diamond' is in 100% of their descriptions and in no relevant category/tags",
 	},
 	{
 		query: "unlocked dual sim android smartphone",
@@ -208,140 +218,140 @@ const NATURAL: ReadonlyArray<GoldenQuery> = [
 		segment: "natural",
 		labelNodes: ["T-Shirts"],
 		rationale:
-			"breadcrumb 'T-Shirts' = 5 products; anchor 'cotton' is in 80% of their descriptions and in no relevant category/tags",
+			"breadcrumb 'T-Shirts' = 14 products; anchor 'cotton' is in 93% of their descriptions and in no relevant category/tags",
 	},
 	{
 		query: "long sleeve onesie 5 pack",
 		segment: "natural",
 		labelNodes: ["Bodysuits"],
 		rationale:
-			"breadcrumb 'Bodysuits' = 5 products; anchor 'sleeve' is in 100% of their descriptions and in no relevant category/tags",
+			"breadcrumb 'Bodysuits' = 8 products; anchor 'sleeve' is in 0% of their descriptions and in no relevant category/tags",
 	},
 	{
 		query: "extra large desk mat for gaming",
 		segment: "natural",
 		labelNodes: ["Mouse Pads"],
 		rationale:
-			"breadcrumb 'Mouse Pads' = 5 products; anchor 'desk' is in 100% of their descriptions and in no relevant category/tags",
+			"breadcrumb 'Mouse Pads' = 7 products; anchor 'desk' is in 100% of their descriptions and in no relevant category/tags",
 	},
 	{
 		query: "2024 weekly agenda organizer",
 		segment: "natural",
 		labelNodes: ["Planners"],
 		rationale:
-			"breadcrumb 'Planners' = 5 products; anchor '2024' is in 100% of their descriptions and in no relevant category/tags",
+			"breadcrumb 'Planners' = 7 products; anchor '2024' is in 0% of their descriptions and in no relevant category/tags",
 	},
 	{
 		query: "musical pop up birthday card",
 		segment: "natural",
 		labelNodes: ["Greeting Cards"],
 		rationale:
-			"breadcrumb 'Greeting Cards' = 5 products; anchor 'card' is in 100% of their descriptions and in no relevant category/tags",
+			"breadcrumb 'Greeting Cards' = 6 products; anchor 'card' is in 100% of their descriptions and in no relevant category/tags",
 	},
 	{
 		query: "purple color corrector for stained teeth",
 		segment: "natural",
 		labelNodes: ["Toothpaste"],
 		rationale:
-			"breadcrumb 'Toothpaste' = 4 products; anchor 'teeth' is in 75% of their descriptions and in no relevant category/tags",
+			"breadcrumb 'Toothpaste' = 9 products; anchor 'teeth' is in 44% of their descriptions and in no relevant category/tags",
 	},
 	{
 		query: "blue light blocking readers",
 		segment: "natural",
 		labelNodes: ["Reading Glasses"],
 		rationale:
-			"breadcrumb 'Reading Glasses' = 4 products; anchor 'blue' is in 100% of their descriptions and in no relevant category/tags",
+			"breadcrumb 'Reading Glasses' = 6 products; anchor 'blue' is in 83% of their descriptions and in no relevant category/tags",
 	},
 	{
 		query: "zipper freezer bags for leftovers",
 		segment: "natural",
 		labelNodes: ["Food Storage Bags"],
 		rationale:
-			"breadcrumb 'Food Storage Bags' = 4 products; anchor 'zipper' is in 100% of their descriptions and in no relevant category/tags",
+			"breadcrumb 'Food Storage Bags' = 6 products; anchor 'zipper' is in 67% of their descriptions and in no relevant category/tags",
 	},
 	{
 		query: "anti snoring nose device for sleep",
 		segment: "natural",
 		labelNodes: ["Snore Reducing Aids"],
 		rationale:
-			"breadcrumb 'Snore Reducing Aids' = 4 products; anchor 'anti' is in 100% of their descriptions and in no relevant category/tags",
+			"breadcrumb 'Snore Reducing Aids' = 5 products; anchor 'anti' is in 0% of their descriptions and in no relevant category/tags",
 	},
 	{
 		query: "disposable face mask individually wrapped",
 		segment: "natural",
 		labelNodes: ["Disposable Cup Dust Safety Masks"],
 		rationale:
-			"breadcrumb 'Disposable Cup Dust Safety Masks' = 4 products; anchor 'mask' is in 75% of their descriptions and in no relevant category/tags",
+			"breadcrumb 'Disposable Cup Dust Safety Masks' = 5 products; anchor 'mask' is in 20% of their descriptions and in no relevant category/tags",
 	},
 	{
 		query: "umbrella that shades the deck",
 		segment: "natural",
 		labelNodes: ["Umbrellas"],
 		rationale:
-			"breadcrumb 'Umbrellas' = 6 products; anchor 'umbrella' is in 100% of their descriptions and in no relevant category/tags",
+			"breadcrumb 'Umbrellas' = 6 products; anchor 'umbrella' is in 50% of their descriptions and in no relevant category/tags",
 	},
 	{
 		query: "fleece pullover sweatshirt",
 		segment: "natural",
 		labelNodes: ["Active Sweatshirts"],
 		rationale:
-			"breadcrumb 'Active Sweatshirts' = 4 products; anchor 'sweatshirt' is in 50% of their descriptions and in no relevant category/tags",
+			"breadcrumb 'Active Sweatshirts' = 6 products; anchor 'sweatshirt' is in 0% of their descriptions and in no relevant category/tags",
 	},
 	{
 		query: "key fob cover with ring",
 		segment: "natural",
 		labelNodes: ["Keychains"],
 		rationale:
-			"breadcrumb 'Keychains' = 4 products; anchor 'key' is in 100% of their descriptions and in no relevant category/tags",
+			"breadcrumb 'Keychains' = 6 products; anchor 'key' is in 83% of their descriptions and in no relevant category/tags",
 	},
 	{
 		query: "bluetooth portable speaker",
 		segment: "natural",
 		labelNodes: ["Portable Bluetooth Speakers"],
 		rationale:
-			"breadcrumb 'Portable Bluetooth Speakers' = 1 product; anchor 'bluetooth' is in 100% of its description and in no relevant category/tags",
+			"breadcrumb 'Portable Bluetooth Speakers' = 6 products; anchor 'bluetooth' is in 0% of their descriptions and in no relevant category/tags",
 	},
 	{
 		query: "surveillance camera for the front door",
 		segment: "natural",
 		labelNodes: ["Surveillance Cameras", "Dome Cameras"],
 		rationale:
-			"breadcrumbs 'Surveillance Cameras' + 'Dome Cameras' = 2 products; anchor 'camera' is in 100% of their descriptions and in no relevant category/tags",
+			"breadcrumbs 'Surveillance Cameras' + 'Dome Cameras' = 7 products; anchor 'camera' is in 57% of their descriptions and in no relevant category/tags",
 	},
 	{
 		query: "instant film camera",
 		segment: "natural",
 		labelNodes: ["Instant Cameras", "Film Cameras"],
 		rationale:
-			"breadcrumbs 'Film Cameras' + 'Instant Cameras' = 1 product; anchor 'instant' is in 100% of its description and in no relevant category/tags",
+			"breadcrumbs 'Instant Cameras' + 'Film Cameras' = 3 products; anchor 'instant' is in 33% of their descriptions and in no relevant category/tags",
 	},
 	{
 		query: "sneakers for everyday walking",
 		segment: "natural",
 		labelNodes: ["Fashion Sneakers"],
 		rationale:
-			"breadcrumb 'Fashion Sneakers' = 1 product; anchor 'walking' is in 100% of its description and in no relevant category/tags",
+			"breadcrumb 'Fashion Sneakers' = 7 products; anchor 'walking' is in 57% of their descriptions and in no relevant category/tags",
 	},
 	{
 		query: "drip tubing kit for the vegetable bed",
 		segment: "natural",
 		labelNodes: ["Drip Irrigation Kits"],
 		rationale:
-			"breadcrumb 'Drip Irrigation Kits' = 1 product; anchor 'drip' is in 100% of its description and in no relevant category/tags",
+			"breadcrumb 'Drip Irrigation Kits' = 5 products; anchor 'drip' is in 40% of their descriptions and in no relevant category/tags",
 	},
 	{
 		query: "fast charging brick for the wall",
 		segment: "natural",
 		labelNodes: ["Wall Chargers"],
 		rationale:
-			"breadcrumb 'Wall Chargers' = 3 products; anchor 'fast' is in 100% of their descriptions and in no relevant category/tags",
+			"breadcrumb 'Wall Chargers' = 7 products; anchor 'fast' is in 100% of their descriptions and in no relevant category/tags",
 	},
 	{
 		query: "powder for hair skin and nails",
 		segment: "natural",
 		labelNodes: ["Collagen"],
 		rationale:
-			"breadcrumb 'Collagen' = 1 product; anchor 'hair' is in 100% of its description and in no relevant category/tags",
+			"breadcrumb 'Collagen' = 5 products; anchor 'hair' is in 80% of their descriptions and in no relevant category/tags",
 	},
 ];
 

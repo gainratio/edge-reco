@@ -228,7 +228,7 @@ describe("VectorIndex.nearest (kNN-to-seed primitive)", () => {
 	it("over the real bundle: seed excluded, k results, strictly descending", async () => {
 		const files = await syncedFiles();
 		const index = await loadVectorIndex(files);
-		const seed = "B07FPCD8BM";
+		const seed = "NB-00011";
 		const hits = await index.nearest(seed, 10);
 		expect(hits).toHaveLength(10);
 		expect(hits.some((h) => h.id === seed)).toBe(false);

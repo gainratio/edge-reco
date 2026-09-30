@@ -17,10 +17,10 @@ from edgereco.catalog.product_image import (
 
 def _product(**overrides: object) -> Product:
     base: dict[str, object] = {
-        "id": "B07Q6CKRQL",
-        "title": "mDesign Plastic Portable Craft Storage Organizer Caddy",
+        "id": "NB-00001",
+        "title": "Crafthollow Craft Storage Organizer, Clear, With Handle",
         "category": "Home & Kitchen",
-        "brand": "mDesign",
+        "brand": "Crafthollow",
         "price": 16.49,
     }
     base.update(overrides)
@@ -29,11 +29,11 @@ def _product(**overrides: object) -> Product:
 
 def test_local_image_url_is_root_relative() -> None:
     # The frontend's isLocalImage() only trusts root-relative, same-origin paths.
-    assert local_image_url("B07Q6CKRQL") == "/images/B07Q6CKRQL.svg"
+    assert local_image_url("NB-00001") == "/images/NB-00001.svg"
 
 
 def test_image_relpath_is_bundle_relative() -> None:
-    assert image_relpath("B07Q6CKRQL") == "images/B07Q6CKRQL.svg"
+    assert image_relpath("NB-00001") == "images/NB-00001.svg"
 
 
 def test_generation_is_deterministic() -> None:
@@ -64,8 +64,8 @@ def test_distinct_categories_get_distinct_backgrounds() -> None:
 
 
 def test_renders_product_facts() -> None:
-    svg = generate_product_image(_product(brand="mDesign", price=16.49))
-    assert "mDesign" in svg
+    svg = generate_product_image(_product(brand="Crafthollow", price=16.49))
+    assert "Crafthollow" in svg
     assert "16.49" in svg
 
 

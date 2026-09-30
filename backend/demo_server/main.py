@@ -10,7 +10,7 @@ Catalog source — local-first delivery loop:
     When ``EDGERECO_BUNDLE_BASE_URL`` + ``EDGERECO_VERIFY_KEY_PATH`` are set (the
     Docker stack sets both), the backend SYNCS a signed, content-addressed bundle
     from the Caddy CDN origin at import time via ``ServiceContainer.from_synced`` —
-    proving the real publish→sync→serve loop end-to-end with the 720-product Amazon
+    proving the real publish→sync→serve loop end-to-end with the 720-product synthetic
     catalog. Sync fails closed on a bad signature or tampered chunk.
 
     With no bundle env set (plain ``uv run`` / tests), it falls back to the committed

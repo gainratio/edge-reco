@@ -27,11 +27,17 @@ jobs:
           ref: ${{ github.event.workflow_run.head_sha }}
           fetch-depth: 0
           persist-credentials: false
+      # dagger-for-github pastes `call` into bash, so event values arrive only as
+      # environment variables and the call quotes them: bash expands each one as a
+      # single inert argument and never parses it as code.
       - uses: dagger/dagger-for-github@27b130bf0f79a7f6fbbbe0fbca6760dc9bb40a77 # v8.4.1
         env:
           CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
           CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
           GITHUB_TOKEN: ${{ github.token }}
+          HEAD_SHA: ${{ github.event.workflow_run.head_sha }}
+          RUN_ID: ${{ github.event.workflow_run.id }}
+          RUN_ATTEMPT: ${{ github.event.workflow_run.run_attempt }}
         with:
           version: "0.21.8"
           call: >-
@@ -39,6 +45,6 @@ jobs:
             --cloudflare-api-token=env:CLOUDFLARE_API_TOKEN
             --cloudflare-account-id=env:CLOUDFLARE_ACCOUNT_ID
             --github-token=env:GITHUB_TOKEN
-            --commit-sha=${{ github.event.workflow_run.head_sha }}
-            --workflow-run-id=${{ github.event.workflow_run.id }}
-            --run-attempt=${{ github.event.workflow_run.run_attempt }}
+            --commit-sha="$HEAD_SHA"
+            --workflow-run-id="$RUN_ID"
+            --run-attempt="$RUN_ATTEMPT"

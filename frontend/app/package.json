@@ -20,7 +20,8 @@
 		"typecheck": "tsc -b",
 		"gen-icons": "node scripts/gen-icons.mjs",
 		"preview": "vite preview",
-		"verify:i18n": "node scripts/verify-i18n.mjs"
+		"verify:i18n": "node scripts/verify-i18n.mjs",
+		"measure:live": "node scripts/measure-live-boot.mjs"
 	},
 	"dependencies": {
 		"@edgeproc/browser": "github:hseshadr/edgeproc-browser#02171df60afc8b09d6439112ea7ea3202338d46a",
