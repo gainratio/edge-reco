@@ -45,6 +45,18 @@ def test_every_installed_assay_file_is_assay_engines() -> None:
     assert not foreign, f"assay/ files not from assay-engine (avow's copy won?): {foreign}"
 
 
+def test_no_other_distribution_ships_a_top_level_assay_or_avow() -> None:
+    # The file-hash check above passes once the image reinstalls assay-engine, so on its
+    # own it hides a dependency that still ships a stray `assay/`. This asks the
+    # installed metadata directly: exactly one owner per top-level package.
+    owners = importlib.metadata.packages_distributions()
+    assert owners.get("assay") == ["assay-engine"], (
+        f"top-level assay/ owners: {owners.get('assay')}"
+    )
+    assert owners.get("avow") == ["avow"], f"top-level avow/ owners: {owners.get('avow')}"
+    assert "writ" not in owners, f"a stray top-level writ/ is installed by {owners['writ']}"
+
+
 def test_the_composition_entry_points_import() -> None:
     from assay import compose  # noqa: F401 - the import is the assertion
     from assay.composite import canonical_zero  # noqa: F401
