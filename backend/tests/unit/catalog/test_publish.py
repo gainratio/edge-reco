@@ -21,6 +21,7 @@ from edgeproc.bundles.signing import (
     generate_keypair,
 )
 from edgeproc.bundles.sync import materialize_file, sync_index
+from tests.signing import save_seed
 from typer.testing import CliRunner
 
 from edgereco.catalog.product_image import ImageMode
@@ -65,7 +66,7 @@ def test_produces_consumable_signed_origin(tmp_path: Path) -> None:
     origin = tmp_path / "origin"
     private, public = generate_keypair()
     key_path = tmp_path / "private.key"
-    key_path.write_bytes(private.private_bytes_raw())
+    save_seed(private.private_bytes_raw(), key_path)
 
     publish_bundle(
         staging_dir=staging,
@@ -132,7 +133,7 @@ def test_republish_at_the_same_sequence_with_new_content_is_a_client_rollback(
     """
     private, _ = generate_keypair()
     key_path = tmp_path / "private.key"
-    key_path.write_bytes(private.private_bytes_raw())
+    save_seed(private.private_bytes_raw(), key_path)
 
     def publish(products: str, sequence: int, origin: Path) -> VersionPointer:
         staging = _staging(tmp_path / f"s{sequence}{origin.name}")
@@ -186,7 +187,7 @@ def test_remote_mode_leaves_the_catalog_urls_untouched(tmp_path: Path) -> None:
     origin = tmp_path / "origin"
     private, public = generate_keypair()
     key_path = tmp_path / "private.key"
-    key_path.write_bytes(private.private_bytes_raw())
+    save_seed(private.private_bytes_raw(), key_path)
 
     publish_bundle(
         staging_dir=staging,
@@ -228,7 +229,7 @@ def test_local_mode_is_the_default(tmp_path: Path) -> None:
     origin = tmp_path / "origin"
     private, public = generate_keypair()
     key_path = tmp_path / "private.key"
-    key_path.write_bytes(private.private_bytes_raw())
+    save_seed(private.private_bytes_raw(), key_path)
 
     publish_bundle(  # no image_mode argument
         staging_dir=staging,
@@ -269,7 +270,7 @@ def test_publish_prefers_a_staged_real_photo_over_the_generated_card(tmp_path: P
     origin = tmp_path / "origin"
     private, public = generate_keypair()
     key_path = tmp_path / "private.key"
-    key_path.write_bytes(private.private_bytes_raw())
+    save_seed(private.private_bytes_raw(), key_path)
 
     publish_bundle(
         staging_dir=staging,
@@ -322,7 +323,7 @@ def test_a_failed_download_falls_back_per_product_not_per_build(tmp_path: Path) 
     origin = tmp_path / "origin"
     private, public = generate_keypair()
     key_path = tmp_path / "private.key"
-    key_path.write_bytes(private.private_bytes_raw())
+    save_seed(private.private_bytes_raw(), key_path)
 
     publish_bundle(
         staging_dir=staging,
@@ -377,7 +378,7 @@ def test_publish_localizes_remote_product_image_urls(tmp_path: Path) -> None:
     origin = tmp_path / "origin"
     private, public = generate_keypair()
     key_path = tmp_path / "private.key"
-    key_path.write_bytes(private.private_bytes_raw())
+    save_seed(private.private_bytes_raw(), key_path)
 
     publish_bundle(
         staging_dir=staging,
@@ -428,7 +429,7 @@ def test_republishing_the_same_staging_dir_is_byte_identical(tmp_path: Path) -> 
     )
     private, _ = generate_keypair()
     key_path = tmp_path / "private.key"
-    key_path.write_bytes(private.private_bytes_raw())
+    save_seed(private.private_bytes_raw(), key_path)
 
     def publish_to(origin: Path) -> str:
         publish_bundle(
@@ -469,7 +470,7 @@ def test_localize_survives_unicode_line_separators(tmp_path: Path) -> None:
     origin = tmp_path / "origin"
     private, public = generate_keypair()
     key_path = tmp_path / "private.key"
-    key_path.write_bytes(private.private_bytes_raw())
+    save_seed(private.private_bytes_raw(), key_path)
 
     publish_bundle(
         staging_dir=staging,
@@ -515,7 +516,7 @@ def test_publish_refuses_symlinked_images_dir(tmp_path: Path) -> None:
     origin = tmp_path / "origin"
     private, _ = generate_keypair()
     key_path = tmp_path / "private.key"
-    key_path.write_bytes(private.private_bytes_raw())
+    save_seed(private.private_bytes_raw(), key_path)
 
     with pytest.raises(ValueError, match="symlink"):
         publish_bundle(
@@ -550,7 +551,7 @@ def test_bundle_covers_staged_product_images(tmp_path: Path) -> None:
     origin = tmp_path / "origin"
     private, public = generate_keypair()
     key_path = tmp_path / "private.key"
-    key_path.write_bytes(private.private_bytes_raw())
+    save_seed(private.private_bytes_raw(), key_path)
 
     publish_bundle(
         staging_dir=staging,
@@ -585,7 +586,7 @@ def test_bundle_carries_signed_cooccurrence(tmp_path: Path) -> None:
     origin = tmp_path / "origin"
     private, public = generate_keypair()
     key_path = tmp_path / "private.key"
-    key_path.write_bytes(private.private_bytes_raw())
+    save_seed(private.private_bytes_raw(), key_path)
 
     publish_bundle(
         staging_dir=staging,
@@ -617,7 +618,7 @@ def test_bundle_defaults_empty_cooccurrence_when_absent(tmp_path: Path) -> None:
     origin = tmp_path / "origin"
     private, public = generate_keypair()
     key_path = tmp_path / "private.key"
-    key_path.write_bytes(private.private_bytes_raw())
+    save_seed(private.private_bytes_raw(), key_path)
 
     publish_bundle(
         staging_dir=staging,
@@ -650,7 +651,7 @@ def test_bundle_carries_signed_ranking_config(tmp_path: Path) -> None:
     origin = tmp_path / "origin"
     private, public = generate_keypair()
     key_path = tmp_path / "private.key"
-    key_path.write_bytes(private.private_bytes_raw())
+    save_seed(private.private_bytes_raw(), key_path)
 
     publish_bundle(
         staging_dir=staging,
@@ -687,7 +688,7 @@ def test_bundle_carries_verifiable_ranking_receipt(tmp_path: Path) -> None:
     origin = tmp_path / "origin"
     private, public = generate_keypair()
     key_path = tmp_path / "private.key"
-    key_path.write_bytes(private.private_bytes_raw())
+    save_seed(private.private_bytes_raw(), key_path)
 
     publish_bundle(
         staging_dir=staging,
@@ -732,7 +733,7 @@ def test_bundle_canonicalizes_staged_ranking_config(tmp_path: Path) -> None:
     origin = tmp_path / "origin"
     private, public = generate_keypair()
     key_path = tmp_path / "private.key"
-    key_path.write_bytes(private.private_bytes_raw())
+    save_seed(private.private_bytes_raw(), key_path)
 
     publish_bundle(
         staging_dir=staging,
@@ -770,7 +771,7 @@ def test_catalog_meta_carries_current_schema_version(tmp_path: Path) -> None:
     origin = tmp_path / "origin"
     private, public = generate_keypair()
     key_path = tmp_path / "private.key"
-    key_path.write_bytes(private.private_bytes_raw())
+    save_seed(private.private_bytes_raw(), key_path)
     publish_bundle(
         staging_dir=staging,
         origin_dir=origin,
@@ -817,7 +818,7 @@ def test_republish_requires_feature_files_and_raises_when_missing(tmp_path: Path
     origin = tmp_path / "origin"
     private, _ = generate_keypair()
     key_path = tmp_path / "private.key"
-    key_path.write_bytes(private.private_bytes_raw())
+    save_seed(private.private_bytes_raw(), key_path)
     with pytest.raises(FileNotFoundError):
         publish_bundle(
             staging_dir=staging,
@@ -840,7 +841,7 @@ def test_fresh_build_still_defaults_feature_files(tmp_path: Path) -> None:
     origin = tmp_path / "origin"
     private, public = generate_keypair()
     key_path = tmp_path / "private.key"
-    key_path.write_bytes(private.private_bytes_raw())
+    save_seed(private.private_bytes_raw(), key_path)
     publish_bundle(
         staging_dir=staging,
         origin_dir=origin,
@@ -869,7 +870,7 @@ def test_catalog_meta_content(tmp_path: Path) -> None:
     origin = tmp_path / "origin"
     private, public = generate_keypair()
     key_path = tmp_path / "private.key"
-    key_path.write_bytes(private.private_bytes_raw())
+    save_seed(private.private_bytes_raw(), key_path)
 
     publish_bundle(
         staging_dir=staging,
@@ -916,7 +917,7 @@ def test_publish_rejects_symlinked_staging_entry(tmp_path: Path) -> None:
     origin = tmp_path / "origin"
     private, _ = generate_keypair()
     key_path = tmp_path / "private.key"
-    key_path.write_bytes(private.private_bytes_raw())
+    save_seed(private.private_bytes_raw(), key_path)
 
     with pytest.raises(ValueError, match="symlink"):
         publish_bundle(
@@ -950,7 +951,7 @@ def test_publish_rejects_symlinked_top_level_entry(tmp_path: Path) -> None:
     origin = tmp_path / "origin"
     private, _ = generate_keypair()
     key_path = tmp_path / "private.key"
-    key_path.write_bytes(private.private_bytes_raw())
+    save_seed(private.private_bytes_raw(), key_path)
 
     with pytest.raises(ValueError, match="symlink"):
         publish_bundle(
@@ -984,7 +985,7 @@ def test_publish_refuses_symlinked_meta_write_target(tmp_path: Path) -> None:
     origin = tmp_path / "origin"
     private, _ = generate_keypair()
     key_path = tmp_path / "private.key"
-    key_path.write_bytes(private.private_bytes_raw())
+    save_seed(private.private_bytes_raw(), key_path)
 
     with pytest.raises(ValueError, match="symlink"):
         publish_bundle(
@@ -1022,7 +1023,7 @@ def test_signature_fail_closed(tmp_path: Path) -> None:
     origin = tmp_path / "origin"
     private, _ = generate_keypair()
     key_path = tmp_path / "private.key"
-    key_path.write_bytes(private.private_bytes_raw())
+    save_seed(private.private_bytes_raw(), key_path)
 
     publish_bundle(
         staging_dir=staging,
@@ -1052,7 +1053,7 @@ def test_cli_bundle_end_to_end(tmp_path: Path) -> None:
     origin = tmp_path / "origin"
     private, public = generate_keypair()
     key_path = tmp_path / "private.key"
-    key_path.write_bytes(private.private_bytes_raw())
+    save_seed(private.private_bytes_raw(), key_path)
 
     result = runner.invoke(
         app,

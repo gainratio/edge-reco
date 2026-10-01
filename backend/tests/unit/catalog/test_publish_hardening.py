@@ -19,6 +19,7 @@ from pathlib import Path
 import pytest
 from edgeproc.bundles.manifest import VersionPointer
 from edgeproc.bundles.signing import generate_keypair
+from tests.signing import save_seed
 from typer.testing import CliRunner
 
 import edgereco.catalog.publish as publish_module
@@ -45,7 +46,7 @@ def _staging(root: Path, title: str) -> Path:
 def _key(tmp_path: Path, name: str = "private.key") -> Path:
     private, _ = generate_keypair()
     key_path = tmp_path / name
-    key_path.write_bytes(private.private_bytes_raw())
+    save_seed(private.private_bytes_raw(), key_path)
     return key_path
 
 

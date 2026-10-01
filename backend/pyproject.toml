@@ -59,11 +59,11 @@ dependencies = [
   "assay-engine[metrics]==0.5.0.dev3",
   # Avow owns only the RFC-8785 + Ed25519 evidence envelope. EdgeReco signs one
   # static ranking proof at catalog publish time and never signs shopper results.
-  # 0.4.1 floor: the latest PyPI release. EdgeReco uses only content_hash /
-  # load_signing_key / sign_payload, which are unchanged since 0.3.0; 0.4.x's
-  # changes are ledger durability fixes (0.4.1 supersedes 0.4.0) plus the removal
-  # of the deprecated `avow.replay_mismatch` code, which nothing here matches on.
-  "avow>=0.4.1",
+  # 0.5.1 floor: the first avow release that ships only the `avow` package. Every
+  # release through 0.4.1 also installed stray top-level `assay/` and `writ/`
+  # packages that overwrote assay-engine; those releases are being yanked. EdgeReco
+  # uses only content_hash / load_signing_key / sign_payload, unchanged since 0.3.0.
+  "avow>=0.5.1",
   # Direct: catalog/publish.py holds a FileLock on ORIGIN_DIR/.publish.lock from the
   # served-`latest` read through the `latest` write. Same floor as edge-proc's own.
   "filelock>=3.20",

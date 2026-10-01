@@ -14,6 +14,7 @@ from edgereco.api.deps import ServiceContainer
 from edgereco.catalog.loader import load_jsonl
 from edgereco.embeddings.encoder import ProductEncoder
 from edgereco.embeddings.index import VectorIndex
+from tests.signing import save_seed
 
 FIXTURES_DIR = Path(__file__).parent.parent / "fixtures"
 
@@ -32,7 +33,7 @@ def signed_origin(tmp_path_factory: pytest.TempPathFactory) -> tuple[Path, Ed255
 
     private, public = generate_keypair()
     key_path = tmp_path_factory.mktemp("keys") / "private.key"
-    key_path.write_bytes(private.private_bytes_raw())
+    save_seed(private.private_bytes_raw(), key_path)
 
     origin = tmp_path_factory.mktemp("origin")
     from edgereco.catalog.publish import publish_bundle

@@ -18,6 +18,7 @@ from edgeproc.bundles.cas import FilesystemCacheStore, RollbackError
 from edgeproc.bundles.manifest import VersionPointer
 from edgeproc.bundles.signing import Ed25519Verifier, generate_keypair
 from edgeproc.bundles.sync import sync_index
+from tests.signing import save_seed
 from typer.testing import CliRunner
 
 from edgereco.catalog.publish import SequenceNotIncreasingError, publish_bundle
@@ -39,7 +40,7 @@ def _staging(root: Path, title: str) -> Path:
 def _key(tmp_path: Path) -> tuple[Path, Ed25519Verifier]:
     private, public = generate_keypair()
     key_path = tmp_path / "private.key"
-    key_path.write_bytes(private.private_bytes_raw())
+    save_seed(private.private_bytes_raw(), key_path)
     return key_path, Ed25519Verifier(public)
 
 

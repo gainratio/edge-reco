@@ -16,6 +16,7 @@ from pathlib import Path
 import numpy as np
 import pytest
 from edgeproc.bundles.signing import Ed25519Verifier, generate_keypair
+from tests.signing import save_seed
 
 from edgereco.api.deps import EmbeddingModelMismatchError, ServiceContainer
 from edgereco.catalog.models import CatalogManifest, Product
@@ -59,7 +60,7 @@ def _build_origin(tmp_path: Path) -> tuple[Path, Ed25519Verifier]:
     )
     private, public = generate_keypair()
     key_path = tmp_path / "private.key"
-    key_path.write_bytes(private.private_bytes_raw())
+    save_seed(private.private_bytes_raw(), key_path)
     origin = tmp_path / "origin"
     publish_bundle(
         staging_dir=staging,

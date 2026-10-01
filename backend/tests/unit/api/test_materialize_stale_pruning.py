@@ -14,6 +14,7 @@ from pathlib import Path
 
 import numpy as np
 from edgeproc.bundles.signing import Ed25519Verifier, generate_keypair
+from tests.signing import save_seed
 
 from edgereco.api.deps import _sync_and_load_manifest, sync_and_materialize
 from edgereco.catalog.models import Product
@@ -65,7 +66,7 @@ def test_rematerialize_prunes_files_dropped_by_new_version(tmp_path: Path) -> No
     """The materialized tree is exactly the ACTIVE manifest's file set — no leftovers."""
     private, public = generate_keypair()
     key_path = tmp_path / "private.key"
-    key_path.write_bytes(private.private_bytes_raw())
+    save_seed(private.private_bytes_raw(), key_path)
     verifier = Ed25519Verifier(public)
     origin = tmp_path / "origin"
     cache_root = tmp_path / "cache"

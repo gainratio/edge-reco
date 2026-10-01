@@ -16,6 +16,7 @@ from edgereco.catalog.loader import dump_jsonl
 from edgereco.catalog.models import Product
 from edgereco.catalog.publish import publish_bundle
 from edgereco.cli import app
+from tests.signing import save_seed
 
 runner = CliRunner()
 
@@ -44,7 +45,7 @@ def test_retrain_command_republishes_bumped_version(tmp_path: Path) -> None:
     private, public = generate_keypair()
     private_key = tmp_path / "private.key"
     public_key = tmp_path / "public.key"
-    private_key.write_bytes(private.private_bytes_raw())
+    save_seed(private.private_bytes_raw(), private_key)
     public_key.write_bytes(public.public_bytes_raw())
     origin = _seed_origin(tmp_path, private_key)
 
@@ -75,7 +76,7 @@ def test_retrain_command_recomputes_cooccurrence_from_sessions(tmp_path: Path) -
     private, public = generate_keypair()
     private_key = tmp_path / "private.key"
     public_key = tmp_path / "public.key"
-    private_key.write_bytes(private.private_bytes_raw())
+    save_seed(private.private_bytes_raw(), private_key)
     public_key.write_bytes(public.public_bytes_raw())
     origin = _seed_origin_two(tmp_path, private_key)
     sessions = tmp_path / "sessions.jsonl"

@@ -14,6 +14,7 @@ from edgeproc.bundles.sync import SyncResult, sync_index
 from pytest_bdd import given, scenarios, then, when
 
 from edgereco.catalog.publish import publish_bundle
+from tests.signing import save_seed
 
 scenarios("catalog_sync.feature")
 
@@ -68,7 +69,7 @@ def _publish(ctx: StepContext, *, tag: str, version: str, sequence: int = 1) -> 
 def ctx(tmp_path: Path) -> StepContext:
     private, public = generate_keypair()
     key_path = tmp_path / "private.key"
-    key_path.write_bytes(private.private_bytes_raw())
+    save_seed(private.private_bytes_raw(), key_path)
     return StepContext(tmp_path=tmp_path, key_path=key_path, public=public)
 
 

@@ -21,6 +21,7 @@ from edgereco.catalog.models import Product
 from edgereco.catalog.publish import publish_bundle
 from edgereco.reco.retrain import EngagementStat
 from edgereco.republish import retrain_and_republish
+from tests.signing import save_seed
 
 
 def _seed_origin(tmp: Path, key_path: Path) -> Path:
@@ -55,7 +56,7 @@ def _seed_origin(tmp: Path, key_path: Path) -> Path:
 def keypair(tmp_path: Path) -> tuple[Path, Ed25519Verifier]:
     private, public = generate_keypair()
     key_path = tmp_path / "private.key"
-    key_path.write_bytes(private.private_bytes_raw())
+    save_seed(private.private_bytes_raw(), key_path)
     return key_path, Ed25519Verifier(public)
 
 
