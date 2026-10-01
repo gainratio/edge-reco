@@ -8,6 +8,7 @@ import pytest
 from defusedxml.minidom import parseString
 
 from edgereco.catalog.models import Product
+from edgereco.catalog.product_icons import icon_body
 from edgereco.catalog.product_image import (
     generate_product_image,
     image_relpath,
@@ -56,17 +57,52 @@ def test_no_placeholder_emoji_tile() -> None:
     assert "\U0001f50c" not in svg  # electronics plug glyph
 
 
-def test_distinct_categories_get_distinct_backgrounds() -> None:
-    a = generate_product_image(_product(category="Electronics"))
-    b = generate_product_image(_product(category="Books"))
-    # Different categories should render visually distinct cards (color differs).
+def test_distinct_products_get_distinct_backgrounds() -> None:
+    # Colour comes from the product id, so neighbours on one shelf still differ.
+    a = generate_product_image(_product(id="NB-00001"))
+    b = generate_product_image(_product(id="NB-00002"))
     assert _fill_stops(a) != _fill_stops(b)
 
 
-def test_renders_product_facts() -> None:
+def test_background_is_stable_for_one_product() -> None:
+    a = generate_product_image(_product(id="NB-00042", title="One"))
+    b = generate_product_image(_product(id="NB-00042", title="Two"))
+    assert _fill_stops(a) == _fill_stops(b)
+
+
+def test_card_shows_the_icon_for_the_product_shelf() -> None:
+    product = _product(
+        category="Electronics",
+        subcategories=["Headphones, Earbuds & Accessories", "Over-Ear Headphones"],
+    )
+    svg = generate_product_image(product)
+    assert icon_body("headphones") in svg
+    assert 'data-icon="headphones"' in svg
+
+
+def test_card_is_a_picture_not_a_monogram() -> None:
+    # The old card was initials on a gradient, which read as a missing photo.
+    svg = generate_product_image(_product(brand="Crafthollow"))
+    assert ">C<" not in svg
+    assert 'font-size="96"' not in svg
+
+
+def test_card_names_the_product_for_assistive_tech() -> None:
+    svg = generate_product_image(_product(title="Vantrel Foldable Headphones"))
+    assert 'aria-label="Vantrel Foldable Headphones"' in svg
+
+
+def test_card_stays_small() -> None:
+    # 720 of these ship in the signed bundle; the old card averaged ~1.66 KB.
+    svg = generate_product_image(_product())
+    assert len(svg.encode("utf-8")) < 1600
+
+
+def test_renders_the_brand_small() -> None:
+    # Title and price are page text beside the card; only the brand stays in the art.
     svg = generate_product_image(_product(brand="Crafthollow", price=16.49))
     assert "Crafthollow" in svg
-    assert "16.49" in svg
+    assert "16.49" not in svg
 
 
 def test_escapes_xml_hostile_text() -> None:
