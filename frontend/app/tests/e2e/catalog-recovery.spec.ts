@@ -1,3 +1,4 @@
+import { readFileSync } from "node:fs";
 import { expect, type Page, test } from "@playwright/test";
 
 /**
@@ -29,8 +30,17 @@ const CLEAR = "Clear cached catalog and retry";
 const CONFIRM = "Yes, clear and retry";
 const EMBEDDING_DIM = 384;
 
-/** The committed bundle's live pointer sequence (backend/examples/catalog/latest). */
-const LIVE_SEQUENCE = 12;
+/**
+ * The committed bundle's live pointer sequence, read from
+ * backend/examples/catalog/latest so a re-sign (every rebuild bumps it) can't
+ * leave this lane asserting a stale floor.
+ */
+const LIVE_SEQUENCE: number = JSON.parse(
+	readFileSync(
+		new URL("../../../../backend/examples/catalog/latest", import.meta.url),
+		"utf8",
+	),
+).sequence;
 
 /** The library's IndexedDB rollback floor (resolveIndexedDbLayout() default). */
 const FLOOR_DB = "edgeproc-browser-cache";
