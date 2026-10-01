@@ -63,6 +63,9 @@ const NAME_CODES: Readonly<Record<string, BundleCode>> = {
 	WorkerTimeoutError: "bundle.timeout",
 	WorkerCrashError: "bundle.device_unsupported",
 	StorageQuotaError: "bundle.quota_exceeded",
+	// The on-device vector store could not be opened (vectorIndex.ts). A local
+	// storage fault on an already-verified bundle — never an integrity refusal.
+	VectorStoreUnavailableError: "bundle.device_unsupported",
 };
 
 /**
