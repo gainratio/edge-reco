@@ -102,6 +102,14 @@ minimumReleaseAge: 0
 #     is ESM-only (it dropped the CJS entry point), while postcss is CJS and does
 #     `require('nanoid')`. An open `>=3.3.18` overshoots to the 6.x line and breaks
 #     postcss outright. 3.x is the patched line postcss can actually consume.
+#   serialize-javascript: floor >=7.1.2 for GHSA-gfhx-hw2g-v5hg (LOW - XSS via an
+#     unescaped </script> in serialized function bodies; 7.1.1 only). Build-time
+#     only: app>vite-plugin-pwa>workbox-build>@rollup/plugin-terser. Every direct
+#     and intermediate dependency is already on its latest release, and
+#     @rollup/plugin-terser@1.0.0 declares `^7.0.3`, so no upstream bump exists to
+#     take; the lock had frozen 7.1.1 from before 7.1.2 shipped (2026-09-23). A
+#     plain `pnpm update` also drags unrelated rollup patch bumps, so the floor is
+#     the minimal change. Bounded `<8` to stay on the major terser consumes.
 overrides:
   adm-zip: "0.6.1"
   undici: ">=7.28.0 <8"
@@ -112,6 +120,7 @@ overrides:
   brace-expansion: ">=5.0.9 <6"
   filelist: ">=2.0.2 <3"
   nanoid: ">=3.3.18 <4"
+  serialize-javascript: ">=7.1.2 <8"
 
 # pnpm v11 does not run a dependency's build/postinstall scripts unless it is
 # explicitly allowlisted here (replaces v10's onlyBuiltDependencies). These are
