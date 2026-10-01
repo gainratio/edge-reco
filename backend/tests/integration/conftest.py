@@ -22,6 +22,7 @@ from edgereco.catalog.publish import publish_bundle
 from edgereco.embeddings.encoder import ProductEncoder
 from edgereco.embeddings.index import VectorIndex
 from edgereco.reco.ranking_config import RankingConfig
+from tests.signing import save_seed
 
 FIXTURES_DIR = Path(__file__).parent.parent / "fixtures"
 
@@ -67,7 +68,7 @@ def build_synced_container(
     product_count, dim = _stage_mini_catalog(staging, ranking_config)
     private, public = generate_keypair()
     key_path = tmp_path_factory.mktemp("keys") / "private.key"
-    key_path.write_bytes(private.private_bytes_raw())
+    save_seed(private.private_bytes_raw(), key_path)
     origin = tmp_path_factory.mktemp("origin")
     _publish_mini_bundle(staging, origin, key_path, product_count=product_count, dim=dim)
     return ServiceContainer.from_synced(

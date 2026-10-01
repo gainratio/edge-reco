@@ -4,13 +4,15 @@ from __future__ import annotations
 
 import importlib
 import json
+import os
 from pathlib import Path
 from types import ModuleType
 
 import pytest
 from avow import content_hash, generate_signing_key, public_key_hex, verify_signature
-from avow.errors import PayloadHashMismatch, SignatureInvalid
+from avow.errors import KeyPermissionsInsecure, PayloadHashMismatch, SignatureInvalid
 from nacl.signing import SigningKey
+from tests.signing import save_seed
 
 from edgereco.reco.ranking_config import (
     DEFAULT_RANKING_CONFIG,
@@ -242,13 +244,26 @@ def test_should_load_raw_seed_as_same_publisher_identity(tmp_path: Path) -> None
     # Given
     receipts = _module("edgereco.reco.score_receipt")
     key_path = tmp_path / "private.key"
-    key_path.write_bytes(bytes(_key()))
+    save_seed(bytes(_key()), key_path)
 
     # When
     loaded = receipts.signing_key_from_seed(key_path)
 
     # Then
     assert public_key_hex(loaded) == public_key_hex(_key())
+
+
+@pytest.mark.skipif(os.name != "posix", reason="POSIX mode bits are required")
+def test_should_reject_group_readable_signing_seed(tmp_path: Path) -> None:
+    # Given
+    receipts = _module("edgereco.reco.score_receipt")
+    key_path = tmp_path / "private.key"
+    key_path.write_bytes(bytes(_key()))
+    key_path.chmod(0o640)
+
+    # When / Then
+    with pytest.raises(KeyPermissionsInsecure, match="owner-only"):
+        receipts.signing_key_from_seed(key_path)
 
 
 def test_should_emit_edge_owned_payload_inside_avow_envelope() -> None:

@@ -15,6 +15,7 @@ from edgereco.catalog.models import Product
 from edgereco.catalog.publish import publish_bundle
 from edgereco.reco.retrain import EngagementStat
 from edgereco.republish import RetrainResult, retrain_and_republish
+from tests.signing import save_seed
 
 scenarios("retrain.feature")
 
@@ -38,7 +39,7 @@ class StepContext:
 def ctx(tmp_path: Path) -> StepContext:
     private, public = generate_keypair()
     key_path = tmp_path / "private.key"
-    key_path.write_bytes(private.private_bytes_raw())
+    save_seed(private.private_bytes_raw(), key_path)
     return StepContext(tmp_path=tmp_path, key_path=key_path, verifier=Ed25519Verifier(public))
 
 
