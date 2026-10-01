@@ -303,6 +303,21 @@ describe("bootFailure — which failures offer the manual catalog-cache clear", 
 		}
 	});
 
+	it("files an on-device search-index open failure as a local storage problem, not integrity", () => {
+		// Regression: another tab holding the OPFS vector database was shown as a
+		// "malformed catalog bundle" — security-meaning copy for a local fault.
+		vi.spyOn(console, "error").mockImplementation(() => {});
+		const raw = engineError(
+			"VectorStoreUnavailableError",
+			"could not open the on-device search index: OPFS unavailable",
+		);
+		expect(bootFailure(raw)).toMatchObject({
+			code: "bundle.device_unsupported",
+			offerCacheClear: false,
+			confirmCacheClear: false,
+		});
+	});
+
 	it("carries the verbatim message and logs the same coded breadcrumb as bootErrorMessage", () => {
 		const spy = vi.spyOn(console, "error").mockImplementation(() => {});
 		const err = new EngineOperationError({

@@ -12,12 +12,21 @@ import type {
 } from "@edgeproc/browser/vector";
 import { createSqliteVectorIndex } from "@edgeproc/browser/vector/sqlite";
 import type { Product } from "./domain";
+import { tabSafeVectorIndexFactory } from "./vectorStoreOwnership";
 
 const DECODER = new TextDecoder();
 const SQLITE_INDEX_NAME = "edgereco-catalog";
 
-const createPersistentVectorIndex: VectorIndexFactory = (options) =>
-	createSqliteVectorIndex({ ...options, persistence: "opfs" });
+/**
+ * The first tab owns the persistent OPFS store; other open tabs get the same
+ * SQLite-vector engine in memory (see vectorStoreOwnership.ts). One factory per
+ * page, so the owner lease lives exactly as long as the tab.
+ */
+const createPersistentVectorIndex: VectorIndexFactory =
+	tabSafeVectorIndexFactory({
+		locks: globalThis.navigator?.locks,
+		open: createSqliteVectorIndex,
+	});
 
 /** The four reassembled bundle files the index is built from. */
 export interface VectorIndexFiles {
@@ -58,6 +67,31 @@ export class VectorIndexError extends Error {
 	public constructor(message: string) {
 		super(`malformed catalog bundle: ${message}`);
 		this.name = "VectorIndexError";
+	}
+}
+
+/**
+ * Thrown when the on-device vector store itself cannot be opened (OPFS
+ * unavailable, storage broken). This is a LOCAL storage failure, not a verdict on
+ * the catalog: the bundle was already signature-checked, so it must never read
+ * as "malformed" or tampered. The underlying error is kept as `cause`.
+ */
+export class VectorStoreUnavailableError extends Error {
+	public constructor(cause: unknown) {
+		const detail = cause instanceof Error ? cause.message : String(cause);
+		super(`could not open the on-device search index: ${detail}`, { cause });
+		this.name = "VectorStoreUnavailableError";
+	}
+}
+
+async function openVectorStore(
+	factory: VectorIndexFactory,
+	dimension: number,
+): Promise<SharedVectorIndex> {
+	try {
+		return await factory({ name: SQLITE_INDEX_NAME, dimension });
+	} catch (error) {
+		throw new VectorStoreUnavailableError(error);
 	}
 }
 
@@ -348,9 +382,8 @@ export async function loadVectorIndex(
 	const matrix = asMatrix(files.embeddings, ntotal, dim);
 	const products = parseProducts(files.products);
 	const catalogVersion = await sha256Hex(files.state);
-	let vectors: SharedVectorIndex | undefined;
+	const vectors = await openVectorStore(factory, dim);
 	try {
-		vectors = await factory({ name: SQLITE_INDEX_NAME, dimension: dim });
 		// The database is durable across catalog revisions. Clear it before this
 		// bootstrap exposes the engine so removed product ids cannot accumulate and
 		// make sqlite-vector's full scan progressively more expensive. If import is
@@ -365,7 +398,7 @@ export async function loadVectorIndex(
 		);
 		return new VectorIndex(vectors, state.faiss_ids, products, catalogVersion);
 	} catch (error) {
-		await vectors?.dispose();
+		await vectors.dispose();
 		const message = error instanceof Error ? error.message : String(error);
 		throw new VectorIndexError(`vector index rejected the bundle: ${message}`);
 	}
