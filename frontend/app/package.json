@@ -24,7 +24,7 @@
 		"measure:live": "node scripts/measure-live-boot.mjs"
 	},
 	"dependencies": {
-		"@edgeproc/browser": "github:hseshadr/edgeproc-browser#02171df60afc8b09d6439112ea7ea3202338d46a",
+		"@edgeproc/browser": "github:hseshadr/edgeproc-browser#0a604bf8293e52fcc973074dcaa2afa1f970016d",
 		"@edgereco/browser": "workspace:*",
 		"@edgeproc/errors": "^0.1.3",
 		"@huggingface/transformers": "^4.2.0",
