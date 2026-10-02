@@ -30,8 +30,8 @@ importers:
   app:
     dependencies:
       '@edgeproc/browser':
-        specifier: github:hseshadr/edgeproc-browser#0a604bf8293e52fcc973074dcaa2afa1f970016d
-        version: https://codeload.github.com/hseshadr/edgeproc-browser/tar.gz/0a604bf8293e52fcc973074dcaa2afa1f970016d
+        specifier: github:hseshadr/edgeproc-browser#0749e66b4260ffcd02b1d039eb2eaa26cd970da7
+        version: '@gainratio/browser@https://codeload.github.com/hseshadr/edgeproc-browser/tar.gz/0749e66b4260ffcd02b1d039eb2eaa26cd970da7'
       '@edgeproc/errors':
         specifier: ^0.1.3
         version: 0.1.3
@@ -118,8 +118,8 @@ importers:
         specifier: 0.4.1
         version: 0.4.1
       '@edgeproc/browser':
-        specifier: github:hseshadr/edgeproc-browser#0a604bf8293e52fcc973074dcaa2afa1f970016d
-        version: https://codeload.github.com/hseshadr/edgeproc-browser/tar.gz/0a604bf8293e52fcc973074dcaa2afa1f970016d
+        specifier: github:hseshadr/edgeproc-browser#0749e66b4260ffcd02b1d039eb2eaa26cd970da7
+        version: '@gainratio/browser@https://codeload.github.com/hseshadr/edgeproc-browser/tar.gz/0749e66b4260ffcd02b1d039eb2eaa26cd970da7'
       '@huggingface/transformers':
         specifier: ^4.2.0
         version: 4.2.0(@types/node@26.6.3)
@@ -825,11 +825,6 @@ packages:
     resolution: {integrity: sha512-HmoF165wNgrcMv5ZwAHXbzCrR8gFqATQONNMtUArNMFm1L46oTZJ0sWDOdVHWAg4PZwEAkRQo5PRVOPbyAjBIA==}
     engines: {node: '>=22.13'}
 
-  '@edgeproc/browser@https://codeload.github.com/hseshadr/edgeproc-browser/tar.gz/0a604bf8293e52fcc973074dcaa2afa1f970016d':
-    resolution: {gitHosted: true, tarball: https://codeload.github.com/hseshadr/edgeproc-browser/tar.gz/0a604bf8293e52fcc973074dcaa2afa1f970016d}
-    version: 0.1.0
-    engines: {node: '>=22.13'}
-
   '@edgeproc/errors@0.1.3':
     resolution: {integrity: sha512-KHlQIVwhAZ+NLKN/D7P0q6joVTGpttHuhFZ5mLLmOc9SatMVtUVkFCcy3Tyt/61ZX/BHzgDqDtKDkwrqNwGg1A==}
     engines: {node: '>=22.13'}
@@ -1001,6 +996,11 @@ packages:
     peerDependenciesMeta:
       '@noble/hashes':
         optional: true
+
+  '@gainratio/browser@https://codeload.github.com/hseshadr/edgeproc-browser/tar.gz/0749e66b4260ffcd02b1d039eb2eaa26cd970da7':
+    resolution: {gitHosted: true, tarball: https://codeload.github.com/hseshadr/edgeproc-browser/tar.gz/0749e66b4260ffcd02b1d039eb2eaa26cd970da7}
+    version: 0.1.1
+    engines: {node: '>=22.13'}
 
   '@hpcc-js/wasm-zstd@1.16.1':
     resolution: {integrity: sha512-mMAkjBmrtkThCRY2h9FazYEsDhn42z+6hQ2zPtIP3TEtwZKgIqUBrnH4r39ujK/MNP94MFEJmVm7h9wcpzMo3Q==}
@@ -4070,12 +4070,6 @@ snapshots:
       '@noble/ed25519': 3.1.0
       canonicalize: 3.0.0
 
-  '@edgeproc/browser@https://codeload.github.com/hseshadr/edgeproc-browser/tar.gz/0a604bf8293e52fcc973074dcaa2afa1f970016d':
-    dependencies:
-      '@hpcc-js/wasm-zstd': 1.16.1
-      '@noble/ed25519': 3.1.0
-      idb-keyval: 6.3.0
-
   '@edgeproc/errors@0.1.3': {}
 
   '@emnapi/runtime@1.11.3':
@@ -4162,6 +4156,12 @@ snapshots:
     optional: true
 
   '@exodus/bytes@1.15.1': {}
+
+  '@gainratio/browser@https://codeload.github.com/hseshadr/edgeproc-browser/tar.gz/0749e66b4260ffcd02b1d039eb2eaa26cd970da7':
+    dependencies:
+      '@hpcc-js/wasm-zstd': 1.16.1
+      '@noble/ed25519': 3.1.0
+      idb-keyval: 6.3.0
 
   '@hpcc-js/wasm-zstd@1.16.1': {}
 
