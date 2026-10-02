@@ -128,7 +128,7 @@ overrides:
 # embedding parity tests: onnxruntime-node is the native ONNX backend, protobufjs
 # compiles its proto bindings, sharp builds its native image binary.
 allowBuilds:
-  "@edgeproc/browser": true
+  "@gainratio/browser": true
   esbuild: true
   onnxruntime-node: true
   protobufjs: true
