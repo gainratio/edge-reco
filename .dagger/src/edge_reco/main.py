@@ -6,10 +6,20 @@ import json
 from dataclasses import dataclass
 from shlex import split as shell_split
 from typing import Final, Self, cast
+from uuid import uuid4
 
 import dagger
 from dagger import check, dag, field, function, object_type
 
+from edge_reco.live_release import (
+    RECOVERY_SMOKE,
+    RELEASE_SMOKE,
+    Deployment,
+    LiveSmokeError,
+    RollbackEvidence,
+    SmokeRun,
+    release_with_rollback,
+)
 from edge_reco.targets import EdgeRecoTarget
 
 PYTHON_IMAGE: Final = "python:3.13.14-slim@sha256:9662417aace5ae7b8e2609cce472b72a8958e134ba372808abe9cc1a0c0125e6"
@@ -290,7 +300,20 @@ class EdgeReco:
     @function
     async def verify_live(self, commit_sha: str) -> str:
         """Verify public identity, canonical routing, and zero-egress browser behavior."""
-        return await self._live_container(self.source, commit_sha).stdout()
+        run = await self._smoke(self.source, commit_sha, RELEASE_SMOKE)
+        if not run.passed:
+            raise LiveSmokeError(f"Live verification failed against https://{TARGET.domain}\n{run.output}")
+        return run.output
+
+    @function(cache="never")  # type: ignore[call-overload,untyped-decorator]  # SDK stub gap
+    async def live_probe(self) -> str:
+        """Scheduled fresh-visitor smoke against production; never cached, needs no credentials."""
+        run = await self._smoke(self.source, CHECK_SHA, RECOVERY_SMOKE)
+        verdict = "passed" if run.passed else "failed"
+        message = f"Live probe {verdict} (fresh) against https://{TARGET.domain}\n{run.output}"
+        if not run.passed:
+            raise LiveSmokeError(message)
+        return message
 
     @function
     async def deploy(  # noqa: PLR0913,PLR0917 -- generated CLI requires explicit typed inputs.
@@ -309,10 +332,9 @@ class EdgeReco:
 
     async def _deploy_context(self, context: ReleaseContext, credentials: ProviderCredentials) -> str:
         request = self._provider_request(self._build_source(context.source, context.commit_sha), context)
-        provider = dag.cloudflare_pages()
-        identity = await self._deliver(provider, request, credentials)
-        live = await self._live_container(context.source, context.commit_sha).stdout()
-        return self._deployment_result(identity, live)
+        port = PagesRelease(self, context, request, credentials)
+        released, proof = await release_with_rollback(port)
+        return self._deployment_result(released, proof)
 
     async def _deliver(
         self,
@@ -324,7 +346,7 @@ class EdgeReco:
         return await self._provider_identity(evidence)
 
     @staticmethod
-    def _deployment_result(identity: ProviderIdentity, live: str) -> str:
+    def _deployment_result(identity: Deployment, live: str) -> str:
         evidence = f"provider deployment verified: id={identity.deployment_id} url={identity.deployment_url}"
         return f"{evidence}\n{live}"
 
@@ -395,19 +417,19 @@ class EdgeReco:
         container = self._dependencies(source)
         return container.with_directory("/artifact", artifact).with_workdir("/src/frontend")
 
-    def _live_container(self, source: dagger.Directory, commit: str) -> dagger.Container:
+    async def _smoke(self, source: dagger.Directory, commit: str, grep: str) -> SmokeRun:
+        """Run one live Playwright selection; the verdict is its exit code, never its output."""
+        run = self._live_container(source, commit, grep)
+        return SmokeRun.from_streams(await run.exit_code(), await run.stdout(), await run.stderr())
+
+    def _live_container(self, source: dagger.Directory, commit: str, grep: str) -> dagger.Container:
         self._require_sha(commit)
         verified = self._frontend(source, commit).with_env_variable("LIVE_BASE_URL", f"https://{TARGET.domain}")
+        # A fresh nonce per run: a cached green must never stand in for a live site that broke since.
+        verified = verified.with_env_variable("LIVE_SMOKE_RUN", uuid4().hex)
         return verified.with_exec(
-            [
-                "pnpm",
-                "-C",
-                "app",
-                "exec",
-                "playwright",
-                "test",
-                "--config=playwright.live.config.ts",
-            ]
+            ["pnpm", "-C", "app", "exec", "playwright", "test", "--config=playwright.live.config.ts", "--grep", grep],
+            expect=dagger.ReturnType.ANY,
         )
 
     def _python(self, source: dagger.Directory) -> dagger.Container:
@@ -534,3 +556,35 @@ class EdgeReco:
     def _parity_command() -> str:
         pairs = " ".join(f"--pair /baseline/{name}.json {FIXTURE_DIR}/{name}.json" for name in FIXTURES)
         return f"uv run python scripts/compare_parity_fixtures.py {pairs}"
+
+
+@dataclass(frozen=True)
+class PagesRelease:
+    """The live release port, wired to the shared cloudflare-pages module."""
+
+    module: EdgeReco
+    context: ReleaseContext
+    request: ProviderRequest
+    credentials: ProviderCredentials
+
+    async def previous_production(self) -> Deployment:
+        """Read-only: the deployment production serves now, recorded as the rollback target."""
+        account = (self.credentials.api_token, self.credentials.account_id)
+        current = dag.cloudflare_pages().previous_production_deployment(*account, TARGET.project)
+        return Deployment(await current.deployment_id(), await current.deployment_url())
+
+    async def deploy(self) -> Deployment:
+        """Run the shared verified deploy transaction exactly once."""
+        identity = await self.module._deliver(dag.cloudflare_pages(), self.request, self.credentials)
+        return Deployment(identity.deployment_id, identity.deployment_url)
+
+    async def smoke(self, grep: str) -> SmokeRun:
+        """Drive the live site with one Playwright selection."""
+        return await self.module._smoke(self.context.source, self.context.commit_sha, grep)
+
+    async def rollback_to(self, deployment_id: str) -> RollbackEvidence:
+        """Roll production back through the shared module and return its evidence."""
+        account = (self.credentials.api_token, self.credentials.account_id)
+        evidence = dag.cloudflare_pages().rollback(*account, TARGET.project, deployment_id=deployment_id)
+        ids = (evidence.from_deployment_id(), evidence.to_deployment_id(), evidence.live_deployment_id())
+        return RollbackEvidence(*[await value for value in ids])

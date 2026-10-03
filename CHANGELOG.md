@@ -5,6 +5,17 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ## [Unreleased]
 
+### Added
+- **Deploys roll themselves back when the live site is broken.** `dagger call deploy`
+  now records the production deployment that is live before the upload, runs the live
+  Playwright smoke after it (`@release` identity checks + `@fresh` storefront journey,
+  judged by exit code), and on a red smoke rolls production back through the shared
+  `cloudflare-pages` module's `rollback`, then runs a recovery smoke. The workflow
+  stays red either way. Before this, a red live check failed the workflow but left
+  the broken deployment serving.
+- **Scheduled live probe.** `.github/workflows/live-probe.yml` runs the `@fresh`
+  smoke against https://edge-reco.com every 4 hours (`dagger call live-probe`).
+
 ### Changed
 - **Own libraries moved to their newest releases.** Python `assay-engine` 0.5.0.dev3
   -> 0.5.0.dev6 (still an exact pin, matched by the npm side, so both tiers run the

@@ -238,6 +238,27 @@ Pages **Deployments → Rollback to this deployment** operation. After rollback,
 the selected deployment's `/build.json` commit before announcing recovery; the next
 CI-driven deploy repeats the same exact-SHA identity gate.
 
+**Automatic rollback.** The deploy does this for you when the live site is broken.
+Before uploading, `dagger call deploy` asks the shared `cloudflare-pages` module which
+deployment production serves now (`previousProductionDeployment`, read-only). After
+the upload it runs the live Playwright smoke (`tests/e2e-live/live.spec.ts`,
+`--grep "@release|@fresh"`): `@release` checks `/build.json`, the signed bundle, the
+model hashes and the `www` redirect for the exact commit; `@fresh` drives the demo in
+a clean browser profile. The verdict is the Playwright exit code. If it is red, the
+module's `rollback` puts the recorded deployment back, a recovery smoke (`@fresh`)
+checks the restored site, and the workflow still fails with both outputs in the log.
+A rollback is a recovery, never a green deploy.
+
+One limit: browsers keep the highest bundle `sequence` they have accepted as an
+anti-rollback floor (see below). If the failed release also shipped a new bundle, a
+shopper who synced it during the few minutes before the rollback will refuse the
+older bundle the restored deployment serves, until the next release publishes a
+higher `sequence`. Fix forward with a new release in that case.
+
+`.github/workflows/live-probe.yml` runs the same `@fresh` smoke against
+https://edge-reco.com every 4 hours (`dagger call live-probe`, no credentials). A red
+probe means the live site is broken for new visitors.
+
 The canonical-host check is deliberately part of the green contract. If the custom
 domain or worker redirect is missing or drifts, code can still upload, but the
 workflow remains red and production must not be reported healthy.
