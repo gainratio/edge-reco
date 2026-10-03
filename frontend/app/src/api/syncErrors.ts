@@ -1,6 +1,6 @@
 /**
  * Bundle-sync error classification — edge-reco's adoption of the portfolio
- * canonical-errors standard ([`@edgeproc/errors`](https://www.npmjs.com/package/@edgeproc/errors),
+ * canonical-errors standard ([`@gainratio/errors`](https://www.npmjs.com/package/@gainratio/errors),
  * installed from npm).
  *
  * This module is the ONLY place in the app that names that library. Everything
@@ -32,7 +32,7 @@ import {
 	errorNameOf,
 	errorTextOf,
 	starterPack,
-} from "@edgeproc/errors";
+} from "@gainratio/errors";
 
 /** The canonical codes a sync failure can classify into. */
 type BundleCode =
@@ -133,7 +133,7 @@ function engineMatch(code: BundleCode): (raw: unknown) => boolean {
 const starterUnreachable = starterPack["net.unreachable"].match;
 
 /**
- * edge-reco's bundle-sync catalog, expressed in the shared `@edgeproc/errors`
+ * edge-reco's bundle-sync catalog, expressed in the shared `@gainratio/errors`
  * vocabulary. Each code is REUSED from the published `starterPack`; on top of
  * the starter data we attach a `match` predicate driven by `engineCodeOf`, so
  * `classify()` reproduces the engine's fail-closed taxonomy for BOTH in-thread
@@ -185,7 +185,7 @@ const BUNDLE_ERROR_CATALOG = {
 /**
  * edge-reco's bundle-sync error registry — the single place raw engine/transport
  * failures are classified into canonical codes, built with the shared
- * `@edgeproc/errors` library. Exported so the classification is inspectable and
+ * `@gainratio/errors` library. Exported so the classification is inspectable and
  * testable as the library's own `Registry` (and so a server surface can later
  * reuse the same codes for RFC 9457 Problem Details without re-deriving them).
  */

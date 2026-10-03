@@ -3,17 +3,17 @@ import { readFile } from "node:fs/promises";
 import { resolve } from "node:path";
 import { test } from "node:test";
 
-const PACKAGE_NAME = "@edgeproc/assay";
-const VERSION = "0.5.0-dev.3";
+const PACKAGE_NAME = "@gainratio/assay";
+const VERSION = "0.5.0-dev.6";
 const INTEGRITY =
-	"sha512-s0NBvvTvbc7Y6z50oqaIPraN0hd6RRd9vY4dPXkWpB3DTGKCuJ8c4Kz2eX1KjEqF7PecQ4FyqzAYvgxIrJsQYg==";
+	"sha512-VOH1brU6gHHOZ1jRO4DXRPseSCnOLAlKewlfuzYumG3Kswb9KvrngoN5mPv7rdw61O3EuqGQO+WFPON8AV3NzQ==";
 const PACKAGE_MANIFEST = resolve(
 	import.meta.dirname,
 	"../../packages/edgereco-browser/package.json",
 );
 const INSTALLED_MANIFEST = resolve(
 	import.meta.dirname,
-	"../../packages/edgereco-browser/node_modules/@edgeproc/assay/package.json",
+	"../../packages/edgereco-browser/node_modules/@gainratio/assay/package.json",
 );
 const LOCKFILE = resolve(import.meta.dirname, "../../pnpm-lock.yaml");
 

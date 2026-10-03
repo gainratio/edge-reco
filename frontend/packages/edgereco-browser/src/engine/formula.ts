@@ -6,7 +6,7 @@ import {
 	additive,
 	type Operation,
 	type ScoreResult,
-} from "@edgeproc/assay";
+} from "@gainratio/assay";
 import type { ScoringWeights } from "./rankingConfig";
 
 export const FORMULA_METHOD_VERSION = "edgereco.recommendation-v3";

@@ -6,6 +6,18 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 ## [Unreleased]
 
 ### Changed
+- **Own libraries moved to their newest releases.** Python `assay-engine` 0.5.0.dev3
+  -> 0.5.0.dev6 (still an exact pin, matched by the npm side, so both tiers run the
+  same scoring; dev6 has no scoring change) and `avow>=0.5.2`. npm moved to the renamed
+  `@gainratio` scope: `@gainratio/assay` 0.5.0-dev.6, `@gainratio/avow` ^0.5.2 (was
+  `@edgeproc/avow` 0.4.1), `@gainratio/errors` ^0.2.1 (was `@edgeproc/errors` ^0.1.3).
+  `@edgeproc/browser` (the alias, same name as almamesh uses) moves to `edd9971`: every
+  SQLite store operation runs inside one exclusive per-store Web Lock, so two tabs take
+  turns; reads across tabs are serialized. `@hpcc-js/wasm-zstd` resolves 1.16.2, the
+  version edgeproc-browser's own gate proves. Avow 0.5 requires `schema:
+  "avow.receipt/v1"` on every receipt it verifies; EdgeReco's ranking receipts have
+  always carried it, and the browser verifier now passes it through. Schema-less
+  receipts were already reported as `legacy` and never verified.
 - **Product pictures now show what the product is.** Each generated card draws the
   Lucide icon for the product's shelf (headphones, camera, desk lamp, flash drive,
   ceiling light, ...) on a pastel backdrop whose colour comes from the product id, with

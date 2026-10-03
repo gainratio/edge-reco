@@ -10,7 +10,7 @@
 // tag_match is the MEAN tag affinity over the product's tags (0 if it has none).
 // Retrieval is normalized RRF for search and zero for recommendation-only rails.
 
-import type { ScoreResult } from "@edgeproc/assay";
+import type { ScoreResult } from "@gainratio/assay";
 import type { Product, ScoreComponents, SearchResult } from "./domain";
 import { explainScore, type FormulaSignals } from "./formula";
 import { DEFAULT_RANKING_CONFIG, type ScoringWeights } from "./rankingConfig";
