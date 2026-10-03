@@ -1,4 +1,4 @@
-import { signPayload } from "@edgeproc/avow";
+import { signPayload } from "@gainratio/avow";
 import { describe, expect, it } from "vitest";
 import fixture from "./__fixtures__/ranking_proof_v1.json" with {
 	type: "json",
@@ -253,7 +253,7 @@ describe("ranking proof verification", () => {
 		const signed = await signPayload(alteredPayload, "07".repeat(32));
 
 		const evidence = await verifyRankingProof(
-			encoded({ schema: "avow.receipt/v1", ...signed }),
+			encoded(signed),
 			DEFAULT_RANKING_CONFIG,
 			PINNED_PUBLIC_KEY,
 		);

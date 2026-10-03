@@ -17,8 +17,17 @@ describe("shared browser substrate dependency", () => {
 	it("keeps EdgeReco product code separate from @edgeproc/browser", () => {
 		expect(manifest.name).toBe("@edgereco/browser");
 		expect(manifest.dependencies?.["@edgeproc/browser"]).toBe(
-			"github:hseshadr/edgeproc-browser#0749e66b4260ffcd02b1d039eb2eaa26cd970da7",
+			"github:hseshadr/edgeproc-browser#edd99713ddf6e700c384f8981dcfc25341cc20a7",
 		);
+	});
+
+	it("takes Assay and Avow from the renamed @gainratio scope", () => {
+		// @edgeproc/assay and @edgeproc/avow are frozen at their last release
+		// (0.5.0-dev.3 / 0.5.1); new releases ship only as @gainratio/*.
+		expect(manifest.dependencies?.["@gainratio/assay"]).toBe("0.5.0-dev.6");
+		expect(manifest.dependencies?.["@gainratio/avow"]).toBe("^0.5.2");
+		expect(manifest.dependencies?.["@edgeproc/assay"]).toBeUndefined();
+		expect(manifest.dependencies?.["@edgeproc/avow"]).toBeUndefined();
 	});
 
 	it("does not vendor generic sync, storage, crypto, or Worker modules", () => {

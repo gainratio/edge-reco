@@ -60,7 +60,7 @@ https://edge-reco.com/github.
   Egress Guard on the send path. TypeScript.
 - https://github.com/hseshadr/assay — sign a decision record with Ed25519 over RFC 8785
   canonical JSON and verify it offline years later; shipped as avow on PyPI and
-  @edgeproc/avow on npm.
+  @gainratio/avow on npm.
 - https://github.com/hseshadr/almamesh — Vedic astrology running the whole Python engine
   in the browser via Pyodide (Skyfield, DE421 JPL kernel). Live at https://almamesh.com/
 - https://github.com/hseshadr/ci — the shared GitHub Actions the edgeproc repos use: 7

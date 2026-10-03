@@ -54,16 +54,21 @@ dependencies = [
   "edgeproc-core>=0.4.3",
   # Assay owns deterministic score composition. Pin the independently verified
   # 0.5 release candidate exactly so every deployment executes the same formula.
+  # Exact on purpose (the one exception to floor-only): it is a prerelease, and the
+  # browser tier pins the matching npm @gainratio/assay 0.5.0-dev.6 so both tiers
+  # run byte-identical scoring. dev6 has no scoring change from dev3 (dev4/dev5 were
+  # never published; dev6 is a pipeline/packaging release).
   # The metrics extra retains the reference ranking metrics used by the relevance
   # baseline; the additive face now also drives every live score.
-  "assay-engine[metrics]==0.5.0.dev3",
+  "assay-engine[metrics]==0.5.0.dev6",
   # Avow owns only the RFC-8785 + Ed25519 evidence envelope. EdgeReco signs one
   # static ranking proof at catalog publish time and never signs shopper results.
   # 0.5.1 floor: the first avow release that ships only the `avow` package. Every
   # release through 0.4.1 also installed stray top-level `assay/` and `writ/`
   # packages that overwrote assay-engine; those releases are being yanked. EdgeReco
   # uses only content_hash / load_signing_key / sign_payload, unchanged since 0.3.0.
-  "avow>=0.5.1",
+  # 0.5.2 floor: rename-only release (npm moved to @gainratio/avow), Python unchanged.
+  "avow>=0.5.2",
   # Direct: catalog/publish.py holds a FileLock on ORIGIN_DIR/.publish.lock from the
   # served-`latest` read through the `latest` write. Same floor as edge-proc's own.
   "filelock>=3.20",

@@ -4,7 +4,7 @@
 // re-exports them from here. The shapes are byte-identical to edge-reco's API
 // response models, so the demo components consume the engine output unchanged.
 
-import type { ScoreResult } from "@edgeproc/assay";
+import type { ScoreResult } from "@gainratio/assay";
 
 /** One catalog product (a row of products.jsonl). */
 export interface Product {

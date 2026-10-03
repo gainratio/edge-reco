@@ -1,12 +1,12 @@
 /** Verify EdgeReco's static Assay ranking proof under the pinned Avow signer. */
 
-import type { ScoreResult } from "@edgeproc/assay";
+import type { ScoreResult } from "@gainratio/assay";
 import {
 	contentHash,
 	type JsonValue,
 	type SignedReceipt,
 	verifySignature,
-} from "@edgeproc/avow";
+} from "@gainratio/avow";
 import { explainScore, type FormulaSignals } from "./formula";
 import {
 	normalizeRankingConfig,
@@ -158,6 +158,7 @@ function signedReceipt(
 		return undefined;
 	}
 	return {
+		schema: AVOW_RECEIPT_SCHEMA,
 		payload: jsonValue(document.payload),
 		payload_hash,
 		public_key,

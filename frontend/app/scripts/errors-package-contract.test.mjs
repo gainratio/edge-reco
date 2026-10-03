@@ -5,7 +5,7 @@ import { join, resolve } from "node:path";
 import { test } from "node:test";
 
 /**
- * `@edgeproc/errors` — the portfolio's canonical-errors library — is a SHARED
+ * `@gainratio/errors` (formerly `@edgeproc/errors`) — the portfolio's canonical-errors library — is a SHARED
  * library consumed from npm, not a copy living in this repo.
  *
  * This repo used to carry a fork of it at `frontend/packages/edgeproc-errors/`.
@@ -35,12 +35,12 @@ import { test } from "node:test";
  * constrained.
  */
 
-const PACKAGE_NAME = "@edgeproc/errors";
+const PACKAGE_NAME = "@gainratio/errors";
 const APP_MANIFEST = resolve(import.meta.dirname, "../package.json");
 const PACKAGES_DIR = resolve(import.meta.dirname, "../../packages");
 const INSTALLED_MANIFEST = resolve(
 	import.meta.dirname,
-	"../node_modules/@edgeproc/errors/package.json",
+	"../node_modules/@gainratio/errors/package.json",
 );
 
 /** pnpm specifiers that resolve to something inside this checkout rather than the registry. */

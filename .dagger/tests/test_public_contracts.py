@@ -1145,3 +1145,16 @@ def test_should_enforce_the_complete_dagger_quality_gate() -> None:
 
 def test_should_compare_relevance_from_the_product_browser_package() -> None:
     assert EdgeReco._relevance_path() == ("packages/edgereco-browser/src/engine/__fixtures__/relevance_export.json")
+
+
+def test_should_reinstall_the_same_assay_release_the_backend_locks() -> None:
+    # Given
+    backend = tomllib.loads((Path(__file__).parents[2] / "backend/pyproject.toml").read_text())
+    pinned = [item for item in backend["project"]["dependencies"] if item.startswith("assay-engine")]
+
+    # When
+    requirement = main_module.ASSAY_INSTALL[-1]
+
+    # Then
+    assert pinned == ["assay-engine[metrics]==0.5.0.dev6"]
+    assert requirement == "assay-engine==0.5.0.dev6"

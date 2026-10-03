@@ -30,14 +30,14 @@ importers:
   app:
     dependencies:
       '@edgeproc/browser':
-        specifier: github:hseshadr/edgeproc-browser#0749e66b4260ffcd02b1d039eb2eaa26cd970da7
-        version: '@gainratio/browser@https://codeload.github.com/hseshadr/edgeproc-browser/tar.gz/0749e66b4260ffcd02b1d039eb2eaa26cd970da7'
-      '@edgeproc/errors':
-        specifier: ^0.1.3
-        version: 0.1.3
+        specifier: github:hseshadr/edgeproc-browser#edd99713ddf6e700c384f8981dcfc25341cc20a7
+        version: '@gainratio/browser@https://codeload.github.com/hseshadr/edgeproc-browser/tar.gz/edd99713ddf6e700c384f8981dcfc25341cc20a7'
       '@edgereco/browser':
         specifier: workspace:*
         version: link:../packages/edgereco-browser
+      '@gainratio/errors':
+        specifier: ^0.2.1
+        version: 0.2.1
       '@huggingface/transformers':
         specifier: ^4.2.0
         version: 4.2.0(@types/node@26.6.3)
@@ -111,15 +111,15 @@ importers:
 
   packages/edgereco-browser:
     dependencies:
-      '@edgeproc/assay':
-        specifier: 0.5.0-dev.3
-        version: 0.5.0-dev.3
-      '@edgeproc/avow':
-        specifier: 0.4.1
-        version: 0.4.1
       '@edgeproc/browser':
-        specifier: github:hseshadr/edgeproc-browser#0749e66b4260ffcd02b1d039eb2eaa26cd970da7
-        version: '@gainratio/browser@https://codeload.github.com/hseshadr/edgeproc-browser/tar.gz/0749e66b4260ffcd02b1d039eb2eaa26cd970da7'
+        specifier: github:hseshadr/edgeproc-browser#edd99713ddf6e700c384f8981dcfc25341cc20a7
+        version: '@gainratio/browser@https://codeload.github.com/hseshadr/edgeproc-browser/tar.gz/edd99713ddf6e700c384f8981dcfc25341cc20a7'
+      '@gainratio/assay':
+        specifier: 0.5.0-dev.6
+        version: 0.5.0-dev.6
+      '@gainratio/avow':
+        specifier: ^0.5.2
+        version: 0.5.2
       '@huggingface/transformers':
         specifier: ^4.2.0
         version: 4.2.0(@types/node@26.6.3)
@@ -817,18 +817,6 @@ packages:
     resolution: {integrity: sha512-QxULHAm7cNu72w97JUNCBFODFaXpbDg+dP8b/oWFAZ2MTRppA3U00Y2L1HqaS4J6yBqxwa/Y3nMBaxVKbB/NsA==}
     engines: {node: '>=20.19.0'}
 
-  '@edgeproc/assay@0.5.0-dev.3':
-    resolution: {integrity: sha512-s0NBvvTvbc7Y6z50oqaIPraN0hd6RRd9vY4dPXkWpB3DTGKCuJ8c4Kz2eX1KjEqF7PecQ4FyqzAYvgxIrJsQYg==}
-    engines: {node: '>=22.13'}
-
-  '@edgeproc/avow@0.4.1':
-    resolution: {integrity: sha512-HmoF165wNgrcMv5ZwAHXbzCrR8gFqATQONNMtUArNMFm1L46oTZJ0sWDOdVHWAg4PZwEAkRQo5PRVOPbyAjBIA==}
-    engines: {node: '>=22.13'}
-
-  '@edgeproc/errors@0.1.3':
-    resolution: {integrity: sha512-KHlQIVwhAZ+NLKN/D7P0q6joVTGpttHuhFZ5mLLmOc9SatMVtUVkFCcy3Tyt/61ZX/BHzgDqDtKDkwrqNwGg1A==}
-    engines: {node: '>=22.13'}
-
   '@emnapi/runtime@1.11.3':
     resolution: {integrity: sha512-Xz4Tpyki7XyrpbUK1jR1AhdAdaXyhhY4lZ3neLodmhpuWfy2PAQN5B46sAiU4liOXGLkHypn/qU+jvfWSCYYLA==}
 
@@ -997,13 +985,25 @@ packages:
       '@noble/hashes':
         optional: true
 
-  '@gainratio/browser@https://codeload.github.com/hseshadr/edgeproc-browser/tar.gz/0749e66b4260ffcd02b1d039eb2eaa26cd970da7':
-    resolution: {gitHosted: true, tarball: https://codeload.github.com/hseshadr/edgeproc-browser/tar.gz/0749e66b4260ffcd02b1d039eb2eaa26cd970da7}
+  '@gainratio/assay@0.5.0-dev.6':
+    resolution: {integrity: sha512-VOH1brU6gHHOZ1jRO4DXRPseSCnOLAlKewlfuzYumG3Kswb9KvrngoN5mPv7rdw61O3EuqGQO+WFPON8AV3NzQ==}
+    engines: {node: '>=22.13'}
+
+  '@gainratio/avow@0.5.2':
+    resolution: {integrity: sha512-a4vtiKx9Dbb5HNFKvwWNOzuZk6EY7pq6vFPKM/vwTSaVmEQ4Ym+GJSJ3u6vnLbsAxZJgBfr0JWpGUmdB5Oqkww==}
+    engines: {node: '>=22.13'}
+
+  '@gainratio/browser@https://codeload.github.com/hseshadr/edgeproc-browser/tar.gz/edd99713ddf6e700c384f8981dcfc25341cc20a7':
+    resolution: {gitHosted: true, tarball: https://codeload.github.com/hseshadr/edgeproc-browser/tar.gz/edd99713ddf6e700c384f8981dcfc25341cc20a7}
     version: 0.1.1
     engines: {node: '>=22.13'}
 
-  '@hpcc-js/wasm-zstd@1.16.1':
-    resolution: {integrity: sha512-mMAkjBmrtkThCRY2h9FazYEsDhn42z+6hQ2zPtIP3TEtwZKgIqUBrnH4r39ujK/MNP94MFEJmVm7h9wcpzMo3Q==}
+  '@gainratio/errors@0.2.1':
+    resolution: {integrity: sha512-f1XOpswhbypRe2u8sJ2rRuh8BADbddkSSRONO5DRk3u5g7M+s8aaQ4vuPdk813GkLuvkQo1HMEwTj92TjT1ySQ==}
+    engines: {node: '>=22.13'}
+
+  '@hpcc-js/wasm-zstd@1.16.2':
+    resolution: {integrity: sha512-owm3y0AfdgVfft82RaF4aEPHdk1odK8V1RqryjAhYx3s1oaaHG0gBDC+PJ5P7sFEoayBHSWS5zuXLt9hmOgEvQ==}
 
   '@huggingface/jinja@0.5.10':
     resolution: {integrity: sha512-SgS1D1bglQ94ceD4ZCL6eayUDy9uV1xuyk61OjgSxU5GJh7upqZCKII0JoTYMc6wWsg3JUgaPRX0ElQzXPk3Cw==}
@@ -1212,6 +1212,9 @@ packages:
 
   '@noble/ed25519@3.1.0':
     resolution: {integrity: sha512-pfcObRY3CtvwfaG9Mt5XqZdKmAQppl37tHUeuBhDUbiwJBCVY4/A4lbMvb1xKhMDx96AqAqZpMWuBX1HulhX4g==}
+
+  '@noble/ed25519@3.2.0':
+    resolution: {integrity: sha512-criDgRlnUA09hchYrTy/JUWPIEap5rZxQe6wDWzRx51oWWpDRcUpuNzlgPxDJaOK6AsW9c0wKcj3rKRv6t+bPQ==}
 
   '@oxc-project/types@0.150.0':
     resolution: {integrity: sha512-rDS5/31E9HfPl/CIzGrn0DOlvBbXFseQ5URJ9sYMfstbKLD/c6Gm9vmRzRGDdAXyOIL4zmO37lc9RIwYqVruZw==}
@@ -4063,15 +4066,6 @@ snapshots:
 
   '@csstools/css-tokenizer@4.0.0': {}
 
-  '@edgeproc/assay@0.5.0-dev.3': {}
-
-  '@edgeproc/avow@0.4.1':
-    dependencies:
-      '@noble/ed25519': 3.1.0
-      canonicalize: 3.0.0
-
-  '@edgeproc/errors@0.1.3': {}
-
   '@emnapi/runtime@1.11.3':
     dependencies:
       tslib: 2.8.1
@@ -4157,13 +4151,22 @@ snapshots:
 
   '@exodus/bytes@1.15.1': {}
 
-  '@gainratio/browser@https://codeload.github.com/hseshadr/edgeproc-browser/tar.gz/0749e66b4260ffcd02b1d039eb2eaa26cd970da7':
+  '@gainratio/assay@0.5.0-dev.6': {}
+
+  '@gainratio/avow@0.5.2':
     dependencies:
-      '@hpcc-js/wasm-zstd': 1.16.1
       '@noble/ed25519': 3.1.0
+      canonicalize: 3.0.0
+
+  '@gainratio/browser@https://codeload.github.com/hseshadr/edgeproc-browser/tar.gz/edd99713ddf6e700c384f8981dcfc25341cc20a7':
+    dependencies:
+      '@hpcc-js/wasm-zstd': 1.16.2
+      '@noble/ed25519': 3.2.0
       idb-keyval: 6.3.0
 
-  '@hpcc-js/wasm-zstd@1.16.1': {}
+  '@gainratio/errors@0.2.1': {}
+
+  '@hpcc-js/wasm-zstd@1.16.2': {}
 
   '@huggingface/jinja@0.5.10': {}
 
@@ -4320,6 +4323,8 @@ snapshots:
     optional: true
 
   '@noble/ed25519@3.1.0': {}
+
+  '@noble/ed25519@3.2.0': {}
 
   '@oxc-project/types@0.150.0': {}
 

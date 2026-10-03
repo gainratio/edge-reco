@@ -1,5 +1,5 @@
 import { type EngineErrorCode, EngineOperationError } from "@edgeproc/browser";
-import { starterPack } from "@edgeproc/errors";
+import { starterPack } from "@gainratio/errors";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import {
 	bootErrorMessage,
@@ -21,13 +21,13 @@ function engineError(name: string, message: string): Error {
 	return err;
 }
 
-describe("@edgeproc/errors adoption — bundleErrorRegistry", () => {
+describe("@gainratio/errors adoption — bundleErrorRegistry", () => {
 	// Proves (1) the published library is really what does the work —
-	// `bundleErrorRegistry` is a genuine @edgeproc/errors Registry built from its
+	// `bundleErrorRegistry` is a genuine @gainratio/errors Registry built from its
 	// `starterPack` codes; and (2) each engine error still maps to a canonical
 	// code, so the classification vocabulary is the shared portfolio one.
 
-	it("is a genuine @edgeproc/errors Registry built from the published starterPack", () => {
+	it("is a genuine @gainratio/errors Registry built from the published starterPack", () => {
 		for (const method of [
 			"classify",
 			"describe",
