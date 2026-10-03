@@ -64,13 +64,21 @@ function backendCalls(page: import("@playwright/test").Page) {
 		.locator(".metrics-strip__value");
 }
 
-test("production completes the backend-free signed storefront journey", async ({
-	context,
-	page,
-}) => {
+// Dagger `deploy` runs both tags right after upload; a red run rolls production
+// back to the deployment that was live before. The rollback's recovery smoke and
+// the scheduled `live-probe` workflow run only `@fresh`, because the deployment
+// they check is not the one this checkout's EXPECTED_SHA describes.
+test("production serves the exact signed release", {
+	tag: "@release",
+}, async () => {
 	await verifyRelease();
 	await verifyModels();
 	await verifyRedirect();
+});
+
+test("fresh visitor completes the backend-free signed storefront journey", {
+	tag: "@fresh",
+}, async ({ context, page }) => {
 	const foreign: string[] = [];
 	const errors: string[] = [];
 	await context.route("**/*", (route) => {

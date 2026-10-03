@@ -1,0 +1,32 @@
+# Scheduled production probe: a fresh browser profile opens https://edge-reco.com,
+# launches the demo, syncs the signed bundle, searches, opens a product, and must
+# see zero backend calls, zero foreign requests, and a clean console. Read-only
+# and credential-free. A red run means the live site is broken for new visitors.
+name: Live Probe (edge-reco.com)
+
+on:
+  schedule:
+    - cron: "17 */4 * * *"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ${{ github.workflow }}
+  cancel-in-progress: false
+
+jobs:
+  live-probe:
+    name: Fresh-visitor smoke against production (Dagger)
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          persist-credentials: false
+      - uses: dagger/dagger-for-github@27b130bf0f79a7f6fbbbe0fbca6760dc9bb40a77 # v8.4.1
+        with:
+          version: "0.21.8"
+          verb: call
+          args: live-probe

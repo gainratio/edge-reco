@@ -20,15 +20,19 @@ import dagger
 import pytest
 
 import edge_reco.main as main_module
+from edge_reco.live_release import LiveSmokeError
 from edge_reco.main import EdgeReco, parse_release_evidence
 
 FOUNDATION_SHA = "2338511a17ed240121def1639a6c4f95c929ec2d"
 VALID_DEPLOYMENT_ID = "f621dc42-3cf9-4217-b4fb-0392c1d39020"
 VALID_DEPLOYMENT_URL = "https://f621dc42.edge-reco.pages.dev"
+PREVIOUS_DEPLOYMENT_ID = "0b915c11-176b-493e-b9fb-969a1304cdec"
+PREVIOUS_DEPLOYMENT_URL = "https://0b915c11.edge-reco.pages.dev"
 RECORDING_ENVELOPE = object()
 RECORDING_GITHUB_TOKEN = object()
 RECORDING_CLOUDFLARE_TOKEN = object()
 RECORDING_CLOUDFLARE_ACCOUNT = object()
+RECORDING_ACCOUNT = (RECORDING_CLOUDFLARE_TOKEN, RECORDING_CLOUDFLARE_ACCOUNT, "edge-reco")
 PRETRANSPORT_SOURCE = """\
 from dagger import dag, function, object_type
 
@@ -100,14 +104,23 @@ class RecordingSync:
 
 
 class RecordingContainer:
-    """Record the retained product-live boundary without invoking a browser."""
+    """Record one live-smoke run without invoking a browser; exit codes are scripted per grep."""
 
-    def __init__(self, events: list[str]) -> None:
+    def __init__(self, events: list[str], grep: str, exit_codes: dict[str, list[int]]) -> None:
         self.events = events
+        self.grep = grep
+        self.exit_codes = exit_codes
+
+    async def exit_code(self) -> int:
+        self.events.append(f"smoke:{self.grep}")
+        codes = self.exit_codes.get(self.grep, [])
+        return codes.pop(0) if codes else 0
 
     async def stdout(self) -> str:
-        self.events.append("live")
         return "live proof"
+
+    async def stderr(self) -> str:
+        return ""
 
 
 class RecordingDeployment:
@@ -159,6 +172,22 @@ class RecordingProvider:
     def load_evidence(self, object_id: str) -> dagger.CloudflarePagesDeploymentEvidence:
         return self.evidence_by_id[object_id]
 
+    def previous_production_deployment(
+        self, api_token: object, account_id: object, project: str
+    ) -> dagger.CloudflarePagesProductionDeployment:
+        assert (api_token, account_id, project) == RECORDING_ACCOUNT
+        self.events.append("previous")
+        current = RecordingDeployment(self.events, "previous", PREVIOUS_DEPLOYMENT_ID, PREVIOUS_DEPLOYMENT_URL)
+        return cast(dagger.CloudflarePagesProductionDeployment, current)
+
+    def rollback(
+        self, api_token: object, account_id: object, project: str, *, deployment_id: str = ""
+    ) -> dagger.CloudflarePagesProductionRollbackEvidence:
+        assert (api_token, account_id, project) == RECORDING_ACCOUNT
+        self.events.append(f"rollback:{deployment_id}")
+        evidence = RecordingRollback(self.created_id, deployment_id)
+        return cast(dagger.CloudflarePagesProductionRollbackEvidence, evidence)
+
     def _record(
         self, object_id: str, deployment_id: str, deployment_url: str
     ) -> dagger.CloudflarePagesDeploymentEvidence:
@@ -170,6 +199,23 @@ class RecordingProvider:
     @staticmethod
     def _require_exact_arguments(arguments: tuple[object, ...]) -> None:
         assert arguments == _recording_provider_arguments()
+
+
+class RecordingRollback:
+    """The shared module's rollback evidence: production now serves the target."""
+
+    def __init__(self, released_id: str, target_id: str) -> None:
+        self.released_id = released_id
+        self.target_id = target_id
+
+    async def from_deployment_id(self) -> str:
+        return self.released_id
+
+    async def to_deployment_id(self) -> str:
+        return self.target_id
+
+    async def live_deployment_id(self) -> str:
+        return self.target_id
 
 
 class IdBackedDeployment:
@@ -351,7 +397,7 @@ class GraphContainer:
     def with_directory(self, _path: str, _directory: dagger.Directory) -> GraphContainer:
         return self
 
-    def with_exec(self, _command: list[str]) -> GraphContainer:
+    def with_exec(self, _command: list[str], **_options: object) -> GraphContainer:
         return self
 
     def with_file(self, _path: str, _file: dagger.File) -> GraphContainer:
@@ -389,6 +435,28 @@ class GraphContainer:
 
     async def stdout(self) -> str:
         return "live proof"
+
+    async def stderr(self) -> str:
+        return ""
+
+    async def exit_code(self) -> int:
+        return 0
+
+
+class SmokeGraphContainer:
+    """Record the environment and the single exec of one live-smoke container."""
+
+    def __init__(self) -> None:
+        self.environment: dict[str, str] = {}
+        self.executed: tuple[list[str], dict[str, object]] = ([], {})
+
+    def with_env_variable(self, name: str, value: str) -> SmokeGraphContainer:
+        self.environment[name] = value
+        return self
+
+    def with_exec(self, command: list[str], **options: object) -> SmokeGraphContainer:
+        self.executed = (command, options)
+        return self
 
 
 class GraphGitRef:
@@ -433,6 +501,17 @@ class GraphCloudflarePages:
     def deploy(self, *_arguments: object) -> dagger.CloudflarePagesDeploymentEvidence:
         return cast(dagger.CloudflarePagesDeploymentEvidence, GraphDeployment())
 
+    def previous_production_deployment(self, *_arguments: object) -> dagger.CloudflarePagesProductionDeployment:
+        return cast(dagger.CloudflarePagesProductionDeployment, GraphPreviousDeployment())
+
+
+class GraphPreviousDeployment:
+    async def deployment_id(self) -> str:
+        return PREVIOUS_DEPLOYMENT_ID
+
+    async def deployment_url(self) -> str:
+        return PREVIOUS_DEPLOYMENT_URL
+
 
 class GraphDag:
     """Generated-client facade covering each retained EdgeReco composition path."""
@@ -469,13 +548,17 @@ def _recording_edge_reco(
     monkeypatch: pytest.MonkeyPatch,
     events: list[str],
     provider: RecordingProvider,
+    exit_codes: dict[str, list[int]] | None = None,
 ) -> EdgeReco:
     edge_reco = EdgeReco.__new__(EdgeReco)
     edge_reco.source = cast(dagger.Directory, "workspace")
     root = RecordingDag(events, provider)
+    codes = exit_codes if exit_codes is not None else {}
     monkeypatch.setattr(main_module, "dag", root)
     monkeypatch.setattr(edge_reco, "_build_source", lambda *_arguments: _recorded_artifact(events))
-    monkeypatch.setattr(edge_reco, "_live_container", lambda *_arguments: RecordingContainer(events))
+    monkeypatch.setattr(
+        edge_reco, "_live_container", lambda _source, _commit, grep: RecordingContainer(events, grep, codes)
+    )
     return edge_reco
 
 
@@ -740,6 +823,7 @@ def test_should_expose_security_and_live_release_functions() -> None:
         "codeql_upload",
         "release_preflight",
         "verify_live",
+        "live_probe",
     }
     # When
     available = {name for name in expected if hasattr(EdgeReco, name)}
@@ -840,6 +924,7 @@ def test_should_pin_cloudflare_pages_to_literal_central_sha() -> None:
 def test_should_delegate_canonical_provider_delivery_to_the_generated_client() -> None:
     # Given
     deploy = inspect.getsource(EdgeReco.deploy) + inspect.getsource(EdgeReco._deploy_context)
+    deploy += inspect.getsource(main_module.PagesRelease)
 
     # When / Then
     assert "dag.cloudflare_pages" in deploy
@@ -853,7 +938,8 @@ def test_should_keep_product_live_verification_local_to_edge_reco() -> None:
 
     # When / Then
     assert "playwright.live.config.ts" in inspect.getsource(EdgeReco._live_container)
-    assert "_live_container" in verify_live
+    assert "_smoke" in verify_live
+    assert "_live_container" in inspect.getsource(EdgeReco._smoke)
 
 
 def test_should_extract_one_exact_attempt_from_serialized_green_main_evidence() -> None:
@@ -1047,7 +1133,10 @@ def test_should_order_shared_provider_mutation_after_source_guard_and_product_bu
     result = asyncio.run(_deploy_with_fake_secrets(edge_reco))
 
     # Then
-    assert result == (f"provider deployment verified: id={VALID_DEPLOYMENT_ID} url={VALID_DEPLOYMENT_URL}\nlive proof")
+    assert result == (
+        f"provider deployment verified: id={VALID_DEPLOYMENT_ID} url={VALID_DEPLOYMENT_URL}\n"
+        "Live smoke passed: release, fresh\nlive proof"
+    )
     assert events == [
         "source",
         "guard",
@@ -1055,13 +1144,88 @@ def test_should_order_shared_provider_mutation_after_source_guard_and_product_bu
         "directory",
         "envelope",
         "provider-client",
+        "previous",
+        f"identity:{PREVIOUS_DEPLOYMENT_ID}",
+        f"url:{PREVIOUS_DEPLOYMENT_URL}",
+        "provider-client",
         "deploy",
         "materialize:created-evidence",
         "load:created-evidence",
         f"identity:{VALID_DEPLOYMENT_ID}",
         f"url:{VALID_DEPLOYMENT_URL}",
-        "live",
+        "smoke:@release|@fresh",
     ]
+
+
+def test_should_roll_production_back_through_the_shared_module_when_the_live_smoke_fails(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    # Given
+    events: list[str] = []
+    codes = {"@release|@fresh": [1], "@fresh": [0]}
+    edge_reco = _recording_edge_reco(monkeypatch, events, RecordingProvider(events), codes)
+
+    # When / Then
+    with pytest.raises(LiveSmokeError, match=f"rolled back from {VALID_DEPLOYMENT_ID} to {PREVIOUS_DEPLOYMENT_ID}"):
+        asyncio.run(_deploy_with_fake_secrets(edge_reco))
+    assert events[-4:] == [
+        "smoke:@release|@fresh",
+        "provider-client",
+        f"rollback:{PREVIOUS_DEPLOYMENT_ID}",
+        "smoke:@fresh",
+    ]
+
+
+def test_should_fail_verify_live_on_a_red_smoke(monkeypatch: pytest.MonkeyPatch) -> None:
+    # Given
+    events: list[str] = []
+    edge_reco = _recording_edge_reco(monkeypatch, events, RecordingProvider(events), {"@release|@fresh": [1]})
+
+    # When / Then
+    with pytest.raises(LiveSmokeError, match="live proof"):
+        asyncio.run(edge_reco.verify_live("a" * 40))
+
+
+def test_should_probe_production_as_a_fresh_visitor_and_fail_on_red(monkeypatch: pytest.MonkeyPatch) -> None:
+    # Given
+    events: list[str] = []
+    edge_reco = _recording_edge_reco(monkeypatch, events, RecordingProvider(events), {"@fresh": [0, 1]})
+
+    # When
+    proof = asyncio.run(edge_reco.live_probe())
+
+    # Then
+    assert proof == "Live probe passed (fresh) against https://edge-reco.com\nlive proof"
+    with pytest.raises(LiveSmokeError, match="Live probe failed"):
+        asyncio.run(edge_reco.live_probe())
+    assert events == ["smoke:@fresh", "smoke:@fresh"]
+
+
+def test_should_never_cache_the_live_probe() -> None:
+    # Given
+    source = inspect.getsource(EdgeReco.live_probe)
+
+    # Then
+    assert '@function(cache="never")' in source
+
+
+def test_should_judge_each_live_smoke_by_exit_code_with_a_fresh_nonce(monkeypatch: pytest.MonkeyPatch) -> None:
+    # Given
+    edge_reco = EdgeReco.__new__(EdgeReco)
+    monkeypatch.setattr(main_module, "dag", GraphDag())
+    monkeypatch.setattr(edge_reco, "_frontend", lambda *_arguments: SmokeGraphContainer())
+
+    # When
+    first = cast(SmokeGraphContainer, edge_reco._live_container(cast(dagger.Directory, None), "a" * 40, "@fresh"))
+    second = cast(SmokeGraphContainer, edge_reco._live_container(cast(dagger.Directory, None), "a" * 40, "@fresh"))
+
+    # Then
+    command, options = first.executed
+    assert command[-2:] == ["--grep", "@fresh"]
+    assert "--config=playwright.live.config.ts" in command
+    assert options == {"expect": dagger.ReturnType.ANY}
+    assert first.environment["LIVE_BASE_URL"] == "https://edge-reco.com"
+    assert first.environment["LIVE_SMOKE_RUN"] != second.environment["LIVE_SMOKE_RUN"]
 
 
 def test_should_block_product_live_verification_when_provider_transaction_fails(
