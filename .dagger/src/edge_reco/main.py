@@ -573,7 +573,7 @@ class PagesRelease:
         current = dag.cloudflare_pages().previous_production_deployment(*account, TARGET.project)
         return Deployment(await current.deployment_id(), await current.deployment_url())
 
-    async def deploy(self) -> Deployment:
+    async def deploy_release(self) -> Deployment:
         """Run the shared verified deploy transaction exactly once."""
         identity = await self.module._deliver(dag.cloudflare_pages(), self.request, self.credentials)
         return Deployment(identity.deployment_id, identity.deployment_url)

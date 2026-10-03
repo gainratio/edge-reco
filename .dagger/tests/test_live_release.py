@@ -41,7 +41,7 @@ class FakeRelease:
             raise self.previous
         return self.previous
 
-    async def deploy(self) -> Deployment:
+    async def deploy_release(self) -> Deployment:
         self.events.append("deploy")
         return RELEASED
 

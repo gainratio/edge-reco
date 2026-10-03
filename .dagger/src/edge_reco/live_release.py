@@ -57,7 +57,7 @@ class LiveRelease(Protocol):
 
     async def previous_production(self) -> Deployment: ...
 
-    async def deploy(self) -> Deployment: ...
+    async def deploy_release(self) -> Deployment: ...
 
     async def smoke(self, grep: str) -> SmokeRun: ...
 
@@ -71,7 +71,7 @@ class LiveSmokeError(RuntimeError):
 async def release_with_rollback(port: LiveRelease) -> tuple[Deployment, str]:
     """Deploy, smoke the live site, and roll back to the previous deployment on red."""
     previous = await port.previous_production()
-    released = await port.deploy()
+    released = await port.deploy_release()
     smoke = await port.smoke(RELEASE_SMOKE)
     if smoke.passed:
         return released, f"Live smoke passed: release, fresh\n{smoke.output}"
