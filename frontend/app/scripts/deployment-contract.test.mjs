@@ -142,6 +142,9 @@ test("the quality gate fetches the pinned embedding model before any unit suite"
 	const gate = packageJson.scripts["gate:quality"];
 	const fetchAt = gate.indexOf("fetch:model");
 	assert.ok(fetchAt >= 0, "gate:quality must run fetch:model");
-	assert.ok(fetchAt < gate.indexOf("test:coverage"), "fetch:model must precede the unit suites");
+	assert.ok(
+		fetchAt < gate.indexOf("test:coverage"),
+		"fetch:model must precede the unit suites",
+	);
 	assert.match(packageJson.scripts["fetch:model"], /download-model\.mjs/u);
 });
