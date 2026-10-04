@@ -51,6 +51,13 @@ const ALLOWED_URL_HOSTS = new Map([
 	["edge-reco.invalid", "a reserved placeholder origin for URL parsing"],
 	["aml-filter.com", "sibling-site link"],
 	["almamesh.com", "sibling-site link"],
+	[
+		"schema.org",
+		"JSON-LD @context identifier in the static pages, not a request",
+	],
+	["pypi.org", "package link on the static GitHub page"],
+	["www.npmjs.com", "package link on the static GitHub page"],
+	["opensource.org", "license link in the page footer"],
 ]);
 
 // A host is anything after `//` that is either schemed (http, https, ws, wss)
