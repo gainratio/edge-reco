@@ -48,11 +48,17 @@ the old vector pool earlier builds left in OPFS. Keyword search is SQLite FTS5's
 built-in `bm25()`, similarity is sqlite-vector's exact cosine scan, and the RRF
 fusion (`k=60`) is one SQL query that returns both ranks and raw scores. No
 hand-written BM25 or fusion code remains in the browser. The Python runtime uses
-FAISS + rank_bm25 over the same producer rows, so keyword ranking now differs
-slightly between tiers (FTS5 fixes k1=1.2, b=0.75); the parity tests pin how far
-(`hybridParity.test.ts`). The rerank scoring formula
-(`0.40·pop + 0.20·cat + 0.15·tag + 0.10·brand + 0.10·fresh − 0.25·rep`) still
-matches `src/edgereco/` line for line.
+FAISS + rank_bm25 over the same producer rows, so search does not match Python
+exactly. Two things differ. First, the BM25 parameters: FTS5 hard-codes k1=1.2 and
+b=0.75 and normalizes length per column, while Python's `BM25Okapi` uses k1=1.5,
+b=0.75 and floors negative IDF at 0.25 × the mean IDF. Second, the tokenizer: FTS5's
+`unicode61` splits on punctuation and folds diacritics, while Python lowercases and
+splits on whitespace. Changing either inside FTS5 needs a custom C extension in the
+SQLite build, so we pin the gap instead. The contract, enforced by
+`hybridParity.test.ts`: the same top-1 result and at least 80% of the same top-10
+for every fixture query. The rerank formula
+(`retrieval + 0.40·pop + 0.20·cat + 0.15·tag + 0.10·brand + 0.10·fresh − 0.25·rep`,
+retrieval = min-max scaled RRF in 0..1) matches `src/edgereco/` line for line.
 
 ## Architecture (three Workers, off the UI thread)
 
