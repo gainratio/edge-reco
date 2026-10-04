@@ -25,6 +25,8 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
   contract. A new WebKit lane (`test:e2e:webkit`, iPhone 13 emulation, in `gate:e2e`)
   loads the production build. Not a regression of the 2026-10-03 dependency bump:
   the 2026-10-02 build fails the same way.
+- `llms.txt` now says what is true: only the vector search uses SQLite (BM25 is an
+  in-JavaScript port, the query embedder is ONNX Runtime Web).
 
 ### Changed
 - **Own libraries moved to their newest releases.** Python `assay-engine` 0.5.0.dev3
