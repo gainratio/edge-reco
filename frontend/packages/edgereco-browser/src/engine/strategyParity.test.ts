@@ -8,12 +8,12 @@
 // vector strategies retrieve from the STORED bundle vectors via nearest()), so a
 // rejecting stub embedder keeps the model out of the test.
 
-import type { IndexManifest, Verify } from "@edgeproc/browser";
+import type { IndexManifest, Verify } from "@gainratio/browser";
 import {
 	MemoryCacheStore,
 	materializeFile,
 	syncIndex,
-} from "@edgeproc/browser";
+} from "@gainratio/browser";
 import { describe, expect, it } from "vitest";
 import parityFixture from "./__fixtures__/strategy_parity.json" with {
 	type: "json",

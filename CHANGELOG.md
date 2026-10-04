@@ -29,6 +29,18 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
   in-JavaScript port, the query embedder is ONNX Runtime Web).
 
 ### Changed
+- **`@gainratio/browser` now comes from npm (`^0.2.0`), not a git sha.** The
+  `@edgeproc/browser` -> `github:hseshadr/edgeproc-browser#25cdad0` alias is gone from
+  both workspace manifests; imports are `@gainratio/browser` and
+  `@gainratio/browser/sql`, and `pnpm-lock.yaml` locks 0.2.0. Its install scripts are
+  explicitly denied (`allowBuilds: false`); the npm tarball ships a built `dist/`.
+  Dependabot's frontend npm entry now runs daily with a `gainratio` group so a new
+  `@gainratio/*` release opens its own bump PR the same day. A new gate step,
+  `pnpm check:own-deps`, fails if any `package.json` names `@edgeproc/` or installs one
+  of our libraries from GitHub. The Node SQL-Worker test stand-in takes
+  `resolveMemoryProfile` from the published `./sqlite` entry; the SQL Worker internals
+  and the sqlite3 build still have no public entry, so it keeps reading those from
+  `dist/`.
 - **Own libraries moved to their newest releases.** Python `assay-engine` 0.5.0.dev3
   -> 0.5.0.dev6 (still an exact pin, matched by the npm side, so both tiers run the
   same scoring; dev6 has no scoring change) and `avow>=0.5.2`. npm moved to the renamed

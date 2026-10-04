@@ -17,7 +17,7 @@
 import {
 	isNetworkSentinelReport,
 	NETWORK_SENTINEL_CHANNEL,
-} from "@edgeproc/browser";
+} from "@gainratio/browser";
 import { classifyResource } from "./classify";
 import { record } from "./store";
 

@@ -5,13 +5,6 @@
 // embedder, then assert the contract shapes and the live re-rank loop in Node.
 
 import {
-	type IndexManifest,
-	MemoryCacheStore,
-	materializeFile,
-	syncIndex,
-	type Verify,
-} from "@edgeproc/browser";
-import {
 	EMBEDDING_DIM,
 	type Embedder,
 	type EnginePort,
@@ -19,6 +12,13 @@ import {
 	type SyncResult,
 } from "@edgereco/browser";
 import { catalogFetch } from "@edgereco/browser/testing/fixtures";
+import {
+	type IndexManifest,
+	MemoryCacheStore,
+	materializeFile,
+	syncIndex,
+	type Verify,
+} from "@gainratio/browser";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { getSnapshot } from "../metrics/store";
 import {

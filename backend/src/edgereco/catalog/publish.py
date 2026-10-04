@@ -87,7 +87,7 @@ class SequenceNotIncreasingError(ValueError):
     """A publish would not raise the origin's signed ``sequence`` (fail closed).
 
     Every consumer keeps the highest pointer it accepted as an anti-rollback floor:
-    ``@edgeproc/browser`` refuses a lower or equal ``sequence`` over a different
+    ``@gainratio/browser`` refuses a lower or equal ``sequence`` over a different
     manifest, and edge-proc >=0.3.0 promotes a same-version release only on a strictly
     greater one. A publish at or below what the origin already serves would strand
     every returning shopper, so the producer refuses it before signing anything.

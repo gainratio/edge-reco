@@ -1,9 +1,9 @@
-import type { IndexManifest, Verify, VersionPointer } from "@edgeproc/browser";
+import type { IndexManifest, Verify, VersionPointer } from "@gainratio/browser";
 import {
 	MemoryCacheStore,
 	materializeFile,
 	syncIndex,
-} from "@edgeproc/browser";
+} from "@gainratio/browser";
 import { describe, expect, it, vi } from "vitest";
 import { openCatalogueStore } from "./catalogueDb";
 import { openCatalogueSql, retireLegacyVectorPool } from "./catalogueSql";

@@ -1,4 +1,4 @@
-import { type EngineErrorCode, EngineOperationError } from "@edgeproc/browser";
+import { type EngineErrorCode, EngineOperationError } from "@gainratio/browser";
 import { starterPack } from "@gainratio/errors";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import {

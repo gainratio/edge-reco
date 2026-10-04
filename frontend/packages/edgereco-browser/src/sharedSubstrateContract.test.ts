@@ -14,11 +14,14 @@ const manifest = JSON.parse(
 ) as PackageManifest;
 
 describe("shared browser substrate dependency", () => {
-	it("keeps EdgeReco product code separate from @edgeproc/browser", () => {
+	it("keeps EdgeReco product code separate from @gainratio/browser", () => {
 		expect(manifest.name).toBe("@edgereco/browser");
-		expect(manifest.dependencies?.["@edgeproc/browser"]).toBe(
-			"github:hseshadr/edgeproc-browser#25cdad0356d879799faaed57dd006582313084e6",
+		// From npm with a caret range (tracks the latest release, no upper cap),
+		// never a git-sha alias or the old @edgeproc scope.
+		expect(manifest.dependencies?.["@gainratio/browser"]).toMatch(
+			/^\^\d+\.\d+\.\d+$/u,
 		);
+		expect(manifest.dependencies?.["@edgeproc/browser"]).toBeUndefined();
 	});
 
 	it("takes Assay and Avow from the renamed @gainratio scope", () => {
@@ -56,7 +59,7 @@ describe("shared browser substrate dependency", () => {
 		const entry = readFileSync(join(engine, "edgeprocWorker.ts"), "utf8");
 		const runtime = readFileSync(join(engine, "runtime.ts"), "utf8");
 
-		expect(entry.trim()).toBe('import "@edgeproc/browser/worker";');
+		expect(entry.trim()).toBe('import "@gainratio/browser/worker";');
 		expect(runtime).toContain('from "./edgeprocWorker?worker"');
 		expect(runtime).not.toContain("EngineClient.spawn(");
 	});

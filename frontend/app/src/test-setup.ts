@@ -8,7 +8,7 @@ import { vi } from "vitest";
 import "./i18n";
 
 // jsdom has no Worker/OPFS. Unit tests open the catalogue through the real
-// seam and @edgeproc/browser client, with the library's Worker handler run
+// seam and @gainratio/browser client, with the library's Worker handler run
 // in-process on the same SQLite build; the production-build Playwright suite
 // owns the real SQLite WASM + Worker + OPFS proof.
 vi.mock(

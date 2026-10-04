@@ -1,9 +1,10 @@
 /// <reference types="node" />
 // Inject, don't entangle: edge-reco reaches SQLite only through
-// @edgeproc/browser/sql, and only from ONE seam file (engine/catalogueSql.ts).
+// @gainratio/browser/sql, and only from ONE seam file (engine/catalogueSql.ts).
 // Nothing may load the sqlite3 build by file path. The single exception is the
 // test-only in-process Worker (engine/__fixtures__/nodeSqlWorker.ts), because
-// the library ships no Node entry for its SQL Worker.
+// the library ships no Node entry for its SQL Worker; it may also import the
+// published @gainratio/browser/sqlite entry for resolveMemoryProfile.
 
 import { readdirSync, readFileSync, statSync } from "node:fs";
 import { join, relative } from "node:path";
@@ -17,10 +18,10 @@ const SELF = "src/sqlBoundary.test.ts";
 
 /** A quoted string that loads the SQLite build or reaches into a package dist. */
 const RAW_SQLITE =
-	/["'`][^"'`\n]*(?:sqlite3\.(?:mjs|wasm|js)|@sqlite\.org\/|node_modules\/@edgeproc\/)[^"'`\n]*["'`]/u;
+	/["'`][^"'`\n]*(?:sqlite3\.(?:mjs|wasm|js)|@sqlite\.org\/|node_modules\/@gainratio\/)[^"'`\n]*["'`]/u;
 /** An import of the library's SQL / SQLite / vector-SQLite subpaths. */
 const SQL_SUBPATH =
-	/["']@edgeproc\/browser\/(?:sql|sqlite|vector\/sqlite)(?:\/[^"']*)?["']/u;
+	/["']@gainratio\/browser\/(?:sql|sqlite|vector\/sqlite)(?:\/[^"']*)?["']/u;
 
 function sources(directory: string): string[] {
 	return readdirSync(directory).flatMap((name) => {
@@ -38,8 +39,8 @@ function violations(file: string, text: string): string[] {
 	if (file !== NODE_FIXTURE && RAW_SQLITE.test(text)) {
 		found.push(`${file}: loads SQLite by file path`);
 	}
-	if (file !== SEAM && SQL_SUBPATH.test(text)) {
-		found.push(`${file}: imports @edgeproc/browser SQL outside ${SEAM}`);
+	if (file !== SEAM && file !== NODE_FIXTURE && SQL_SUBPATH.test(text)) {
+		found.push(`${file}: imports @gainratio/browser SQL outside ${SEAM}`);
 	}
 	return found;
 }
@@ -49,17 +50,17 @@ describe("SQLite boundary", () => {
 		expect(
 			violations(
 				"src/engine/vectorIndex.ts",
-				'import init from "../../node_modules/@edgeproc/browser/dist/vector/sqlite/assets/sqlite3.mjs";',
+				'import init from "../../node_modules/@gainratio/browser/dist/vector/sqlite/assets/sqlite3.mjs";',
 			),
 		).toHaveLength(1);
 		expect(
 			violations(
 				"src/engine/searchEngine.ts",
-				'import { openSqlDatabase } from "@edgeproc/browser/sql";',
+				'import { openSqlDatabase } from "@gainratio/browser/sql";',
 			),
 		).toHaveLength(1);
 		expect(
-			violations(SEAM, 'import { x } from "@edgeproc/browser/sql";'),
+			violations(SEAM, 'import { x } from "@gainratio/browser/sql";'),
 		).toEqual([]);
 	});
 
@@ -73,8 +74,8 @@ describe("SQLite boundary", () => {
 		expect(found).toEqual([]);
 	});
 
-	it("keeps the seam the one importer of @edgeproc/browser/sql", () => {
+	it("keeps the seam the one importer of @gainratio/browser/sql", () => {
 		const seam = readFileSync(join(PACKAGE, SEAM), "utf8");
-		expect(seam).toContain('from "@edgeproc/browser/sql"');
+		expect(seam).toContain('from "@gainratio/browser/sql"');
 	});
 });

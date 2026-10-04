@@ -5,7 +5,7 @@
 // error → propagate (fail closed). This locks that branching so an unexpected
 // fault can never masquerade as "older bundle".
 
-import type { SyncResult } from "@edgeproc/browser";
+import type { SyncResult } from "@gainratio/browser";
 import { describe, expect, it } from "vitest";
 import { type EnginePort, readOptionalBundleFile } from "./runtime";
 

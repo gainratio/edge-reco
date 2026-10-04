@@ -14,7 +14,7 @@
  * That is not a cosmetic difference. In a sibling repo this exact class of skew
  * reported three permanently-broken tests as green for an entire session: Node
  * 22's WebCrypto REJECTS the cross-realm bare `ArrayBuffer` passed through the
- * shared @edgeproc/browser verifier, and Node 24 ACCEPTS it. Same commit, same
+ * shared @gainratio/browser verifier, and Node 24 ACCEPTS it. Same commit, same
  * lockfile — the runtime alone flipped the result. The signed-bundle tests
  * exercise that dependency path.
  *

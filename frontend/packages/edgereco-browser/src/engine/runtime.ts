@@ -7,7 +7,7 @@
 //     ed25519+sha256 fail-closed, and materializes the four index files;
 //   - the embedder Worker (embedderWorker.ts) owns transformers.js: the ~25 MB
 //     all-MiniLM-L6-v2 weights download + ONNX inference.
-//   - @edgeproc/browser's SQL Worker owns the catalogue database (FTS5 keyword
+//   - @gainratio/browser's SQL Worker owns the catalogue database (FTS5 keyword
 //     search, sqlite-vector cosine, RRF fusion) in OPFS (catalogueSql.ts).
 //
 // bootstrap() drives both with a progress callback so the UI can show real
@@ -22,7 +22,7 @@ import {
 	MAX_TRUST_ROOT_BYTES,
 	parseTrustRoot,
 	type SyncResult,
-} from "@edgeproc/browser";
+} from "@gainratio/browser";
 import { deleteBundleFloorDatabase } from "./cacheFloor";
 import type { CatalogueStoreFactory } from "./catalogueDb";
 import { type CooccurrenceMatrix, parseCooccurrence } from "./cooccurrence";

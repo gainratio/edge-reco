@@ -25,7 +25,7 @@
  * dev-facing coded console breadcrumb) is new.
  */
 
-import type { EngineErrorCode } from "@edgeproc/browser";
+import type { EngineErrorCode } from "@gainratio/browser";
 import {
 	type Catalog,
 	defineErrors,

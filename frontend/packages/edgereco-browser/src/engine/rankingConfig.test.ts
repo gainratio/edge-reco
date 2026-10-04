@@ -1,9 +1,9 @@
-import type { IndexManifest, Verify, VersionPointer } from "@edgeproc/browser";
+import type { IndexManifest, Verify, VersionPointer } from "@gainratio/browser";
 import {
 	MemoryCacheStore,
 	materializeFile,
 	syncIndex,
-} from "@edgeproc/browser";
+} from "@gainratio/browser";
 import { describe, expect, it } from "vitest";
 import { catalogFetch, latestBytes } from "./fixtures";
 import { DEFAULT_RANKING_CONFIG, parseRankingConfig } from "./rankingConfig";

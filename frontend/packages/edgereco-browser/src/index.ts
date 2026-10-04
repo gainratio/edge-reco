@@ -1,17 +1,17 @@
 // @edgereco/browser — EdgeReco's in-browser recommendation engine.
 //
 // The generic signed-bundle sync, OPFS, Worker and integrity substrate comes
-// from the standalone @edgeproc/browser dependency. This package owns only the
+// from the standalone @gainratio/browser dependency. This package owns only the
 // EdgeReco domain layer: embeddings, hybrid search, ranking and session state.
 //
 // Primary entry point: EngineRuntime.bootstrap() → SearchEngine.
 //
 // The node-only fixture loader lives behind
 // `@edgereco/browser/testing/fixtures`. Generic test seams are imported
-// directly from `@edgeproc/browser`.
+// directly from `@gainratio/browser`.
 
 // --- the SyncResult shape leaks through BootStage; expose its type only ---
-export type { SyncResult } from "@edgeproc/browser";
+export type { SyncResult } from "@gainratio/browser";
 // --- the engine-owned domain contract (single source of truth) ---
 export type {
 	BrowseResponse,

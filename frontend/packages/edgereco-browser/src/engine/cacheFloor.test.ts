@@ -1,4 +1,4 @@
-import { resolveIndexedDbLayout } from "@edgeproc/browser";
+import { resolveIndexedDbLayout } from "@gainratio/browser";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import {
 	BUNDLE_FLOOR_DATABASE,

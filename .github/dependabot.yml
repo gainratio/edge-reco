@@ -2,7 +2,7 @@
 #   - pip            : the Python core + demo server (backend/, uv-managed)
 #   - npm            : the pnpm storefront workspace (frontend/, pnpm-lock.yaml)
 #   - github-actions : the workflows under .github/workflows/
-# All weekly. Dependabot's "npm" ecosystem natively understands pnpm-lock.yaml.
+# Weekly, except the frontend npm entry (daily, for @gainratio/*). Dependabot's "npm" ecosystem natively understands pnpm-lock.yaml.
 # Each ecosystem is GROUPED into a single consolidated PR per run, so updates
 # arrive as one reviewable PR instead of a flood of one-per-dependency PRs.
 version: 2
@@ -16,10 +16,16 @@ updates:
         patterns: ["*"]
         update-types: ["minor", "patch"]
 
+  # DAILY, not weekly: our own libraries (@gainratio/*) must track their latest
+  # npm release, so the bump PR should open the day a release ships. Dependabot
+  # allows only one entry per ecosystem + directory, so the whole /frontend npm
+  # entry runs daily; the @gainratio group is listed first so our libraries get
+  # their own PR (a dependency joins the first group it matches), and everything
+  # else stays in the one consolidated frontend-npm PR.
   - package-ecosystem: "npm"
     directory: "/frontend"
     schedule:
-      interval: "weekly"
+      interval: "daily"
     # transformers.js >=4.3.0 pulls onnxruntime-web 1.31.0-dev, whose
     # ort-wasm-simd-threaded.asyncify.wasm (26,861,777 B) exceeds the Cloudflare
     # Pages 25 MiB per-file limit that the self-hosted ORT runtime must fit
@@ -29,6 +35,8 @@ updates:
       - dependency-name: "@huggingface/transformers"
         versions: [">=4.3.0"]
     groups:
+      gainratio:
+        patterns: ["@gainratio/*"]
       frontend-npm:
         patterns: ["*"]
         update-types: ["minor", "patch"]

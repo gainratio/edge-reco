@@ -57,8 +57,8 @@ the `torch>=2.12.1` floor; the `--ignore-vuln` flag has been dropped.))
 
 ## 2. Frontend gate (pnpm workspaces)
 
-`@edgeproc/browser` is resolved from the exact public Git commit pinned in both
-workspace manifests and `pnpm-lock.yaml`. No sibling checkout or copied source
+`@gainratio/browser` comes from npm with a caret range (`^0.2.0`) in both
+workspace manifests; `pnpm-lock.yaml` pins the exact release CI tested. No sibling checkout or copied source
 is required.
 
 ```bash
@@ -71,7 +71,7 @@ pnpm -r run test                                # vitest on both
 pnpm -F frontend run build                      # prove the workspace link resolves
 ```
 
-The pnpm workspace is rooted at `frontend/`; the SPA lives in `frontend/app/` and EdgeReco's product engine in `frontend/packages/edgereco-browser/`. Both consume the same exact `edgeproc-browser` Git commit.
+The pnpm workspace is rooted at `frontend/`; the SPA lives in `frontend/app/` and EdgeReco's product engine in `frontend/packages/edgereco-browser/`. Both consume the same `@gainratio/browser` release from npm.
 
 ## 3. Run the demo (backend-free, in-browser)
 

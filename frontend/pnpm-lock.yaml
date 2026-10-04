@@ -29,12 +29,12 @@ importers:
 
   app:
     dependencies:
-      '@edgeproc/browser':
-        specifier: github:hseshadr/edgeproc-browser#25cdad0356d879799faaed57dd006582313084e6
-        version: '@gainratio/browser@https://codeload.github.com/hseshadr/edgeproc-browser/tar.gz/25cdad0356d879799faaed57dd006582313084e6'
       '@edgereco/browser':
         specifier: workspace:*
         version: link:../packages/edgereco-browser
+      '@gainratio/browser':
+        specifier: ^0.2.0
+        version: 0.2.0
       '@gainratio/errors':
         specifier: ^0.2.1
         version: 0.2.1
@@ -111,15 +111,15 @@ importers:
 
   packages/edgereco-browser:
     dependencies:
-      '@edgeproc/browser':
-        specifier: github:hseshadr/edgeproc-browser#25cdad0356d879799faaed57dd006582313084e6
-        version: '@gainratio/browser@https://codeload.github.com/hseshadr/edgeproc-browser/tar.gz/25cdad0356d879799faaed57dd006582313084e6'
       '@gainratio/assay':
         specifier: 0.5.0-dev.6
         version: 0.5.0-dev.6
       '@gainratio/avow':
         specifier: ^0.5.2
         version: 0.5.2
+      '@gainratio/browser':
+        specifier: ^0.2.0
+        version: 0.2.0
       '@huggingface/transformers':
         specifier: ^4.2.0
         version: 4.2.0(@types/node@26.6.3)
@@ -993,9 +993,8 @@ packages:
     resolution: {integrity: sha512-a4vtiKx9Dbb5HNFKvwWNOzuZk6EY7pq6vFPKM/vwTSaVmEQ4Ym+GJSJ3u6vnLbsAxZJgBfr0JWpGUmdB5Oqkww==}
     engines: {node: '>=22.13'}
 
-  '@gainratio/browser@https://codeload.github.com/hseshadr/edgeproc-browser/tar.gz/25cdad0356d879799faaed57dd006582313084e6':
-    resolution: {gitHosted: true, integrity: sha512-Ej7Y7GRxMdjVAGC8q/ZbiiioOL6PPgPDeMuUqErEOfXbZSVMDx3R+qRiV5s1qWzPnnIoZdQXJ1PhiXAcQA79pQ==, tarball: https://codeload.github.com/hseshadr/edgeproc-browser/tar.gz/25cdad0356d879799faaed57dd006582313084e6}
-    version: 0.1.1
+  '@gainratio/browser@0.2.0':
+    resolution: {integrity: sha512-IZHx4QKak4fXys3yzRw+o2nyyrsuetKGIJEDLbuGwoXM2bHAHCNhtueHWlhbhbmFS7O+CzYhfkqiGc26ExDMeg==}
     engines: {node: '>=22.13'}
 
   '@gainratio/errors@0.2.1':
@@ -4162,7 +4161,7 @@ snapshots:
       '@noble/ed25519': 3.1.0
       canonicalize: 3.0.0
 
-  '@gainratio/browser@https://codeload.github.com/hseshadr/edgeproc-browser/tar.gz/25cdad0356d879799faaed57dd006582313084e6':
+  '@gainratio/browser@0.2.0':
     dependencies:
       '@hpcc-js/wasm-zstd': 1.16.2
       '@noble/ed25519': 3.2.0

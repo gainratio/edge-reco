@@ -2,7 +2,7 @@ import assert from "node:assert/strict";
 import { readFile } from "node:fs/promises";
 import { join, resolve } from "node:path";
 import { test } from "node:test";
-import { parseTrustRoot } from "@edgeproc/browser";
+import { parseTrustRoot } from "@gainratio/browser";
 
 /**
  * ONE trust root, read ONE way.
@@ -10,7 +10,7 @@ import { parseTrustRoot } from "@edgeproc/browser";
  * The pinned trust root ships in three committed copies: the one the SPA serves
  * (`frontend/app/public/public.key`), the publisher's (`backend/examples/keys/`),
  * and the browser package's self-contained test fixture. The sync Worker reads
- * the served copy with `@edgeproc/browser`'s `loadTrustRoot` → `parseTrustRoot`
+ * the served copy with `@gainratio/browser`'s `loadTrustRoot` → `parseTrustRoot`
  * (a raw 32-byte Ed25519 key OR an `edgeproc.keyring/v1` JSON keyring), and the
  * ranking-proof check reads it with the same `parseTrustRoot`.
  *

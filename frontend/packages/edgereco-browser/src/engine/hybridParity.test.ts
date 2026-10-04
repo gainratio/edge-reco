@@ -12,12 +12,12 @@
 // EDGE_RECO_SKIP_EMBEDDING_PARITY=1 (the embedder is the gated part).
 
 import { resolve } from "node:path";
-import type { IndexManifest, Verify } from "@edgeproc/browser";
+import type { IndexManifest, Verify } from "@gainratio/browser";
 import {
 	MemoryCacheStore,
 	materializeFile,
 	syncIndex,
-} from "@edgeproc/browser";
+} from "@gainratio/browser";
 import { env, pipeline } from "@huggingface/transformers";
 import { describe, expect, it } from "vitest";
 import hybridFixture from "./__fixtures__/hybrid_parity.json" with {

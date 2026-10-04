@@ -1,22 +1,24 @@
 /// <reference types="node" />
 // TEST-ONLY. Node and jsdom have no Worker or OPFS, so this stands in for
-// @edgeproc/browser's SQL Worker: it runs the library's OWN Worker-side handler
+// @gainratio/browser's SQL Worker: it runs the library's OWN Worker-side handler
 // and engine in-process, on the same pinned sqlite3.wasm, in memory. Every
 // request and response is structured-cloned exactly as postMessage would. The
 // production client (openSqlDatabase) is unchanged; only the far side of the
 // message channel moves in-process.
 //
-// The library exports no Node entry for its SQL Worker, so this is the one file
-// allowed to reach into its dist (sqlBoundary.test.ts). It is never bundled.
+// @gainratio/browser 0.2.0 exports no entry for its SQL Worker internals
+// (SqlEngine, createSqlWorkerHandler) or its sqlite3.mjs/.wasm build, so this
+// is the one file allowed to reach into its dist (sqlBoundary.test.ts).
+// resolveMemoryProfile comes from the published ./sqlite entry. Never bundled.
 
 import { readFile } from "node:fs/promises";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
-import { SqlEngine } from "../../../node_modules/@edgeproc/browser/dist/sql/engine.js";
-import { createSqlWorkerHandler } from "../../../node_modules/@edgeproc/browser/dist/sql/handler.js";
-import { resolveMemoryProfile } from "../../../node_modules/@edgeproc/browser/dist/sqlite/memoryProfile.js";
+import { resolveMemoryProfile } from "@gainratio/browser/sqlite";
+import { SqlEngine } from "../../../node_modules/@gainratio/browser/dist/sql/engine.js";
+import { createSqlWorkerHandler } from "../../../node_modules/@gainratio/browser/dist/sql/handler.js";
 // @ts-expect-error -- sqlite3.mjs ships without type declarations.
-import sqlite3InitModule from "../../../node_modules/@edgeproc/browser/dist/vector/sqlite/assets/sqlite3.mjs";
+import sqlite3InitModule from "../../../node_modules/@gainratio/browser/dist/vector/sqlite/assets/sqlite3.mjs";
 import type { OpenCatalogueSqlDeps } from "../catalogueSql";
 
 type Handler = ReturnType<typeof createSqlWorkerHandler>;
@@ -29,7 +31,7 @@ interface NodeSqlite {
 
 const WASM_PATH = join(
 	dirname(fileURLToPath(import.meta.url)),
-	"../../../node_modules/@edgeproc/browser/dist/vector/sqlite/assets/sqlite3.wasm",
+	"../../../node_modules/@gainratio/browser/dist/vector/sqlite/assets/sqlite3.wasm",
 );
 
 let loaded: Promise<NodeSqlite> | undefined;

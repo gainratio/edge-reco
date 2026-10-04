@@ -1,4 +1,8 @@
-import { deriveKeyId, KEYRING_SCHEMA, parseTrustRoot } from "@edgeproc/browser";
+import {
+	deriveKeyId,
+	KEYRING_SCHEMA,
+	parseTrustRoot,
+} from "@gainratio/browser";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import fixture from "./__fixtures__/ranking_proof_v1.json" with {
 	type: "json",

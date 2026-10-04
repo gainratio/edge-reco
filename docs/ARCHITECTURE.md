@@ -5,7 +5,7 @@ EdgeReco runs a store's recommendation engine on the shopper's device instead of
 Three pieces, composed from a shared browser Lego:
 
 - **`backend/`** — Python build-side. Catalog ingest, embedding, FAISS index build, BM25 build, signed-bundle publish.
-- **[`@edgeproc/browser`](https://github.com/hseshadr/edgeproc-browser)** — the standalone browser substrate: signed-bundle sync into OPFS, integrity, Worker transport, and vector adapter contracts.
+- **[`@gainratio/browser`](https://github.com/hseshadr/edgeproc-browser)** — the standalone browser substrate: signed-bundle sync into OPFS, integrity, Worker transport, and vector adapter contracts.
 - **`frontend/packages/edgereco-browser/`** — `@edgereco/browser`. EdgeReco's transformers.js embedder, hybrid search, ranking, and session logic composed over that substrate.
 - **`frontend/app/`** — the Nimbus React storefront. Thin UI over `@edgereco/browser`; no app server in the request path.
 
@@ -20,7 +20,7 @@ The whole system is four repositories that compose as one stack:
 | [**edgeproc-browser**](https://github.com/hseshadr/edgeproc-browser) | the reusable browser substrate — signed sync, OPFS/CAS, Worker transport, integrity, and swappable vector indexes. |
 | [**edgeproc-core**](https://github.com/hseshadr/edgeproc-core) | the vector-partitioning protocol edge-proc builds its local vector index on (formerly `shared-libs-python`). On PyPI as [`edgeproc-core`](https://pypi.org/project/edgeproc-core/). |
 
-The backend installs `edge-proc` and `edgeproc-core` from PyPI (`uv.lock` pins the exact releases), and the frontend installs `@edgeproc/browser` from a pinned GitHub commit — see [`GETTING_STARTED.md`](GETTING_STARTED.md). You only clone edge-reco. [privacy-core](https://github.com/hseshadr/privacy-core), by the same author, is unrelated: it redacts personal data from AI prompts and is not part of this stack.
+The backend installs `edge-proc` and `edgeproc-core` from PyPI (`uv.lock` pins the exact releases), and the frontend installs `@gainratio/browser` from npm (`^0.2.0`, locked in `pnpm-lock.yaml`) — see [`GETTING_STARTED.md`](GETTING_STARTED.md). You only clone edge-reco. [privacy-core](https://github.com/hseshadr/privacy-core), by the same author, is unrelated: it redacts personal data from AI prompts and is not part of this stack.
 
 ## System context
 
@@ -36,7 +36,7 @@ flowchart TB
   end
 
   subgraph consumers["Two execution shapes, one engine"]
-    browser["Browser tier<br>@edgeproc/browser sync → @edgereco/browser ranking"]
+    browser["Browser tier<br>@gainratio/browser sync → @edgereco/browser ranking"]
     api["FastAPI runtime — edgereco serve<br>same sync, same scoring formula"]
   end
 
@@ -176,7 +176,7 @@ Publish-side: `edgereco bundle` chunks the index dir under GearCDC, writes each 
 
 Serve-side (when running as API server): `edgereco serve` syncs the signed bundle (or reads a flat dir for tests), constructs the `ServiceContainer`, and exposes the FastAPI app. CORS allows the SPA's origin.
 
-## Browser tier (`@edgereco/browser` over `@edgeproc/browser`)
+## Browser tier (`@edgereco/browser` over `@gainratio/browser`)
 
 `frontend/packages/edgereco-browser/src/`:
 
@@ -184,7 +184,7 @@ Serve-side (when running as API server): `edgereco serve` syncs the signed bundl
 flowchart LR
   app["Nimbus React app<br>frontend/app/"]
   engine["Engine — engine.ts<br>BM25 + vector → RRF → session rerank"]
-  sync["Shared sync worker — @edgeproc/browser<br>fetch latest, verify Ed25519,<br>diff the manifest, re-check every chunk's sha256"]
+  sync["Shared sync worker — @gainratio/browser<br>fetch latest, verify Ed25519,<br>diff the manifest, re-check every chunk's sha256"]
   embed["Embedder worker — embedderWorker.ts<br>transformers.js, all-MiniLM-L6-v2"]
   opfs[("OPFS bundle cache<br>content-addressed chunks")]
   profile["Session profile<br>in memory, never persisted"]
@@ -204,21 +204,21 @@ flowchart LR
   class opfs,profile store;
 ```
 
-- **Sync substrate (`@edgeproc/browser`)** — standalone Worker that fetches `/latest`, verifies ed25519 against a SPA-pinned public key, diffs the manifest against the OPFS cache, fetches missing chunks, re-checks every chunk's sha256, and atomically promotes the new version.
+- **Sync substrate (`@gainratio/browser`)** — standalone Worker that fetches `/latest`, verifies ed25519 against a SPA-pinned public key, diffs the manifest against the OPFS cache, fetches missing chunks, re-checks every chunk's sha256, and atomically promotes the new version.
 - **Embedder** — `Xenova/all-MiniLM-L6-v2` via transformers.js. Parity-tested against the Python encoder at cosine ≥ 0.99.
 - **Engine** — same BM25 + vector + RRF + session rerank as the backend, but in TypeScript. Parity-tested against the Python search at top-k identity over the real `examples/catalog` bundle.
 - **Storage** — OPFS for the bundle cache (plus the library's IndexedDB anti-rollback floor); in-memory for the session profile.
 - **Worker boundary** — sync runs in a Worker so the UI thread is never blocked on a multi-MB bundle fetch.
 
-The SPA consumes the private `@edgereco/browser` workspace package and the standalone `@edgeproc/browser` dependency at an exact public Git commit. No shared source or sibling checkout is required.
+The SPA consumes the private `@edgereco/browser` workspace package and the standalone `@gainratio/browser` npm dependency (caret range, exact version in the lockfile). No shared source or sibling checkout is required.
 
 ## Frontend tier (Nimbus storefront)
 
 `frontend/app/`:
 
-A React + Vite SPA over `@edgereco/browser`, which composes `@edgeproc/browser`. The app boots through an intro landing page (its performance tiles quote a dated, recorded measurement of the live site — `src/metrics/live-measurement.json`, written by `pnpm run measure:live` in real Chromium — through `src/metrics/landing-figures.ts`, and `landing-figures.test.ts` recomputes every tile from the raw runs); once launched, the store shows a live `MetricsStrip` of real per-session numbers (recommend latency, backend calls, cold start, JS heap, catalog size). The home page is a 720-product Amazon catalog grid (balanced across 12 categories) with a search box and a `RailStack` of *For You* / *Trending* / *New arrivals* rails — the For You rail re-ranks live as the user clicks, favorites, adds to cart, or lingers; Trending / New arrivals are stable. Clicking a product opens the PDP (`ProductDetail.tsx`; a `#/p/<id>` hash history entry, no router library, so browser Back stays in-app and a reload restores the view) with its seed-based rails — *Similar items*, *Because you viewed*, *Customers also bought*, *Frequently bought together*. The taste itself is durable on the device: every folded interaction appends to an OPFS taste log (`src/signals/tasteLog.ts`, rolling 500-event window, no PII), boot replays it through the same fold with the bundle's `interaction_weights` to rebuild the profile, and a "Reset taste" control next to the For-You badge wipes log + profile back to baseline — still zero backend calls. The headline demo — `cd backend && uv run poe demo` (or `cd frontend && docker compose up` for a Docker-only run) — brings up the static signed-bundle origin + Caddy edge + the SPA; the browser does the search.
+A React + Vite SPA over `@edgereco/browser`, which composes `@gainratio/browser`. The app boots through an intro landing page (its performance tiles quote a dated, recorded measurement of the live site — `src/metrics/live-measurement.json`, written by `pnpm run measure:live` in real Chromium — through `src/metrics/landing-figures.ts`, and `landing-figures.test.ts` recomputes every tile from the raw runs); once launched, the store shows a live `MetricsStrip` of real per-session numbers (recommend latency, backend calls, cold start, JS heap, catalog size). The home page is a 720-product Amazon catalog grid (balanced across 12 categories) with a search box and a `RailStack` of *For You* / *Trending* / *New arrivals* rails — the For You rail re-ranks live as the user clicks, favorites, adds to cart, or lingers; Trending / New arrivals are stable. Clicking a product opens the PDP (`ProductDetail.tsx`; a `#/p/<id>` hash history entry, no router library, so browser Back stays in-app and a reload restores the view) with its seed-based rails — *Similar items*, *Because you viewed*, *Customers also bought*, *Frequently bought together*. The taste itself is durable on the device: every folded interaction appends to an OPFS taste log (`src/signals/tasteLog.ts`, rolling 500-event window, no PII), boot replays it through the same fold with the bundle's `interaction_weights` to rebuild the profile, and a "Reset taste" control next to the For-You badge wipes log + profile back to baseline — still zero backend calls. The headline demo — `cd backend && uv run poe demo` (or `cd frontend && docker compose up` for a Docker-only run) — brings up the static signed-bundle origin + Caddy edge + the SPA; the browser does the search.
 
-The SPA pins the verify public key (`public/public.key`) at build time — it never trusts the origin for the key. That trust root may be a raw 32-byte Ed25519 key or an `edgeproc.keyring/v1` JSON keyring (key rotation + revocation). The sync Worker and the ranking-proof check both parse it with `@edgeproc/browser`'s `parseTrustRoot`, so the two readers always agree on its format.
+The SPA pins the verify public key (`public/public.key`) at build time — it never trusts the origin for the key. That trust root may be a raw 32-byte Ed25519 key or an `edgeproc.keyring/v1` JSON keyring (key rotation + revocation). The sync Worker and the ranking-proof check both parse it with `@gainratio/browser`'s `parseTrustRoot`, so the two readers always agree on its format.
 
 The browser keeps the highest accepted `latest` pointer as an anti-rollback floor (OPFS + IndexedDB), even when the current key can't verify it. A publish must therefore keep `sequence` strictly increasing **across signing keys**, and keep `bundle_id` / `channel` stable. Rotate keys through a keyring trust root, never by swapping `public.key` (see [DEPLOY.md → Signing keys, the release `sequence`, and rotation](DEPLOY.md#signing-keys-the-release-sequence-and-rotation)). A shopper whose floor can't be satisfied sees a fail-closed integrity refusal. The boot screen then offers an explicit **Clear cached catalog and retry** (`EngineRuntime.clearBundleCache()`), which is never automatic. A rollback refusal gets a tampering warning and a second confirm click first. It clears only the synced catalog and its floor, then boots again.
 
@@ -331,7 +331,7 @@ publish a new catalog, never to answer a search.
 
 The Python side depends on [`edge-proc[localvec,bundles]`](../backend/pyproject.toml).
 The browser side depends on the standalone
-[`@edgeproc/browser`](https://github.com/hseshadr/edgeproc-browser) package for signed
+[`@gainratio/browser`](https://github.com/hseshadr/edgeproc-browser) package for signed
 sync, integrity checks, Workers, OPFS and vector contracts, while this repo's
 [`@edgereco/browser`](../frontend/packages/edgereco-browser/) package owns only the
 recommendation-specific embedding, search, ranking and session logic.
@@ -420,7 +420,7 @@ exist.
 
 **Bundle-sync verification is not displayed.** Signature checking runs on every sync and
 a tampered file is refused. The implementation comes from the standalone
-[`@edgeproc/browser`](https://github.com/hseshadr/edgeproc-browser) dependency; EdgeReco
+[`@gainratio/browser`](https://github.com/hseshadr/edgeproc-browser) dependency; EdgeReco
 keeps no private copy. What does not exist is a screen showing that sync outcome. The
 landing page's "verify (Ed25519 + SHA-256, fail-closed)" step is static copy, not a live
 result.
