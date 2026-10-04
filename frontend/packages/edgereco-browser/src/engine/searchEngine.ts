@@ -16,7 +16,7 @@
 // The C2b vector-only parity path is a TEST-ONLY helper, exported separately
 // as `__searchVectorForParity` (not on the public SearchEngine interface).
 
-import type { CatalogueStoreFactory } from "./catalogueClient";
+import type { CatalogueStoreFactory } from "./catalogueDb";
 import { type CooccurrenceMatrix, EMPTY_COOCCURRENCE } from "./cooccurrence";
 import type {
 	BrowseResponse,

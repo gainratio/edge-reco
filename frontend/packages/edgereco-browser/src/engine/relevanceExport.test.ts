@@ -38,7 +38,6 @@ import {
 	syncIndex,
 } from "@edgeproc/browser";
 import { describe, expect, it } from "vitest";
-import { openNodeDatabase } from "./__fixtures__/nodeCatalogue";
 import {
 	CATALOG_ID,
 	ftsTokens,
@@ -51,6 +50,7 @@ import {
 	taxonomyCorpusTokens,
 } from "./__fixtures__/relevanceGoldenSet";
 import { CatalogueDb } from "./catalogueDb";
+import { openCatalogueSql } from "./catalogueSql";
 import type { Product } from "./domain";
 import { createEmbedder, type Embedder } from "./embedder";
 import { catalogFetch } from "./fixtures";
@@ -159,17 +159,17 @@ function matchesCommitted(payload: RelevanceExport): boolean {
 describe("relevance golden set: the labels are independent of the ranker", () => {
 	it("restates the keyword index's tokenizer exactly (ftsTokens == FTS5)", async () => {
 		const products = await catalogProducts();
-		const raw = await openNodeDatabase();
-		const catalogue = new CatalogueDb(raw, 1);
-		catalogue.replace({
+		const sql = await openCatalogueSql();
+		const catalogue = await CatalogueDb.open(sql, 1);
+		await catalogue.replace({
 			products,
 			vectors: new Float32Array(products.length).fill(1),
 		});
-		raw.exec({
-			sql: "CREATE VIRTUAL TABLE temp.vocab USING fts5vocab(main, products_fts, instance)",
-		});
+		await sql.exec(
+			"CREATE VIRTUAL TABLE temp.vocab USING fts5vocab(main, products_fts, instance)",
+		);
 		const indexed = new Map<number, Set<string>>();
-		for (const row of raw.selectObjects("SELECT doc, term FROM temp.vocab")) {
+		for (const row of await sql.query("SELECT doc, term FROM temp.vocab")) {
 			const doc = Number(row.doc);
 			const terms = indexed.get(doc) ?? new Set<string>();
 			terms.add(String(row.term));
@@ -186,7 +186,7 @@ describe("relevance golden set: the labels are independent of the ranker", () =>
 				indexed.get(row) ?? new Set(),
 			);
 		});
-		catalogue.close();
+		await catalogue.dispose();
 	});
 
 	it("gives every natural query a relevant set and no hit on the label field", async () => {

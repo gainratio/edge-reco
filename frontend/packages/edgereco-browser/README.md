@@ -41,8 +41,10 @@ The browser embedder is `Xenova/all-MiniLM-L6-v2` via
 `{ pooling: "mean", normalize: true }` — the byte-for-byte equivalent of the
 Python core's `sentence-transformers` recipe. The browser imports the signed
 products and `vector/embeddings.f32` matrix into ONE SQLite database
-(`catalogueDb.ts`, on the SQLite + sqlite-vector build `@edgeproc/browser`
-ships) in its own Worker, persisted in OPFS. Keyword search is SQLite FTS5's
+(`catalogueDb.ts`). The database comes from `@edgeproc/browser/sql`, which runs
+SQLite + FTS5 + sqlite-vector in its own Worker and persists it in OPFS;
+`catalogueSql.ts` is the only file that imports it. On boot it also deletes
+the old vector pool earlier builds left in OPFS. Keyword search is SQLite FTS5's
 built-in `bm25()`, similarity is sqlite-vector's exact cosine scan, and the RRF
 fusion (`k=60`) is one SQL query that returns both ranks and raw scores. No
 hand-written BM25 or fusion code remains in the browser. The Python runtime uses
@@ -60,7 +62,7 @@ SPA tab
 │     ├── sync Worker   (@edgeproc/browser)
 │     │     └── pull /latest -> verify ed25519 -> fetch chunks ->
 │     │         verify sha256 -> reassemble files into OPFS
-│     ├── catalogue Worker (catalogueWorker.ts)
+│     ├── SQL Worker    (@edgeproc/browser/sql, via catalogueSql.ts)
 │     │     └── products + FTS5 + sqlite-vector -> one SQLite database in OPFS
 │     └── embedder Worker (embedderWorker.ts)
 │           └── load Xenova/all-MiniLM-L6-v2 (~25 MB) -> ONNX session

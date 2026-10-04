@@ -1,14 +1,18 @@
 // The in-browser catalogue index over the synced bundle. Row i of
 // embeddings.f32 is the L2-normalized vector for state.json faiss_ids[i]
 // (Python's VectorSearcher, src/edgereco/search/vector.py). The verified
-// products and vectors are imported into ONE SQLite database in its own Worker
-// (catalogueDb.ts): keyword search is FTS5, similarity is sqlite-vector, and
+// products and vectors are imported into ONE SQLite database, which
+// @edgeproc/browser runs in its own Worker (catalogueDb.ts, catalogueSql.ts): keyword search is FTS5, similarity is sqlite-vector, and
 // hybrid fusion is a SQL query. Every query crosses that Worker boundary and stays
 // off the UI thread.
 
-import type { CatalogueStore, CatalogueStoreFactory } from "./catalogueClient";
-import type { CatalogueProduct, HybridRow } from "./catalogueDb";
-import { openCatalogueStore } from "./catalogueSpawn";
+import {
+	type CatalogueProduct,
+	type CatalogueStore,
+	type CatalogueStoreFactory,
+	type HybridRow,
+	openCatalogueStore,
+} from "./catalogueDb";
 import type { Product } from "./domain";
 
 const DECODER = new TextDecoder();

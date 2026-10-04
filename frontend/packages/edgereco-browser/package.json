@@ -8,7 +8,7 @@
 	"exports": {
 		".": "./src/index.ts",
 		"./testing/fixtures": "./src/engine/fixtures.ts",
-		"./testing/catalogue": "./src/engine/__fixtures__/nodeCatalogue.ts"
+		"./testing/catalogue": "./src/engine/__fixtures__/nodeSqlWorker.ts"
 	},
 	"scripts": {
 		"lint": "biome check .",
@@ -17,7 +17,7 @@
 		"test:coverage": "vitest run --coverage"
 	},
 	"dependencies": {
-		"@edgeproc/browser": "github:hseshadr/edgeproc-browser#36ab30a58225e593927a852d47005bbe9ad79f5b",
+		"@edgeproc/browser": "github:hseshadr/edgeproc-browser#25cdad0356d879799faaed57dd006582313084e6",
 		"@gainratio/assay": "0.5.0-dev.6",
 		"@gainratio/avow": "^0.5.2",
 		"@huggingface/transformers": "^4.2.0"

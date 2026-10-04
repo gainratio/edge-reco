@@ -7,8 +7,8 @@
 //     ed25519+sha256 fail-closed, and materializes the four index files;
 //   - the embedder Worker (embedderWorker.ts) owns transformers.js: the ~25 MB
 //     all-MiniLM-L6-v2 weights download + ONNX inference.
-//   - the shared sqlite-vector Worker owns exact cosine search and its OPFS-
-//     persisted SQLite database.
+//   - @edgeproc/browser's SQL Worker owns the catalogue database (FTS5 keyword
+//     search, sqlite-vector cosine, RRF fusion) in OPFS (catalogueSql.ts).
 //
 // bootstrap() drives both with a progress callback so the UI can show real
 // stages (syncing bundle… loading model…). It is idempotent: the engine is
@@ -24,7 +24,7 @@ import {
 	type SyncResult,
 } from "@edgeproc/browser";
 import { deleteBundleFloorDatabase } from "./cacheFloor";
-import type { CatalogueStoreFactory } from "./catalogueClient";
+import type { CatalogueStoreFactory } from "./catalogueDb";
 import { type CooccurrenceMatrix, parseCooccurrence } from "./cooccurrence";
 import EdgeProcWorker from "./edgeprocWorker?worker";
 import { createEmbedder, type Embedder } from "./embedder";

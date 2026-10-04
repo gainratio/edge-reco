@@ -6,8 +6,11 @@ import {
 	syncIndex,
 } from "@edgeproc/browser";
 import { describe, expect, it, vi } from "vitest";
-import { openNodeCatalogueStore } from "./__fixtures__/nodeCatalogue";
-import type { CatalogueStore, CatalogueStoreOptions } from "./catalogueClient";
+import {
+	type CatalogueStore,
+	type CatalogueStoreOptions,
+	openCatalogueStore,
+} from "./catalogueDb";
 import type { Embedder } from "./embedder";
 import { catalogFetch } from "./fixtures";
 import { type EnginePort, EngineRuntime, type RuntimeConfig } from "./runtime";
@@ -182,7 +185,7 @@ describe("EngineRuntime resource lifecycle", () => {
 			makeEmbedder: () => embedder,
 			makeCatalogue: (options: CatalogueStoreOptions) =>
 				new Promise<CatalogueStore>((resolve) => {
-					void openNodeCatalogueStore(options).then((opened) => {
+					void openCatalogueStore(options).then((opened) => {
 						store = opened;
 						resolveIndex = resolve;
 					});

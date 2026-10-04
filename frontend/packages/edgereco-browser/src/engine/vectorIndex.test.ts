@@ -5,8 +5,8 @@ import {
 	syncIndex,
 } from "@edgeproc/browser";
 import { describe, expect, it, vi } from "vitest";
-import { openNodeCatalogueStore } from "./__fixtures__/nodeCatalogue";
-import { openCatalogueStore } from "./catalogueSpawn";
+import { openCatalogueStore } from "./catalogueDb";
+import { openCatalogueSql, retireLegacyVectorPool } from "./catalogueSql";
 import { catalogFetch, latestBytes } from "./fixtures";
 import {
 	loadVectorIndex,
@@ -80,7 +80,7 @@ function encoder(vectors: ReadonlyArray<ReadonlyArray<number>>): {
 
 describe("loadVectorIndex synthetic correctness", () => {
 	it("imports the whole signed revision in one replace, in bundle row order", async () => {
-		const store = await openNodeCatalogueStore({ dimension: 2 });
+		const store = await openCatalogueStore({ dimension: 2 });
 		const replace = vi.spyOn(store, "replace");
 
 		const index = await loadVectorIndex(
@@ -104,11 +104,18 @@ describe("loadVectorIndex synthetic correctness", () => {
 		await index.dispose();
 	});
 
-	it("opens the catalogue store at the bundle's embedding dimension", async () => {
-		const open = vi.mocked(openCatalogueStore);
+	it("retires main's old vector pool on boot, then opens the catalogue database", async () => {
+		const retire = vi.mocked(retireLegacyVectorPool);
+		const open = vi.mocked(openCatalogueSql);
+		retire.mockClear();
 		open.mockClear();
 		const index = await loadVectorIndex(encoder([[1, 0]]));
-		expect(open).toHaveBeenCalledWith({ dimension: 2 });
+		expect(retire).toHaveBeenCalledOnce();
+		expect(open).toHaveBeenCalledOnce();
+		expect(retire.mock.invocationCallOrder[0]).toBeLessThan(
+			open.mock.invocationCallOrder[0] ?? 0,
+		);
+		expect(index.dim).toBe(2);
 		await index.dispose();
 	});
 
@@ -130,7 +137,7 @@ describe("loadVectorIndex synthetic correctness", () => {
 	});
 
 	it("still reports vectors the store rejects on import as a malformed bundle", async () => {
-		const store = await openNodeCatalogueStore({ dimension: 2 });
+		const store = await openCatalogueStore({ dimension: 2 });
 		vi.spyOn(store, "replace").mockRejectedValue(new Error("non-finite"));
 		const dispose = vi.spyOn(store, "dispose");
 

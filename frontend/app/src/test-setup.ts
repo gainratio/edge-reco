@@ -7,15 +7,26 @@ import { vi } from "vitest";
 // copy via useTranslation() instead of raw keys.
 import "./i18n";
 
-// jsdom has no Worker/OPFS. Unit tests run the catalogue's real SQL on the same
-// SQLite build in-process; the production-build Playwright suite owns the real
-// SQLite WASM + Worker + OPFS proof.
+// jsdom has no Worker/OPFS. Unit tests open the catalogue through the real
+// seam and @edgeproc/browser client, with the library's Worker handler run
+// in-process on the same SQLite build; the production-build Playwright suite
+// owns the real SQLite WASM + Worker + OPFS proof.
 vi.mock(
-	"../../packages/edgereco-browser/src/engine/catalogueSpawn",
-	async () => {
-		const { openNodeCatalogueStore } = await import(
+	"../../packages/edgereco-browser/src/engine/catalogueSql",
+	async (importOriginal) => {
+		const actual =
+			await importOriginal<
+				typeof import("../../packages/edgereco-browser/src/engine/catalogueSql")
+			>();
+		const { nodeSqlWorkerFactory } = await import(
 			"@edgereco/browser/testing/catalogue"
 		);
-		return { openCatalogueStore: vi.fn(openNodeCatalogueStore) };
+		return {
+			...actual,
+			openCatalogueSql: vi.fn(() =>
+				actual.openCatalogueSql({ workerFactory: nodeSqlWorkerFactory }),
+			),
+			retireLegacyVectorPool: vi.fn(async () => "absent"),
+		};
 	},
 );

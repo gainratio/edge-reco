@@ -13,7 +13,7 @@ describe("browser vector runtime contract", () => {
 	// vectorIndex.ts to open @edgeproc/browser's SQLite-vector Worker
 	// (createSqliteVectorIndex). Vectors now live in edge-reco's catalogue
 	// database beside the products and the FTS5 index, on the SAME pinned SQLite +
-	// sqlite-vector build (catalogueSqlite.ts), so one SQL query can fuse keyword
+	// sqlite-vector build (@edgeproc/browser/sql, via catalogueSql.ts), so one SQL query can fuse keyword
 	// and vector ranks. The property this test exists for is unchanged: similarity
 	// runs in sqlite-vector, never in a JS fallback.
 	it("runs similarity in sqlite-vector inside the catalogue database, with no JS fallback", () => {

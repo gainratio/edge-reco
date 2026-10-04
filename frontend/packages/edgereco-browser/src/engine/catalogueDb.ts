@@ -21,16 +21,16 @@
 // FTS5 fixes BM25's k1=1.2 and b=0.75 (https://sqlite.org/fts5.html); only the
 // column weights are tunable. Ties break by bundle row, as before.
 //
-// This module only speaks SQL. Opening the database (OPFS or memory, inside a
-// Worker) is catalogueWorker.ts; the main-thread handle is catalogueClient.ts.
+// This module only speaks SQL. The database itself (Worker, OPFS pool, owner
+// lock, memory fallback) comes from @edgeproc/browser through catalogueSql.ts.
 
-/** The OO1 surface of an open sqlite3 database (sqlite-wasm's `oo1.DB`). */
-export interface CatalogueSqlDatabase {
-	exec(options: { readonly sql: string; readonly bind?: unknown[] }): unknown;
-	selectObjects(sql: string, bind?: unknown[]): Array<Record<string, unknown>>;
-	transaction<T>(callback: () => T): T;
-	close(): void;
-}
+import {
+	type CatalogueSql,
+	openCatalogueSql,
+	retireLegacyVectorPool,
+	type SqlBind,
+	type SqlRow,
+} from "./catalogueSql";
 
 /** The product fields the keyword index reads. */
 export interface CatalogueProduct {
@@ -184,65 +184,109 @@ function vectorBlob(vector: Float32Array): Uint8Array {
 	return new Uint8Array(vector.buffer, vector.byteOffset, vector.byteLength);
 }
 
-/** Catalogue search over one open SQLite database (Worker-side, synchronous). */
-export class CatalogueDb {
-	readonly #db: CatalogueSqlDatabase;
+/** The async catalogue surface the search engine uses. */
+export interface CatalogueStore {
+	replace(revision: CatalogueImport): Promise<void>;
+	hybrid(
+		query: string,
+		vector: Float32Array,
+		k: number,
+	): Promise<ReadonlyArray<HybridRow>>;
+	vectorSearch(
+		vector: Float32Array,
+		k: number,
+	): Promise<ReadonlyArray<ScoredId>>;
+	nearest(id: string, k: number): Promise<ReadonlyArray<ScoredId>>;
+	dispose(): Promise<void>;
+}
+
+export interface CatalogueStoreOptions {
+	readonly dimension: number;
+}
+
+/** Opens a CatalogueStore at the bundle's embedding dimension. */
+export type CatalogueStoreFactory = (
+	options: CatalogueStoreOptions,
+) => Promise<CatalogueStore>;
+
+/**
+ * Production factory: retire main's old OPFS vector pool, then open the
+ * catalogue database through the @edgeproc/browser SQL seam.
+ */
+export const openCatalogueStore: CatalogueStoreFactory = async ({
+	dimension,
+}) => {
+	await retireLegacyVectorPool();
+	return CatalogueDb.open(await openCatalogueSql(), dimension);
+};
+
+/** Catalogue search over one open SQLite database. */
+export class CatalogueDb implements CatalogueStore {
+	readonly #sql: CatalogueSql;
 	readonly #dimension: number;
 	readonly #weights: LexicalWeights;
 
-	public constructor(
-		db: CatalogueSqlDatabase,
+	private constructor(
+		sql: CatalogueSql,
 		dimension: number,
-		weights: LexicalWeights = DEFAULT_LEXICAL_WEIGHTS,
+		weights: LexicalWeights,
 	) {
-		if (!Number.isInteger(dimension) || dimension < 1) {
-			throw new RangeError(`vector dimension must be a positive integer`);
-		}
-		this.#db = db;
+		this.#sql = sql;
 		this.#dimension = dimension;
 		this.#weights = weights;
-		db.exec({ sql: SCHEMA });
-		db.selectObjects(
-			"SELECT vector_init('products', 'embedding', ?) AS initialized",
-			[`dimension=${dimension},type=FLOAT32,distance=COSINE`],
-		);
+	}
+
+	/** Create the schema and register the vector column; closes `sql` on failure. */
+	public static async open(
+		sql: CatalogueSql,
+		dimension: number,
+		weights: LexicalWeights = DEFAULT_LEXICAL_WEIGHTS,
+	): Promise<CatalogueDb> {
+		try {
+			if (!Number.isInteger(dimension) || dimension < 1) {
+				throw new RangeError(`vector dimension must be a positive integer`);
+			}
+			await sql.exec(SCHEMA);
+			await sql.query(
+				"SELECT vector_init('products', 'embedding', ?) AS initialized",
+				[`dimension=${dimension},type=FLOAT32,distance=COSINE`],
+			);
+			return new CatalogueDb(sql, dimension, weights);
+		} catch (error) {
+			await sql.close();
+			throw error;
+		}
 	}
 
 	/** Replace the whole catalogue with one verified revision, atomically. */
-	public replace(revision: CatalogueImport): void {
+	public async replace(revision: CatalogueImport): Promise<void> {
 		const { products, vectors } = revision;
-		if (vectors.length !== products.length * this.#dimension) {
+		const dim = this.#dimension;
+		if (vectors.length !== products.length * dim) {
 			throw new RangeError(
-				`expected ${products.length * this.#dimension} vector values, got ${vectors.length}`,
+				`expected ${products.length * dim} vector values, got ${vectors.length}`,
 			);
 		}
 		assertFinite(vectors, "catalogue vectors");
-		this.#db.transaction(() => {
-			this.#db.exec({ sql: "DELETE FROM products" });
-			products.forEach((product, row) => {
-				const start = row * this.#dimension;
-				this.#db.exec({
-					sql: "INSERT INTO products VALUES (?, ?, ?, ?, ?, ?, ?)",
-					bind: [
-						row,
-						product.id,
-						product.title,
-						product.category,
-						product.tags.join(" "),
-						product.brand,
-						vectorBlob(vectors.subarray(start, start + this.#dimension)),
-					],
-				});
-			});
-			this.#db.exec({
-				sql: "INSERT INTO products_fts(products_fts) VALUES ('rebuild')",
-			});
-		});
+		const rows = products.map((product, row) => [
+			row,
+			product.id,
+			product.title,
+			product.category,
+			product.tags.join(" "),
+			product.brand,
+			vectorBlob(vectors.subarray(row * dim, (row + 1) * dim)),
+		]);
+		await this.#sql.transaction([
+			{ sql: "DELETE FROM products" },
+			{ sql: "INSERT INTO products VALUES (?, ?, ?, ?, ?, ?, ?)", rows },
+			{ sql: "INSERT INTO products_fts(products_fts) VALUES ('rebuild')" },
+		]);
 	}
 
 	/** Number of products in the database. */
-	public count(): number {
-		const row = this.#db.selectObjects("SELECT count(*) AS n FROM products")[0];
+	public async count(): Promise<number> {
+		const [row] = await this.#sql.query("SELECT count(*) AS n FROM products");
 		return Number(row?.n ?? 0);
 	}
 
@@ -250,14 +294,14 @@ export class CatalogueDb {
 	 * Hybrid retrieval in one statement: FTS5 bm25 top-k and exact cosine top-k,
 	 * fused by RRF. A query with no matchable text contributes no keyword list.
 	 */
-	public hybrid(
+	public async hybrid(
 		query: string,
 		vector: Float32Array,
 		k: number,
-	): ReadonlyArray<HybridRow> {
+	): Promise<ReadonlyArray<HybridRow>> {
 		this.#assertVector(vector);
 		const w = this.#weights;
-		const rows = this.#db.selectObjects(HYBRID_SQL, [
+		const rows = await this.#sql.query(HYBRID_SQL, [
 			w.title,
 			w.category,
 			w.tags,
@@ -278,17 +322,20 @@ export class CatalogueDb {
 	}
 
 	/** Exact cosine top-k for a query vector, ties broken by bundle row. */
-	public vectorSearch(
+	public async vectorSearch(
 		vector: Float32Array,
 		k: number,
-	): ReadonlyArray<ScoredId> {
+	): Promise<ReadonlyArray<ScoredId>> {
 		this.#assertVector(vector);
 		return this.#scored(VECTOR_SQL, [vectorBlob(vector), Math.max(0, k)]);
 	}
 
 	/** Top-k neighbours of a stored product, the product itself excluded. */
-	public nearest(id: string, k: number): ReadonlyArray<ScoredId> {
-		const known = this.#db.selectObjects(
+	public async nearest(
+		id: string,
+		k: number,
+	): Promise<ReadonlyArray<ScoredId>> {
+		const known = await this.#sql.query(
 			"SELECT 1 AS known FROM products WHERE id = ?",
 			[id],
 		);
@@ -298,14 +345,16 @@ export class CatalogueDb {
 		return this.#scored(NEAREST_SQL, [id, Math.max(0, k)]);
 	}
 
-	public close(): void {
-		this.#db.close();
+	public dispose(): Promise<void> {
+		return this.#sql.close();
 	}
 
-	#scored(sql: string, bind: unknown[]): ReadonlyArray<ScoredId> {
-		return this.#db
-			.selectObjects(sql, bind)
-			.map((row) => ({ id: String(row.id), score: Number(row.score) }));
+	async #scored(sql: string, bind: SqlBind): Promise<ReadonlyArray<ScoredId>> {
+		const rows: ReadonlyArray<SqlRow> = await this.#sql.query(sql, bind);
+		return rows.map((row) => ({
+			id: String(row.id),
+			score: Number(row.score),
+		}));
 	}
 
 	#assertVector(vector: Float32Array): void {
