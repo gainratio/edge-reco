@@ -14,7 +14,7 @@
 		"fetch:model": "pnpm -F frontend exec node scripts/download-model.mjs",
 		"gate": "pnpm run gate:quality && pnpm run gate:e2e",
 		"gate:quality": "pnpm run check:node && pnpm run check:own-deps && pnpm run fetch:model && pnpm -r run lint && pnpm -r run typecheck && pnpm -r run test:coverage && pnpm -F frontend run test:preflight && pnpm -F frontend run build:pages && pnpm -F frontend run test:artifacts",
-		"gate:e2e": "pnpm -F frontend run test:e2e && pnpm -F frontend run test:e2e:c1 && pnpm -F frontend run test:e2e:webkit && pnpm -F frontend run test:e2e:offline"
+		"gate:e2e": "pnpm -F frontend run test:e2e && pnpm -F frontend run test:e2e:c1 && pnpm -F frontend run test:e2e:webkit && pnpm -F frontend run test:e2e:browsers:built && pnpm -F frontend run test:e2e:offline"
 	},
 	"devDependencies": {
 		"jsdom": "^30.1.1",
