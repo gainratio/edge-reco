@@ -32,6 +32,8 @@ export default defineConfig({
 				// e2e (c1/offline) tiers in a real browser, not jsdom unit specs.
 				"src/engine/embedderWorker.ts",
 				"src/engine/embedderClient.ts",
+				"src/engine/catalogueWorker.ts",
+				"src/engine/catalogueSpawn.ts",
 				"src/engine/runtime.ts",
 				"src/testSetup.ts",
 			],

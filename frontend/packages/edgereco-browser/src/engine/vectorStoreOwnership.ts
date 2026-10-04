@@ -1,19 +1,21 @@
-// Which tab may hold the on-device vector database.
+// Which tab may hold the on-device catalogue database.
 //
-// The shared SQLite + sqlite-vector Worker stores the catalog index in OPFS via
-// SQLite's "opfs-sahpool" VFS. That VFS pre-opens exclusive SyncAccessHandles,
-// so only ONE browsing context per origin can have it installed; SQLite's docs
-// leave multi-tab coordination to the application
+// The catalogue Worker (catalogueWorker.ts) stores products, the FTS5 keyword
+// index and the vectors in OPFS via SQLite's "opfs-sahpool" VFS. That VFS
+// pre-opens exclusive SyncAccessHandles, so only ONE browsing context per origin
+// can have it installed; SQLite's docs leave multi-tab coordination to the
+// application
 // (https://sqlite.org/wasm/doc/trunk/persistence.md#vfs-opfs-sahpool-concurrency).
 //
 // We coordinate with the Web Locks API: the first tab takes an exclusive lock
 // and keeps it for its lifetime (the browser releases it when the tab closes).
-// Every other tab opens the SAME library in its supported in-memory mode. Nothing
-// is lost: loadVectorIndex clears and re-imports the whole verified matrix on
-// every boot, so the persistent copy is never a warm start.
-
-import type { VectorIndex, VectorIndexFactory } from "@edgeproc/browser/vector";
-import type { SqliteVectorWorkerOptions } from "@edgeproc/browser/vector/sqlite";
+// Every other tab opens the SAME SQLite build in memory. Nothing is lost:
+// loadVectorIndex replaces the whole verified catalogue on every boot, so the
+// persistent copy is never a warm start.
+//
+// KNOWN GAP: a second tab's catalogue lives in its WASM heap, not OPFS. SQLite's
+// multi-connection OPFS VFSes ("opfs", "opfs-wl") need SharedArrayBuffer, i.e. a
+// cross-origin-isolated page (COOP + COEP), and edge-reco does not send COEP.
 
 /** The Web Lock name that marks the tab owning the OPFS vector database. */
 export const VECTOR_STORE_LOCK = "edgereco-vector-store";
@@ -27,15 +29,18 @@ export interface LockManagerLike {
 	): Promise<unknown>;
 }
 
-/** Opens one SQLite vector index (production: createSqliteVectorIndex). */
-export type SqliteVectorOpener = (
-	options: SqliteVectorWorkerOptions,
-) => Promise<VectorIndex>;
+/** Where SQLite keeps a store: the shared OPFS file, or this tab's memory. */
+export type StorePersistence = "opfs" | "memory";
 
-export interface TabSafeVectorIndexDeps {
+/** Opens one store with the given persistence (production: the catalogue Worker). */
+export type PersistentOpener<O, T> = (
+	options: O & { readonly persistence: StorePersistence },
+) => Promise<T>;
+
+export interface TabSafeVectorIndexDeps<O, T> {
 	/** `navigator.locks`, or undefined where the Web Locks API is missing. */
 	readonly locks: LockManagerLike | undefined;
-	readonly open: SqliteVectorOpener;
+	readonly open: PersistentOpener<O, T>;
 }
 
 const BUSY_TEXT =
@@ -71,10 +76,10 @@ function claimOwnership(locks: LockManagerLike | undefined): Promise<boolean> {
 	});
 }
 
-async function openOwned(
-	open: SqliteVectorOpener,
-	options: SqliteVectorWorkerOptions,
-): Promise<VectorIndex> {
+async function openOwned<O, T>(
+	open: PersistentOpener<O, T>,
+	options: O,
+): Promise<T> {
 	try {
 		return await open({ ...options, persistence: "opfs" });
 	} catch (error) {
@@ -84,7 +89,7 @@ async function openOwned(
 		// persistent copy is never a warm start, so memory loses nothing. If memory
 		// cannot open either, that error is the one the caller sees.
 		console.warn(
-			"[edge-reco] on-device vector store: OPFS unavailable, using the in-memory index for this tab",
+			"[edge-reco] on-device catalogue: OPFS unavailable, using the in-memory database for this tab",
 			error,
 		);
 		return open({ ...options, persistence: "memory" });
@@ -92,15 +97,15 @@ async function openOwned(
 }
 
 /**
- * A VectorIndexFactory that never fails because another tab has the database
- * open. Create ONE per tab: the owner lease is remembered per factory, so an
- * in-tab retry reopens OPFS instead of competing with itself.
+ * A store factory that never fails because another tab has the database open.
+ * Create ONE per tab: the owner lease is remembered per factory, so an in-tab
+ * retry reopens OPFS instead of competing with itself.
  */
-export function tabSafeVectorIndexFactory(
-	deps: TabSafeVectorIndexDeps,
-): VectorIndexFactory {
+export function tabSafeVectorIndexFactory<O, T>(
+	deps: TabSafeVectorIndexDeps<O, T>,
+): (options: O) => Promise<T> {
 	let lease: Promise<boolean> | undefined;
-	return async (options) => {
+	return async (options: O) => {
 		lease ??= claimOwnership(deps.locks);
 		const owner = await lease;
 		if (!owner) {

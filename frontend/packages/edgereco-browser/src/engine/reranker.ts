@@ -14,7 +14,6 @@ import type { ScoreResult } from "@gainratio/assay";
 import type { Product, ScoreComponents, SearchResult } from "./domain";
 import { explainScore, type FormulaSignals } from "./formula";
 import { DEFAULT_RANKING_CONFIG, type ScoringWeights } from "./rankingConfig";
-import type { RankedHit } from "./rerank";
 import type { SessionProfile } from "./session";
 
 // Search intent is the primary signal. RRF is normalized to [0, 1] before this
@@ -89,22 +88,22 @@ export function meetsRelevanceFloor(
 
 /**
  * Both retrievers' raw scores, keyed by product id — the fusion input before RRF
- * throws the magnitudes away. Absent on one side stays `null`, never 0.
+ * throws the magnitudes away (catalogueDb.ts returns them beside each fused row).
+ * Absent on one side stays `null`, never 0.
  */
 export function retrievalEvidence(
-	keywordHits: ReadonlyArray<RankedHit>,
-	vectorHits: ReadonlyArray<RankedHit>,
+	rows: ReadonlyArray<{
+		readonly id: string;
+		readonly lexicalScore: number | null;
+		readonly semanticScore: number | null;
+	}>,
 ): ReadonlyMap<string, RetrievalEvidence> {
-	const lexical = new Map(keywordHits.map((hit) => [hit.id, hit.score]));
-	const semantic = new Map(vectorHits.map((hit) => [hit.id, hit.score]));
-	const evidence = new Map<string, RetrievalEvidence>();
-	for (const id of new Set([...lexical.keys(), ...semantic.keys()])) {
-		evidence.set(id, {
-			semantic: semantic.get(id) ?? null,
-			lexical: lexical.get(id) ?? null,
-		});
-	}
-	return evidence;
+	return new Map(
+		rows.map((row) => [
+			row.id,
+			{ semantic: row.semanticScore, lexical: row.lexicalScore },
+		]),
+	);
 }
 
 function scoreComponents(explanation: ScoreResult): ScoreComponents {

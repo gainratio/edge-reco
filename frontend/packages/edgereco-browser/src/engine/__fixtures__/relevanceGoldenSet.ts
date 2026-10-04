@@ -21,7 +21,7 @@
 //      embeddings would always pass; this one cannot be satisfied by construction.
 //   2. Query wording is drawn from `description` and `title`, never from the
 //      taxonomy. `description` is in NEITHER retrieval representation — not the
-//      BM25 corpus (`keyword.ts::productTokens` = title + category + tags + brand)
+//      keyword index (`catalogueDb.ts` products_fts = title + category + tags + brand)
 //      and not the embedded text (`embeddings/encoder.py::_product_text`, the same
 //      four fields). Every `natural` query carries a "held-out anchor": a word that
 //      is common in the relevant products' descriptions and absent from their
@@ -33,9 +33,10 @@
 //
 // THE RESIDUAL LEAK, STATED HONESTLY
 // `tags` are slugified `subcategories` ("Garden Hoses" -> "garden-hoses"), so they
-// are a restatement of the label, not a second signal. BM25 tokenizes on whitespace
-// (`keyword.ts::tokenize`), so a multi-word tag is ONE token and a natural query
-// cannot hit it — that is the property `taxonomyCorpusTokens` guards. The sentence
+// are a restatement of the label, not a second signal. The FTS5 tokenizer keeps
+// '-' and "'" inside a token (`catalogueDb.ts`), so a multi-word tag is ONE token and a
+// natural query cannot hit it — that is the property `taxonomyCorpusTokens`
+// guards (and relevanceExport.test.ts checks `ftsTokens` against FTS5). The sentence
 // -transformer tokenizer does split on hyphens, so subcategory words do reach the
 // VECTOR side even for `natural` queries. The natural segment's scores are
 // therefore an upper bound on true generalization, not a clean measurement.
@@ -61,7 +62,6 @@
 //                   engine with no notion of "no good match" still returns k results.
 
 import type { Product } from "../domain";
-import { tokenize } from "../keyword";
 
 /** The bundle these labels were authored against. */
 export const CATALOG_ID = "amazon-demo";
@@ -127,19 +127,34 @@ export function relevantIds(
 }
 
 /**
- * The BM25 tokens a product contributes from its LABEL fields alone — category and
- * tags, run through the engine's own `tokenize` so the guard measures the real
- * lexical surface rather than a re-implementation of it. Title and brand are
+ * The keyword index's tokenizer, restated for the guards: SQLite FTS5
+ * `unicode61 remove_diacritics 2 tokenchars "-'"` folds case and diacritics and
+ * splits on anything that is not a letter, digit, '-' or "'". relevanceExport.test.ts
+ * proves this equals FTS5's own vocabulary over the whole catalogue, so the guards
+ * measure the real lexical surface rather than a guess at it.
+ */
+export function ftsTokens(text: string): ReadonlyArray<string> {
+	return text
+		.normalize("NFD")
+		.replace(/\p{M}/gu, "")
+		.toLowerCase()
+		.split(/[^\p{L}\p{N}'-]+/u)
+		.filter((token) => token.length > 0);
+}
+
+/**
+ * The keyword tokens a product contributes from its LABEL fields alone — category
+ * and tags, run through `ftsTokens`. Title and brand are
  * excluded on purpose: matching a product's NAME is what search is supposed to do;
  * matching the field the label was cut from is the leak.
  */
 export function taxonomyCorpusTokens(product: Product): ReadonlySet<string> {
-	return new Set(tokenize(`${product.category} ${product.tags.join(" ")}`));
+	return new Set(ftsTokens(`${product.category} ${product.tags.join(" ")}`));
 }
 
 /** The query's content words — what the guards reason about. */
 export function queryTerms(query: string): ReadonlyArray<string> {
-	return tokenize(query).filter((t) => !QUERY_STOPWORDS.has(t));
+	return ftsTokens(query).filter((t) => !QUERY_STOPWORDS.has(t));
 }
 
 const NATURAL: ReadonlyArray<GoldenQuery> = [

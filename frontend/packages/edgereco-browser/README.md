@@ -40,15 +40,17 @@ The browser embedder is `Xenova/all-MiniLM-L6-v2` via
 [`@huggingface/transformers`](https://huggingface.co/docs/transformers.js) with
 `{ pooling: "mean", normalize: true }` — the byte-for-byte equivalent of the
 Python core's `sentence-transformers` recipe. The browser imports the signed
-`vector/embeddings.f32` matrix into the shared `@edgeproc/browser` SQLite +
-sqlite-vector Worker and persists the database in OPFS; it never constructs a
-FAISS or packed in-memory browser index. The Python runtime uses FAISS over the
-same producer rows. The
-BM25 tokenizer, RRF fusion (`k=60`), and the rerank scoring formula
-(`0.40·pop + 0.20·cat + 0.15·tag + 0.10·brand + 0.10·fresh − 0.25·rep`) all
-match `src/edgereco/` line for line. The package's parity tests round-trip a
-real query through both engines against the same committed bundle and assert
-top-k by score group.
+products and `vector/embeddings.f32` matrix into ONE SQLite database
+(`catalogueDb.ts`, on the SQLite + sqlite-vector build `@edgeproc/browser`
+ships) in its own Worker, persisted in OPFS. Keyword search is SQLite FTS5's
+built-in `bm25()`, similarity is sqlite-vector's exact cosine scan, and the RRF
+fusion (`k=60`) is one SQL query that returns both ranks and raw scores. No
+hand-written BM25 or fusion code remains in the browser. The Python runtime uses
+FAISS + rank_bm25 over the same producer rows, so keyword ranking now differs
+slightly between tiers (FTS5 fixes k1=1.2, b=0.75); the parity tests pin how far
+(`hybridParity.test.ts`). The rerank scoring formula
+(`0.40·pop + 0.20·cat + 0.15·tag + 0.10·brand + 0.10·fresh − 0.25·rep`) still
+matches `src/edgereco/` line for line.
 
 ## Architecture (three Workers, off the UI thread)
 
@@ -58,12 +60,12 @@ SPA tab
 │     ├── sync Worker   (@edgeproc/browser)
 │     │     └── pull /latest -> verify ed25519 -> fetch chunks ->
 │     │         verify sha256 -> reassemble files into OPFS
-│     ├── sqlite-vector Worker (@edgeproc/browser/vector/sqlite)
-│     │     └── exact cosine search -> SQLite WASM database in OPFS
+│     ├── catalogue Worker (catalogueWorker.ts)
+│     │     └── products + FTS5 + sqlite-vector -> one SQLite database in OPFS
 │     └── embedder Worker (embedderWorker.ts)
 │           └── load Xenova/all-MiniLM-L6-v2 (~25 MB) -> ONNX session
 └── SearchEngine
-      ├── search(q)       embed(q) -> BM25 ⊕ vector -> RRF -> session rerank
+      ├── search(q)       embed(q) -> one SQL query (FTS5 bm25 ⊕ cosine, RRF) -> session rerank
       ├── recommend()     popularity pool -> session rerank
       └── browse()        catalog listing
 ```

@@ -1,12 +1,9 @@
-import { FlatVectorIndex } from "@edgeproc/browser/vector";
 import { vi } from "vitest";
+import { openNodeCatalogueStore } from "./engine/__fixtures__/nodeCatalogue";
 
-// jsdom has no Worker/OPFS. Product tests keep the exact shared VectorIndex
-// contract while the real SQLite WASM + Worker + OPFS path is exercised by the
-// production-build Playwright lane.
-vi.mock("@edgeproc/browser/vector/sqlite", () => ({
-	createSqliteVectorIndex: vi.fn(
-		(options: { readonly name: string; readonly dimension: number }) =>
-			Promise.resolve(new FlatVectorIndex(options)),
-	),
+// jsdom and Node have no Worker or OPFS. Product tests run the catalogue's real
+// SQL on the same SQLite build in-process; the Worker + OPFS path itself is
+// exercised by the production-build Playwright lanes.
+vi.mock("./engine/catalogueSpawn", () => ({
+	openCatalogueStore: vi.fn(openNodeCatalogueStore),
 }));

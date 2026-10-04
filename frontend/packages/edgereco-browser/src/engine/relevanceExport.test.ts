@@ -38,8 +38,10 @@ import {
 	syncIndex,
 } from "@edgeproc/browser";
 import { describe, expect, it } from "vitest";
+import { openNodeDatabase } from "./__fixtures__/nodeCatalogue";
 import {
 	CATALOG_ID,
+	ftsTokens,
 	GOLDEN_QUERIES,
 	type GoldenQuery,
 	LABEL_METHOD,
@@ -48,6 +50,7 @@ import {
 	relevantIds,
 	taxonomyCorpusTokens,
 } from "./__fixtures__/relevanceGoldenSet";
+import { CatalogueDb } from "./catalogueDb";
 import type { Product } from "./domain";
 import { createEmbedder, type Embedder } from "./embedder";
 import { catalogFetch } from "./fixtures";
@@ -127,7 +130,7 @@ async function catalogProducts(): Promise<ReadonlyArray<Product>> {
 	return engine.catalog();
 }
 
-/** The full pipeline: real transformers.js embedder -> BM25 + vector -> RRF -> rerank. */
+/** The full pipeline: real transformers.js embedder -> FTS5 bm25 + vector -> RRF (SQL) -> rerank. */
 async function realEngine(): Promise<SearchEngine> {
 	return createSearchEngine(await syncedFiles(), createEmbedder());
 }
@@ -154,6 +157,38 @@ function matchesCommitted(payload: RelevanceExport): boolean {
 }
 
 describe("relevance golden set: the labels are independent of the ranker", () => {
+	it("restates the keyword index's tokenizer exactly (ftsTokens == FTS5)", async () => {
+		const products = await catalogProducts();
+		const raw = await openNodeDatabase();
+		const catalogue = new CatalogueDb(raw, 1);
+		catalogue.replace({
+			products,
+			vectors: new Float32Array(products.length).fill(1),
+		});
+		raw.exec({
+			sql: "CREATE VIRTUAL TABLE temp.vocab USING fts5vocab(main, products_fts, instance)",
+		});
+		const indexed = new Map<number, Set<string>>();
+		for (const row of raw.selectObjects("SELECT doc, term FROM temp.vocab")) {
+			const doc = Number(row.doc);
+			const terms = indexed.get(doc) ?? new Set<string>();
+			terms.add(String(row.term));
+			indexed.set(doc, terms);
+		}
+		products.forEach((product, row) => {
+			const text = [
+				product.title,
+				product.category,
+				...product.tags,
+				product.brand,
+			].join(" ");
+			expect(new Set(ftsTokens(text)), product.id).toEqual(
+				indexed.get(row) ?? new Set(),
+			);
+		});
+		catalogue.close();
+	});
+
 	it("gives every natural query a relevant set and no hit on the label field", async () => {
 		const products = await catalogProducts();
 		const byId = new Map(products.map((p) => [p.id, p]));

@@ -23,13 +23,13 @@
 - Runtime: web browser / local-first execution
 - Languages: TypeScript (browser engine), Python (catalog and bundle tooling)
 - Core techniques: signed, content-addressed catalog bundles verified fail-closed
-  (Ed25519 signature over an sha256 content-addressed manifest); BM25 keyword search
-  (a plain in-JavaScript port, no database); query embedding with all-MiniLM-L6-v2 on
-  ONNX Runtime Web; exact vector search over the catalog embeddings: FAISS on Python,
-  and in the browser SQLite + sqlite-vector in a Web Worker, kept in OPFS where the
-  browser allows it and in memory where OPFS is refused;
-  Reciprocal Rank Fusion
-  (RRF, k=60) to combine keyword and vector results; session-aware reranking driven by
+  (Ed25519 signature over an sha256 content-addressed manifest); query embedding with
+  all-MiniLM-L6-v2 on ONNX Runtime Web; in the browser, one SQLite database in a Web
+  Worker holds the catalog: BM25 keyword search is SQLite FTS5's bm25(), exact vector
+  search is sqlite-vector, and Reciprocal Rank Fusion (RRF, k=60) of the two is a
+  single SQL query. The database is kept in OPFS for the first tab and in memory for
+  other tabs or where OPFS is refused. The Python tier uses FAISS and rank_bm25;
+  session-aware reranking driven by
   in-session interaction signals (clicks, views, cart, favorites)
 - Primary use case: local product search and recommendations without a per-query
   backend ranking call

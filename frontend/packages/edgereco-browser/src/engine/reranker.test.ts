@@ -263,13 +263,10 @@ describe("the absolute relevance floor", () => {
 
 describe("retrievalEvidence", () => {
 	it("keys both retrievers' absolute scores by product id", () => {
-		const evidence = retrievalEvidence(
-			[{ id: "p1", score: 3.5 }],
-			[
-				{ id: "p1", score: 0.62 },
-				{ id: "p2", score: 0.31 },
-			],
-		);
+		const evidence = retrievalEvidence([
+			{ id: "p1", lexicalScore: 3.5, semanticScore: 0.62 },
+			{ id: "p2", lexicalScore: null, semanticScore: 0.31 },
+		]);
 		expect(evidence.get("p1")).toEqual({ semantic: 0.62, lexical: 3.5 });
 		// Retrieved by one engine only — the other side is absent, not zero. Zero
 		// would read as "scored 0", which is a measurement the retriever never made.

@@ -143,9 +143,12 @@ test("real search is relevant, local, clean, and inside release budgets", async 
 		await walk(root);
 		return names;
 	});
+	// The catalogue database (products + FTS5 + sqlite-vector, catalogueWorker.ts)
+	// owns the OPFS SAH-pool since 2026-10-04; before that it was
+	// @edgeproc/browser's vector Worker pool ("edgeproc-vector-*").
 	expect(
-		opfsEntries.some((name) => name.includes("edgeproc-vector-")),
-		`sqlite-vector did not create its OPFS SAH-pool; found ${JSON.stringify(opfsEntries)}`,
+		opfsEntries.some((name) => name.includes("edgereco-catalogue")),
+		`the catalogue database did not create its OPFS SAH-pool; found ${JSON.stringify(opfsEntries)}`,
 	).toBe(true);
 	expect(
 		blockedRuntimeCdnHits,

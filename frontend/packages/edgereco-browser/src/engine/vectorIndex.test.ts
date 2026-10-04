@@ -4,9 +4,9 @@ import {
 	materializeFile,
 	syncIndex,
 } from "@edgeproc/browser";
-import { FlatVectorIndex } from "@edgeproc/browser/vector";
-import { createSqliteVectorIndex } from "@edgeproc/browser/vector/sqlite";
 import { describe, expect, it, vi } from "vitest";
+import { openNodeCatalogueStore } from "./__fixtures__/nodeCatalogue";
+import { openCatalogueStore } from "./catalogueSpawn";
 import { catalogFetch, latestBytes } from "./fixtures";
 import {
 	loadVectorIndex,
@@ -79,32 +79,36 @@ function encoder(vectors: ReadonlyArray<ReadonlyArray<number>>): {
 }
 
 describe("loadVectorIndex synthetic correctness", () => {
-	it("atomically clears stale catalog rows before importing the signed matrix", async () => {
-		const enc = encoder([[1, 0]]);
-		const shared = new FlatVectorIndex({ name: "test", dimension: 2 });
-		const clear = vi.spyOn(shared, "clear");
-		const insert = vi.spyOn(shared, "insert");
+	it("imports the whole signed revision in one replace, in bundle row order", async () => {
+		const store = await openNodeCatalogueStore({ dimension: 2 });
+		const replace = vi.spyOn(store, "replace");
 
-		const index = await loadVectorIndex(enc, () => shared);
-
-		expect(clear).toHaveBeenCalledOnce();
-		expect(insert).toHaveBeenCalledOnce();
-		expect(clear.mock.invocationCallOrder[0]).toBeLessThan(
-			insert.mock.invocationCallOrder[0] ?? 0,
+		const index = await loadVectorIndex(
+			encoder([
+				[1, 0],
+				[0, 1],
+			]),
+			() => Promise.resolve(store),
 		);
+
+		expect(replace).toHaveBeenCalledOnce();
+		const revision = replace.mock.calls[0]?.[0];
+		expect(revision?.products.map((p) => p.id)).toEqual(["p0", "p1"]);
+		expect(revision?.products[0]).toMatchObject({
+			title: "title p0",
+			category: "c",
+			tags: ["t"],
+			brand: "b",
+		});
+		expect([...(revision?.vectors ?? [])]).toEqual([1, 0, 0, 1]);
 		await index.dispose();
 	});
 
-	it("opens the shared SQLite-vector adapter in persistent OPFS mode", async () => {
-		const createSqlite = vi.mocked(createSqliteVectorIndex);
-		createSqlite.mockClear();
-		const enc = encoder([[1, 0]]);
-		const index = await loadVectorIndex(enc);
-		expect(createSqlite).toHaveBeenCalledWith({
-			name: "edgereco-catalog",
-			dimension: 2,
-			persistence: "opfs",
-		});
+	it("opens the catalogue store at the bundle's embedding dimension", async () => {
+		const open = vi.mocked(openCatalogueStore);
+		open.mockClear();
+		const index = await loadVectorIndex(encoder([[1, 0]]));
+		expect(open).toHaveBeenCalledWith({ dimension: 2 });
 		await index.dispose();
 	});
 
@@ -126,12 +130,14 @@ describe("loadVectorIndex synthetic correctness", () => {
 	});
 
 	it("still reports vectors the store rejects on import as a malformed bundle", async () => {
-		const shared = new FlatVectorIndex({ name: "test", dimension: 2 });
-		vi.spyOn(shared, "insert").mockRejectedValue(new Error("non-finite"));
+		const store = await openNodeCatalogueStore({ dimension: 2 });
+		vi.spyOn(store, "replace").mockRejectedValue(new Error("non-finite"));
+		const dispose = vi.spyOn(store, "dispose");
 
 		await expect(
-			loadVectorIndex(encoder([[1, 0]]), () => shared),
+			loadVectorIndex(encoder([[1, 0]]), () => Promise.resolve(store)),
 		).rejects.toThrow(/^malformed catalog bundle: .*non-finite/);
+		expect(dispose).toHaveBeenCalledOnce();
 	});
 
 	it("cosine top-k ordering is exact over a known matrix", async () => {
@@ -216,6 +222,7 @@ describe("loadVectorIndex over the real synced bundle", () => {
 		const hits = await index.nearest(selfId, 1);
 		expect(hits[0]?.id).not.toBe(selfId);
 		expect(hits[0]?.score).toBeLessThanOrEqual(1);
+		expect(() => index.idAt(index.ntotal)).toThrow(RangeError);
 	});
 });
 
@@ -489,7 +496,7 @@ describe("loadVectorIndex fail-closed validation", () => {
 		await expect(loadVectorIndex(files)).rejects.toThrow(VectorIndexError);
 	});
 
-	it("rejects non-finite vector values at the shared adapter boundary", async () => {
+	it("rejects non-finite vector values at the catalogue boundary", async () => {
 		const files = {
 			...validFiles(),
 			embeddings: new Uint8Array(
@@ -499,7 +506,7 @@ describe("loadVectorIndex fail-closed validation", () => {
 		await expect(loadVectorIndex(files)).rejects.toThrow(VectorIndexError);
 	});
 
-	it("rejects duplicate producer ids at the shared adapter boundary", async () => {
+	it("rejects duplicate producer ids at the catalogue boundary", async () => {
 		const files = {
 			...validFiles(),
 			state: encode({ faiss_ids: ["p0", "p0"] }),
