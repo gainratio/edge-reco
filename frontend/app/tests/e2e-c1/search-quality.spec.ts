@@ -143,10 +143,20 @@ test("real search is relevant, local, clean, and inside release budgets", async 
 		await walk(root);
 		return names;
 	});
+	// The catalogue database (products + FTS5 + sqlite-vector) lives in
+	// @edgeproc/browser's SQL pool for name "edgereco-catalogue" since
+	// 2026-10-04. main's build used the vector pool for "edgereco-catalog";
+	// boot retires that one (catalogueSql.ts retireLegacyVectorPool).
 	expect(
-		opfsEntries.some((name) => name.includes("edgeproc-vector-")),
-		`sqlite-vector did not create its OPFS SAH-pool; found ${JSON.stringify(opfsEntries)}`,
+		opfsEntries.some((name) =>
+			name.startsWith(".edgeproc-sql-fba783151f3ebce32fd791bb8b6b0ae2"),
+		),
+		`the catalogue database did not create its OPFS SAH-pool; found ${JSON.stringify(opfsEntries)}`,
 	).toBe(true);
+	expect(
+		opfsEntries.filter((name) => name.startsWith(".edgeproc-vector-")),
+		"the legacy vector pool is still on the device",
+	).toEqual([]);
 	expect(
 		blockedRuntimeCdnHits,
 		"runtime attempted third-party CDN egress",

@@ -7,8 +7,8 @@
 //     ed25519+sha256 fail-closed, and materializes the four index files;
 //   - the embedder Worker (embedderWorker.ts) owns transformers.js: the ~25 MB
 //     all-MiniLM-L6-v2 weights download + ONNX inference.
-//   - the shared sqlite-vector Worker owns exact cosine search and its OPFS-
-//     persisted SQLite database.
+//   - @edgeproc/browser's SQL Worker owns the catalogue database (FTS5 keyword
+//     search, sqlite-vector cosine, RRF fusion) in OPFS (catalogueSql.ts).
 //
 // bootstrap() drives both with a progress callback so the UI can show real
 // stages (syncing bundle… loading model…). It is idempotent: the engine is
@@ -23,8 +23,8 @@ import {
 	parseTrustRoot,
 	type SyncResult,
 } from "@edgeproc/browser";
-import type { VectorIndexFactory } from "@edgeproc/browser/vector";
 import { deleteBundleFloorDatabase } from "./cacheFloor";
+import type { CatalogueStoreFactory } from "./catalogueDb";
 import { type CooccurrenceMatrix, parseCooccurrence } from "./cooccurrence";
 import EdgeProcWorker from "./edgeprocWorker?worker";
 import { createEmbedder, type Embedder } from "./embedder";
@@ -100,7 +100,7 @@ export interface EnginePort {
 export interface RuntimeDeps {
 	readonly spawnEngine: () => EnginePort;
 	readonly makeEmbedder: () => Embedder;
-	readonly makeVectorIndex?: VectorIndexFactory;
+	readonly makeCatalogue?: CatalogueStoreFactory;
 	/**
 	 * Fetch the raw trust-root bytes at `pubkeyUrl` — the SAME document the sync
 	 * Worker pins: a legacy raw 32-byte Ed25519 key or an `edgeproc.keyring/v1`
@@ -352,7 +352,7 @@ export class EngineRuntime {
 				rankingConfig,
 				cooccurrence,
 				proofEvidence,
-				this.#deps.makeVectorIndex,
+				this.#deps.makeCatalogue,
 			);
 			this.#assertCurrent(generation);
 			this.#ready = searchEngine;

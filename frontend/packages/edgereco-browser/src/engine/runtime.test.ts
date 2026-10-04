@@ -5,12 +5,12 @@ import {
 	type SyncResult,
 	syncIndex,
 } from "@edgeproc/browser";
-import {
-	FlatVectorIndex,
-	type VectorIndex,
-	type VectorIndexOptions,
-} from "@edgeproc/browser/vector";
 import { describe, expect, it, vi } from "vitest";
+import {
+	type CatalogueStore,
+	type CatalogueStoreOptions,
+	openCatalogueStore,
+} from "./catalogueDb";
 import type { Embedder } from "./embedder";
 import { catalogFetch } from "./fixtures";
 import { type EnginePort, EngineRuntime, type RuntimeConfig } from "./runtime";
@@ -177,24 +177,26 @@ describe("EngineRuntime resource lifecycle", () => {
 			embed: () => Promise.resolve(new Float32Array(384)),
 		};
 		let resolveIndex:
-			| ((index: VectorIndex | PromiseLike<VectorIndex>) => void)
+			| ((store: CatalogueStore | PromiseLike<CatalogueStore>) => void)
 			| undefined;
-		let index: FlatVectorIndex | undefined;
+		let store: CatalogueStore | undefined;
 		const runtime = new EngineRuntime({
 			spawnEngine: () => engine,
 			makeEmbedder: () => embedder,
-			makeVectorIndex: (options: VectorIndexOptions) =>
-				new Promise<VectorIndex>((resolve) => {
-					index = new FlatVectorIndex(options);
-					resolveIndex = resolve;
+			makeCatalogue: (options: CatalogueStoreOptions) =>
+				new Promise<CatalogueStore>((resolve) => {
+					void openCatalogueStore(options).then((opened) => {
+						store = opened;
+						resolveIndex = resolve;
+					});
 				}),
 		});
 
 		const pending = runtime.bootstrap(config);
 		await vi.waitFor(() => expect(resolveIndex).toBeTypeOf("function"));
 		await runtime.dispose();
-		const dispose = vi.spyOn(index as FlatVectorIndex, "dispose");
-		resolveIndex?.(index as FlatVectorIndex);
+		const dispose = vi.spyOn(store as CatalogueStore, "dispose");
+		resolveIndex?.(store as CatalogueStore);
 
 		await expect(pending).rejects.toThrow("disposed during bootstrap");
 		expect(dispose).toHaveBeenCalledOnce();

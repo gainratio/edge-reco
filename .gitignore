@@ -58,3 +58,4 @@ origin/
 .publish-drafts/
 # Graphify knowledge-graph output — disposable local analysis artifact.
 graphify-out/
+.wrangler/

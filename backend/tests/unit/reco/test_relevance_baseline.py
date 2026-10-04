@@ -84,19 +84,28 @@ class Floor(NamedTuple):
 #: values, for the record:
 #:     natural       nDCG@10 0.4225  R@10 0.5286  P@10 0.2333  nDCG@24 0.5416  R@24 0.8333
 #:     taxonomy-word nDCG@10 0.7610  R@10 0.1277  P@10 0.7750  nDCG@24 0.7566  R@24 0.3006
+#:
+#: RAISED 2026-10-04 by moving browser keyword search from the in-JS rank_bm25 port to
+#: SQLite FTS5 bm25() (equal column weights; k1=1.2/b=0.75 fixed by FTS5; unicode61
+#: tokenizer keeping '-' and "'" inside tokens) and the RRF fusion into one SQL query
+#: (frontend .../engine/catalogueDb.ts). Same catalog, same golden set. Every floor
+#: moved up or held; none was lowered. Prior values, for the record:
+#:     natural       nDCG@10 0.5178  R@10 0.5121  P@10 0.3366  nDCG@24 0.6160  R@24 0.7358
+#:     taxonomy-word nDCG@10 0.9631  R@10 0.1583  P@10 0.9500  nDCG@24 0.9368  R@24 0.3680
+#:     negative results 2 -> 2
 BASELINE: Final[tuple[Floor, ...]] = (
     # natural (n=30): wording held out of both retrieval representations.
-    Floor("natural", "mean_ndcg_at_k", 10, 0.5178),
-    Floor("natural", "mean_recall_at_k", 10, 0.5121),
+    Floor("natural", "mean_ndcg_at_k", 10, 0.5203),
+    Floor("natural", "mean_recall_at_k", 10, 0.5135),
     Floor("natural", "mean_precision_at_k", 10, 0.3366),
-    Floor("natural", "mean_ndcg_at_k", 24, 0.6160),
-    Floor("natural", "mean_recall_at_k", 24, 0.7358),
+    Floor("natural", "mean_ndcg_at_k", 24, 0.6200),
+    Floor("natural", "mean_recall_at_k", 24, 0.7413),
     # taxonomy-word (n=12): the leaky control group, gated so the leak cannot widen.
-    Floor("taxonomy-word", "mean_ndcg_at_k", 10, 0.9631),
-    Floor("taxonomy-word", "mean_recall_at_k", 10, 0.1583),
-    Floor("taxonomy-word", "mean_precision_at_k", 10, 0.9500),
-    Floor("taxonomy-word", "mean_ndcg_at_k", 24, 0.9368),
-    Floor("taxonomy-word", "mean_recall_at_k", 24, 0.3680),
+    Floor("taxonomy-word", "mean_ndcg_at_k", 10, 0.9779),
+    Floor("taxonomy-word", "mean_recall_at_k", 10, 0.1625),
+    Floor("taxonomy-word", "mean_precision_at_k", 10, 0.9750),
+    Floor("taxonomy-word", "mean_ndcg_at_k", 24, 0.9606),
+    Floor("taxonomy-word", "mean_recall_at_k", 24, 0.3805),
 )
 
 #: Not one of the 8 unanswerable queries may come back holding a full page. Was 8

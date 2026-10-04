@@ -37,9 +37,10 @@ The flow, end to end:
    which would defeat pinning.
 2. **Load the model (in-browser).** A second Worker loads `all-MiniLM-L6-v2` via
    transformers.js — the byte-for-byte equivalent of edge-reco's Python query encoder.
-3. **Search/recommend (in-browser).** The engine embeds the query in-tab, runs BM25 keyword
-   scoring ⊕ vector cosine, fuses them with **RRF**, and applies the **session-aware reranker**
-   — the same pipeline edge-reco runs server-side, matched to top-k parity (cosine = 1.0).
+3. **Search/recommend (in-browser).** The engine embeds the query in-tab, then one SQL query
+   in an on-device SQLite database runs FTS5 BM25 keyword scoring ⊕ sqlite-vector cosine and
+   fuses them with **RRF**; the **session-aware reranker** runs on top. Same pipeline shape as
+   edge-reco's server, which still uses rank_bm25, so keyword ranks can differ slightly.
 4. **The loop that matters:** a product click folds into the in-tab **session profile** (no
    network); the next recommend re-ranks toward your taste. Click → re-rank, entirely in-tab.
 

@@ -3,8 +3,8 @@
 // from a query STRING. Pipeline, matching search.py exactly:
 //
 //   q -> embed(q) [embedder.ts]            (transformers.js, parity-verified)
-//     -> BM25 top-k [keyword.ts]  +  vector cosine top-k [vectorIndex.ts]
-//     -> RRF fuse [rerank.ts]              (k = max(limit*3, 30))
+//     -> one SQL query [catalogueDb.ts]:   (k = max(limit*3, 30))
+//          FTS5 bm25 top-k + sqlite-vector cosine top-k, fused by RRF
 //     -> session rerank [reranker.ts]      (always runs; empty profile = pop+fresh)
 //     -> optional category filter -> slice to limit
 //
@@ -16,7 +16,7 @@
 // The C2b vector-only parity path is a TEST-ONLY helper, exported separately
 // as `__searchVectorForParity` (not on the public SearchEngine interface).
 
-import type { VectorIndexFactory } from "@edgeproc/browser/vector";
+import type { CatalogueStoreFactory } from "./catalogueDb";
 import { type CooccurrenceMatrix, EMPTY_COOCCURRENCE } from "./cooccurrence";
 import type {
 	BrowseResponse,
@@ -26,7 +26,6 @@ import type {
 	SearchResult,
 } from "./domain";
 import type { Embedder } from "./embedder";
-import { KeywordSearcher } from "./keyword";
 import {
 	freshnessPool,
 	popularityPool,
@@ -42,7 +41,6 @@ import {
 	type RankingProofEvidence,
 	unavailableRankingProof,
 } from "./rankingProof";
-import { reciprocalRankFusion } from "./rerank";
 import {
 	rerank,
 	rerankWithCooccurrence,
@@ -148,7 +146,6 @@ function hydrateFused(
 
 class HybridSearchEngine implements SearchEngine {
 	readonly #index: VectorIndex;
-	readonly #keyword: KeywordSearcher;
 	readonly #embedder: Embedder;
 	readonly #catalog: ReadonlyArray<Product>;
 	readonly #config: RankingConfig;
@@ -157,14 +154,12 @@ class HybridSearchEngine implements SearchEngine {
 
 	public constructor(
 		index: VectorIndex,
-		keyword: KeywordSearcher,
 		embedder: Embedder,
 		config: RankingConfig,
 		cooccurrence: CooccurrenceMatrix,
 		proofEvidence: RankingProofEvidence,
 	) {
 		this.#index = index;
-		this.#keyword = keyword;
 		this.#embedder = embedder;
 		this.#catalog = index.products();
 		this.#config = config;
@@ -202,16 +197,17 @@ class HybridSearchEngine implements SearchEngine {
 		}
 		// Candidate width matches the backend: k = max(limit*3, 30).
 		const k = Math.max(limit * 3, 30);
-		const keywordHits = this.#keyword.search(query, k);
 		const queryVec = await this.#embedder.embed(query);
-		const vectorHits = await this.#index.search(queryVec, k);
-		const fused = reciprocalRankFusion(keywordHits, vectorHits);
+		const fused = await this.#index.hybrid(query, queryVec, k);
 
-		const fusedResults = hydrateFused(this.#index, fused);
+		const fusedResults = hydrateFused(
+			this.#index,
+			fused.map((row) => ({ id: row.id, score: row.fused })),
+		);
 		const profile = opts?.profile ?? emptyProfile();
 		let reranked = rerank(
 			fusedResults,
-			retrievalEvidence(keywordHits, vectorHits),
+			retrievalEvidence(fused),
 			profile,
 			this.#config.scoring_weights,
 		);
@@ -444,13 +440,11 @@ export async function createSearchEngine(
 	config: RankingConfig = DEFAULT_RANKING_CONFIG,
 	cooccurrence: CooccurrenceMatrix = EMPTY_COOCCURRENCE,
 	proofEvidence: RankingProofEvidence = unavailableRankingProof("missing"),
-	vectorIndexFactory?: VectorIndexFactory,
+	catalogueFactory?: CatalogueStoreFactory,
 ): Promise<SearchEngine> {
-	const index = await loadVectorIndex(files, vectorIndexFactory);
-	const keyword = KeywordSearcher.fromProducts(index.products());
+	const index = await loadVectorIndex(files, catalogueFactory);
 	return new HybridSearchEngine(
 		index,
-		keyword,
 		embedder,
 		config,
 		cooccurrence,
@@ -468,24 +462,18 @@ export async function __searchVectorForParity(
 	files: VectorIndexFiles,
 	queryVec: Float32Array,
 	limit: number,
-	vectorIndexFactory?: VectorIndexFactory,
+	catalogueFactory?: CatalogueStoreFactory,
 ): Promise<SearchResponse> {
-	const index = await loadVectorIndex(files, vectorIndexFactory);
+	const index = await loadVectorIndex(files, catalogueFactory);
 	const k = Math.max(limit * 3, 30);
-	const hits = await index.search(queryVec, k);
-	const cosineById = new Map(hits.map((h) => [h.id, h.score]));
-	// RRF over the single vector ranking is rank-monotone: preserves cosine
+	// Fusing a single ranking is rank-monotone, so the cosine order IS the fused
 	// order. Report cosine on the result (what VectorSearcher exposes).
-	const fused = reciprocalRankFusion(hits, []);
+	const hits = await index.search(queryVec, k);
 	const results: SearchResult[] = [];
-	for (const { id } of fused) {
+	for (const { id, score } of hits) {
 		const product = index.product(id);
 		if (product !== undefined) {
-			results.push({
-				product,
-				score: cosineById.get(id) ?? 0,
-				score_components: null,
-			});
+			results.push({ product, score, score_components: null });
 		}
 	}
 	const sliced = results.slice(0, limit);

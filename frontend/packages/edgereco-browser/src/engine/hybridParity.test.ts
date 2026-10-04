@@ -1,9 +1,10 @@
 // @vitest-environment node
 //
 // End-to-end hybrid-search parity: the full in-browser pipeline
-// (transformers.js embed -> BM25 + vector cosine -> RRF -> empty-profile rerank)
-// vs edge-reco's /search route over the same examples/catalog bundle. Proves the
-// browser engine reproduces the server's top-k, not just the embedder.
+// (transformers.js embed -> FTS5 bm25 + vector cosine -> RRF in SQL -> empty-
+// profile rerank) vs edge-reco's /search route over the same examples/catalog
+// bundle. Since the move to SQLite FTS5 the browser TRACKS the server's top-k
+// rather than reproducing it (see the contract-change note below).
 //
 // Runs in the node environment because the real transformers.js pipeline uses the
 // onnxruntime-node backend, which rejects jsdom's patched Float32Array. The model
@@ -110,11 +111,20 @@ function scoreGroups(
 describe.skipIf(SKIP)(
 	"hybrid-search parity (TS engine vs edge-reco /search)",
 	() => {
+		// CONTRACT CHANGE (2026-10-04, INVERTED, not deleted). This test used to
+		// assert the browser reproduces edge-reco's Python /search top-k exactly.
+		// Browser keyword search is now SQLite FTS5 bm25() (k1=1.2, IDF floored at
+		// 1e-6) while Python still runs rank_bm25 (k1=1.5, epsilon-floored IDF), so
+		// exact cross-tier parity is gone by design. What still holds is pinned: the
+		// same best answer and >= 80% of the same top-k for every case, and exactly
+		// which cases now order differently. Porting the Python tier to FTS5 would
+		// restore parity and flip `diverged` back to [].
 		it(
-			"reproduces the backend top-k for each query string",
+			"tracks the backend top-k but no longer reproduces it exactly (FTS5 bm25 vs rank_bm25)",
 			async () => {
 				const fixture = hybridFixture as HybridFixture;
 				const engine = await realEngine();
+				const diverged: string[] = [];
 
 				for (const testCase of fixture.cases) {
 					const response = await engine.search(testCase.query, {
@@ -124,20 +134,23 @@ describe.skipIf(SKIP)(
 						id: r.product.id,
 						score: r.score,
 					}));
-					// Top-k ids match by score group (ties may reorder within a group).
-					expect(scoreGroups(actual)).toEqual(scoreGroups(testCase.expected));
-					// Reranked scores match Python to float precision, in order.
-					response.results.forEach((result, i) => {
-						expect(result.score).toBeCloseTo(
-							testCase.expected[i]?.score ?? 0,
-							5,
-						);
-					});
-					expect(response.total).toBe(testCase.total);
+					const expectedIds = testCase.expected.map((e) => e.id);
+					expect(actual[0]?.id, testCase.query).toBe(expectedIds[0]);
+					const shared = actual.filter((a) => expectedIds.includes(a.id));
+					expect(shared.length, testCase.query).toBeGreaterThanOrEqual(
+						Math.ceil(0.8 * expectedIds.length),
+					);
+					const sameOrder =
+						JSON.stringify(scoreGroups(actual)) ===
+						JSON.stringify(scoreGroups(testCase.expected));
+					if (!sameOrder || response.total !== testCase.total) {
+						diverged.push(testCase.query);
+					}
 					expect(response.query).toBe(testCase.query);
 					// The full hybrid path populates the per-signal breakdown.
 					expect(response.results[0]?.score_components).not.toBeNull();
 				}
+				expect(diverged).toEqual(["men's running shoes"]);
 			},
 			TIMEOUT_MS,
 		);

@@ -90,7 +90,7 @@ catalog address (`localhost:8921`). If you then run `vite preview`, the app says
 | Path | What it does |
 | --- | --- |
 | `frontend/app/src/` | The Nimbus storefront (React). `App.tsx` is the shell, `components/` the UI, `locales/en/` all user-facing text. |
-| `frontend/packages/edgereco-browser/src/engine/` | The in-browser engine: keyword search (`keyword.ts`), vector search (`vectorIndex.ts`), re-ranking (`rerank.ts`, `reranker.ts`), ranking config and proof. |
+| `frontend/packages/edgereco-browser/src/engine/` | The in-browser engine: one SQLite catalogue database with FTS5 keyword search, sqlite-vector similarity and RRF fusion in SQL (`catalogueDb.ts`, loaded by `vectorIndex.ts`), re-ranking (`reranker.ts`), ranking config and proof. |
 | `frontend/packages/edgereco-browser/src/engine/__fixtures__/` | Parity fixtures generated from Python. Browser results must match them. |
 | `frontend/app/tests/` | Playwright browser tests: `e2e/` the storefront, `e2e-c1/` sync, tamper refusal and speed budgets, `e2e-offline/` offline and CDN-blocked boots. |
 | `backend/src/edgereco/reco/` | The Python ranking: `ranking_config.py` (weights), `formula.py` (the scoring formula), strategies, retrain and audit. |
