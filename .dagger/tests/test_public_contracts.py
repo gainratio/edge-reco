@@ -158,6 +158,7 @@ class RecordingProvider:
         self.created_id = created_id
         self.created_url = created_url
         self.evidence_by_id: dict[str, dagger.CloudflarePagesDeploymentEvidence] = {}
+        self.stored_by_id: dict[str, object] = {}
 
     async def preflight(self, *arguments: object) -> str:
         self._require_exact_arguments(arguments)
@@ -176,17 +177,21 @@ class RecordingProvider:
         self, api_token: object, account_id: object, project: str
     ) -> dagger.CloudflarePagesProductionDeployment:
         assert (api_token, account_id, project) == RECORDING_ACCOUNT
-        self.events.append("previous")
-        current = RecordingDeployment(self.events, "previous", PREVIOUS_DEPLOYMENT_ID, PREVIOUS_DEPLOYMENT_URL)
-        return cast(dagger.CloudflarePagesProductionDeployment, current)
+        stored = RecordingDeployment(self.events, "previous", PREVIOUS_DEPLOYMENT_ID, PREVIOUS_DEPLOYMENT_URL)
+        self.stored_by_id["previous"] = stored
+        return cast(dagger.CloudflarePagesProductionDeployment, CacheNeverCall(self.events, "previous", stored))
 
     def rollback(
         self, api_token: object, account_id: object, project: str, *, deployment_id: str = ""
     ) -> dagger.CloudflarePagesProductionRollbackEvidence:
         assert (api_token, account_id, project) == RECORDING_ACCOUNT
-        self.events.append(f"rollback:{deployment_id}")
-        evidence = RecordingRollback(self.created_id, deployment_id)
-        return cast(dagger.CloudflarePagesProductionRollbackEvidence, evidence)
+        stored = RecordingRollback(self.created_id, deployment_id)
+        self.stored_by_id[f"rollback-{deployment_id}"] = stored
+        lazy = CacheNeverCall(self.events, f"rollback:{deployment_id}", stored, f"rollback-{deployment_id}")
+        return cast(dagger.CloudflarePagesProductionRollbackEvidence, lazy)
+
+    def load_stored(self, object_id: str) -> object:
+        return self.stored_by_id[object_id]
 
     def _record(
         self, object_id: str, deployment_id: str, deployment_url: str
@@ -199,6 +204,29 @@ class RecordingProvider:
     @staticmethod
     def _require_exact_arguments(arguments: tuple[object, ...]) -> None:
         assert arguments == _recording_provider_arguments()
+
+
+class CacheNeverCall:
+    """A lazy cache="never" call: every query re-executes it, as the Dagger engine does."""
+
+    def __init__(self, events: list[str], execution: str, stored: object, object_id: str = "previous") -> None:
+        self.events = events
+        self.execution = execution
+        self.stored = stored
+        self.object_id = object_id
+
+    async def id(self) -> str:
+        self.events.append(self.execution)
+        return self.object_id
+
+    def __getattr__(self, field: str) -> object:
+        read = getattr(self.stored, field)
+
+        async def query() -> object:
+            self.events.append(self.execution)
+            return await read()
+
+        return query
 
 
 class RecordingRollback:
@@ -332,6 +360,18 @@ class RecordingDag:
         assert isinstance(object_id, dagger.CloudflarePagesDeploymentEvidenceID)
         self.events.append(f"load:{object_id}")
         return self.provider.load_evidence(object_id)
+
+    def load_cloudflare_pages_production_deployment_from_id(
+        self, object_id: dagger.CloudflarePagesProductionDeploymentID
+    ) -> dagger.CloudflarePagesProductionDeployment:
+        assert isinstance(object_id, dagger.CloudflarePagesProductionDeploymentID)
+        return cast(dagger.CloudflarePagesProductionDeployment, self.provider.load_stored(object_id))
+
+    def load_cloudflare_pages_production_rollback_evidence_from_id(
+        self, object_id: dagger.CloudflarePagesProductionRollbackEvidenceID
+    ) -> dagger.CloudflarePagesProductionRollbackEvidence:
+        assert isinstance(object_id, dagger.CloudflarePagesProductionRollbackEvidenceID)
+        return cast(dagger.CloudflarePagesProductionRollbackEvidence, self.provider.load_stored(object_id))
 
 
 class RecordingDirectory:
@@ -506,6 +546,9 @@ class GraphCloudflarePages:
 
 
 class GraphPreviousDeployment:
+    async def id(self) -> str:
+        return "previous"
+
     async def deployment_id(self) -> str:
         return PREVIOUS_DEPLOYMENT_ID
 
@@ -539,6 +582,12 @@ class GraphDag:
     ) -> dagger.CloudflarePagesDeploymentEvidence:
         assert isinstance(_object_id, dagger.CloudflarePagesDeploymentEvidenceID)
         return cast(dagger.CloudflarePagesDeploymentEvidence, GraphDeployment())
+
+    def load_cloudflare_pages_production_deployment_from_id(
+        self, _object_id: dagger.CloudflarePagesProductionDeploymentID
+    ) -> dagger.CloudflarePagesProductionDeployment:
+        assert isinstance(_object_id, dagger.CloudflarePagesProductionDeploymentID)
+        return cast(dagger.CloudflarePagesProductionDeployment, GraphPreviousDeployment())
 
     def foundation(self) -> GraphFoundation:
         return GraphFoundation()
@@ -1174,6 +1223,24 @@ def test_should_roll_production_back_through_the_shared_module_when_the_live_smo
         f"rollback:{PREVIOUS_DEPLOYMENT_ID}",
         "smoke:@fresh",
     ]
+
+
+def test_should_execute_each_cache_never_provider_call_exactly_once_on_a_rollback(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Regression: three field reads off the lazy rollback ran three rollbacks (almamesh run 37162823046)."""
+    # Given
+    events: list[str] = []
+    codes = {"@release|@fresh": [1], "@fresh": [0]}
+    edge_reco = _recording_edge_reco(monkeypatch, events, RecordingProvider(events), codes)
+
+    # When
+    with pytest.raises(LiveSmokeError, match="rolled back"):
+        asyncio.run(_deploy_with_fake_secrets(edge_reco))
+
+    # Then
+    assert events.count(f"rollback:{PREVIOUS_DEPLOYMENT_ID}") == 1
+    assert events.count("previous") == 1
 
 
 def test_should_fail_verify_live_on_a_red_smoke(monkeypatch: pytest.MonkeyPatch) -> None:

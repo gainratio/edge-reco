@@ -570,7 +570,10 @@ class PagesRelease:
     async def previous_production(self) -> Deployment:
         """Read-only: the deployment production serves now, recorded as the rollback target."""
         account = (self.credentials.api_token, self.credentials.account_id)
-        current = dag.cloudflare_pages().previous_production_deployment(*account, TARGET.project)
+        lazy = dag.cloudflare_pages().previous_production_deployment(*account, TARGET.project)
+        # cache="never": each field read off the lazy call is its own API query. Load it once by ID.
+        object_id = dagger.CloudflarePagesProductionDeploymentID(await lazy.id())
+        current = dag.load_cloudflare_pages_production_deployment_from_id(object_id)
         return Deployment(await current.deployment_id(), await current.deployment_url())
 
     async def deploy_release(self) -> Deployment:
@@ -585,6 +588,9 @@ class PagesRelease:
     async def rollback_to(self, deployment_id: str) -> RollbackEvidence:
         """Roll production back through the shared module and return its evidence."""
         account = (self.credentials.api_token, self.credentials.account_id)
-        evidence = dag.cloudflare_pages().rollback(*account, TARGET.project, deployment_id=deployment_id)
+        lazy = dag.cloudflare_pages().rollback(*account, TARGET.project, deployment_id=deployment_id)
+        # cache="never": each field read off the lazy call runs another rollback. Run it once by ID.
+        object_id = dagger.CloudflarePagesProductionRollbackEvidenceID(await lazy.id())
+        evidence = dag.load_cloudflare_pages_production_rollback_evidence_from_id(object_id)
         ids = (evidence.from_deployment_id(), evidence.to_deployment_id(), evidence.live_deployment_id())
         return RollbackEvidence(*[await value for value in ids])
