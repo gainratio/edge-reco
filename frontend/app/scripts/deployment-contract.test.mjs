@@ -133,3 +133,15 @@ test("the quality gate builds and validates the Pages artifact", async () => {
 	assert.match(packageJson.scripts["gate:quality"], /build:pages/u);
 	assert.match(packageJson.scripts["gate:quality"], /test:artifacts/u);
 });
+
+test("the quality gate fetches the pinned embedding model before any unit suite", async () => {
+	// A fresh checkout has no app/public/models/; the node parity suites load the
+	// q8 model from there. Without this step `pnpm gate` died deep inside
+	// hybridParity.test.ts with transformers.js's "file was not found locally".
+	const packageJson = JSON.parse(await readFile(FRONTEND_PACKAGE, "utf8"));
+	const gate = packageJson.scripts["gate:quality"];
+	const fetchAt = gate.indexOf("fetch:model");
+	assert.ok(fetchAt >= 0, "gate:quality must run fetch:model");
+	assert.ok(fetchAt < gate.indexOf("test:coverage"), "fetch:model must precede the unit suites");
+	assert.match(packageJson.scripts["fetch:model"], /download-model\.mjs/u);
+});
