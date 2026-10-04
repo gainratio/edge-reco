@@ -420,7 +420,7 @@ can never be used to push an old release. That has three consequences for publis
   a fresh `ORIGIN_DIR` and pass `--sequence` explicitly: the publisher refuses to read
   a local `latest` signed by a different key as its floor. Revoke the old key id once every
   client has the new release. The sync Worker and the ranking-proof check both read the
-  trust root with `@edgeproc/browser`'s `parseTrustRoot`, and
+  trust root with `@gainratio/browser`'s `parseTrustRoot`, and
   `frontend/app/scripts/trust-root-contract.test.mjs` fails the gate if the committed
   copies disagree or stop parsing. The optional Python/FastAPI tier
   (`EDGERECO_VERIFY_KEY_PATH`, and the `retrain` / `audit` verify key) still reads one

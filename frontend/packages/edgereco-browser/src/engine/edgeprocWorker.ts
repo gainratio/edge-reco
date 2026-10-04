@@ -1,1 +1,1 @@
-import "@edgeproc/browser/worker";
+import "@gainratio/browser/worker";

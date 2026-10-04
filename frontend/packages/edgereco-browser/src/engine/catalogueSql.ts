@@ -1,6 +1,6 @@
-// The ONE file in edge-reco that talks to @edgeproc/browser's SQL seam.
+// The ONE file in edge-reco that talks to @gainratio/browser's SQL seam.
 //
-// @edgeproc/browser/sql owns the SQLite build (FTS5, JSON1 and sqlite-vector on
+// @gainratio/browser/sql owns the SQLite build (FTS5, JSON1 and sqlite-vector on
 // one connection), its Worker, the OPFS pool, the per-origin owner lock and the
 // memory fallback. edge-reco only names its database and runs SQL. Swapping or
 // upgrading the engine touches this file and nothing else
@@ -17,7 +17,7 @@ import {
 	type SqlStorage,
 	type SqlWorkerFactory,
 	sqliteVectorPoolName,
-} from "@edgeproc/browser/sql";
+} from "@gainratio/browser/sql";
 
 export type { SqlBind, SqlRow, SqlStatement, SqlStorage };
 

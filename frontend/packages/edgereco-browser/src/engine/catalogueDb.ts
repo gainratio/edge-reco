@@ -22,7 +22,7 @@
 // column weights are tunable. Ties break by bundle row, as before.
 //
 // This module only speaks SQL. The database itself (Worker, OPFS pool, owner
-// lock, memory fallback) comes from @edgeproc/browser through catalogueSql.ts.
+// lock, memory fallback) comes from @gainratio/browser through catalogueSql.ts.
 
 import {
 	type CatalogueSql,
@@ -211,7 +211,7 @@ export type CatalogueStoreFactory = (
 
 /**
  * Production factory: retire main's old OPFS vector pool, then open the
- * catalogue database through the @edgeproc/browser SQL seam.
+ * catalogue database through the @gainratio/browser SQL seam.
  */
 export const openCatalogueStore: CatalogueStoreFactory = async ({
 	dimension,

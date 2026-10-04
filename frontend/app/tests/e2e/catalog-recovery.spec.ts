@@ -4,7 +4,7 @@ import { expect, type Page, test } from "@playwright/test";
 /**
  * Stuck returning shopper → explicit "Clear cached catalog and retry".
  *
- * @edgeproc/browser keeps the stored pointer as the anti-rollback floor even
+ * @gainratio/browser keeps the stored pointer as the anti-rollback floor even
  * when the current key can't verify it. So a republish with a LOWER `sequence`
  * (a lost/regenerated signing key) or a changed bundle_id/channel refuses on
  * every Retry. This lane proves, against the REAL sync Worker, REAL OPFS and

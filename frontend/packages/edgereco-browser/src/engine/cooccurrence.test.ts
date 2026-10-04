@@ -3,12 +3,12 @@
 // path as ranking_config.json. Parse the committed bundle's file (round-trip) and
 // confirm an absent file degrades to an empty matrix (older bundles).
 
-import type { IndexManifest, Verify } from "@edgeproc/browser";
+import type { IndexManifest, Verify } from "@gainratio/browser";
 import {
 	MemoryCacheStore,
 	materializeFile,
 	syncIndex,
-} from "@edgeproc/browser";
+} from "@gainratio/browser";
 import { describe, expect, it } from "vitest";
 import {
 	type CooccurrenceMatrix,

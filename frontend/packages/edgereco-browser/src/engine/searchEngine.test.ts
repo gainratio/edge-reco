@@ -1,9 +1,9 @@
-import type { IndexManifest, Verify, VersionPointer } from "@edgeproc/browser";
+import type { IndexManifest, Verify, VersionPointer } from "@gainratio/browser";
 import {
 	MemoryCacheStore,
 	materializeFile,
 	syncIndex,
-} from "@edgeproc/browser";
+} from "@gainratio/browser";
 import { describe, expect, it } from "vitest";
 import parityFixture from "./__fixtures__/search_parity.json" with {
 	type: "json",

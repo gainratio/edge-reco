@@ -1,12 +1,12 @@
 // recommend/browse/empty-query coverage for the hybrid engine. These paths do
 // not touch the embedder, so a stub embedder keeps the model out of the test.
 
-import type { IndexManifest, Verify } from "@edgeproc/browser";
+import type { IndexManifest, Verify } from "@gainratio/browser";
 import {
 	MemoryCacheStore,
 	materializeFile,
 	syncIndex,
-} from "@edgeproc/browser";
+} from "@gainratio/browser";
 import { describe, expect, it } from "vitest";
 import type { InteractionEvent, Product } from "./domain";
 import type { Embedder } from "./embedder";

@@ -53,7 +53,7 @@
     {
       "id": "sync_worker",
       "type": "security",
-      "label": "@edgeproc/browser",
+      "label": "@gainratio/browser",
       "sublabel": "Verify + sync Worker",
       "tag": "fail closed",
       "pos": [355, 320],

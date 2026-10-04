@@ -2,7 +2,7 @@
 
 edge-proc 0.3.0 closed an anti-replay hole: an EQUAL version used to read as "fresh",
 so a genuinely signed older pointer at the same label could replay onto a device. A
-promote now needs a strictly greater ``sequence``, and ``@edgeproc/browser`` has always
+promote now needs a strictly greater ``sequence``, and ``@gainratio/browser`` has always
 refused a lower or equal one over a different manifest (docs/DEPLOY.md). So the one
 number a publisher must never get wrong is the next sequence. These tests pin that the
 producer computes it from what the origin already serves and refuses to go backwards.

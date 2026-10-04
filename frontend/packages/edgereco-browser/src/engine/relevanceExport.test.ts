@@ -31,12 +31,12 @@
 import { existsSync, readFileSync, writeFileSync } from "node:fs";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
-import type { IndexManifest, Verify } from "@edgeproc/browser";
+import type { IndexManifest, Verify } from "@gainratio/browser";
 import {
 	MemoryCacheStore,
 	materializeFile,
 	syncIndex,
-} from "@edgeproc/browser";
+} from "@gainratio/browser";
 import { describe, expect, it } from "vitest";
 import {
 	CATALOG_ID,

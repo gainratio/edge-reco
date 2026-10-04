@@ -101,8 +101,8 @@ catalog address (`localhost:8921`). If you then run `vite preview`, the app says
 | `backend/scripts/` | Catalog curation and the parity-fixture generators. |
 
 The signed-catalog download and checking in the browser come from
-[`@edgeproc/browser`](https://github.com/hseshadr/edgeproc-browser), installed from a
-pinned GitHub commit. The Python side gets the same job from
+[`@gainratio/browser`](https://github.com/hseshadr/edgeproc-browser), installed from npm
+(`^0.2.0`, exact version locked in `pnpm-lock.yaml`). The Python side gets the same job from
 [`edge-proc`](https://github.com/hseshadr/edge-proc) on PyPI, which in turn uses
 [`edgeproc-core`](https://github.com/hseshadr/edgeproc-core). Changes to that plumbing
 belong in those repos.

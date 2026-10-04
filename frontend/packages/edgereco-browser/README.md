@@ -1,7 +1,7 @@
 # @edgereco/browser
 
 **EdgeReco's browser product engine.** It composes the standalone
-[`@edgeproc/browser`](https://github.com/hseshadr/edgeproc-browser) Lego for
+[`@gainratio/browser`](https://github.com/hseshadr/edgeproc-browser) Lego for
 signed sync, integrity, OPFS, Worker transport, and vector contracts, then adds
 only EdgeReco's embedding, hybrid search, ranking, and session logic. No
 application backend sits in the request path.
@@ -12,7 +12,7 @@ in [`src/edgereco/`](../../../backend/src/edgereco) — the two are top-k parity
 against the same committed bundle (see `src/engine/hybridParity.test.ts`).
 
 > **Status:** private EdgeReco workspace package, not a general-purpose Lego and
-> not published to npm. The reusable substrate is `@edgeproc/browser`.
+> not published to npm. The reusable substrate is `@gainratio/browser`.
 
 ## TL;DR
 
@@ -41,7 +41,7 @@ The browser embedder is `Xenova/all-MiniLM-L6-v2` via
 `{ pooling: "mean", normalize: true }` — the byte-for-byte equivalent of the
 Python core's `sentence-transformers` recipe. The browser imports the signed
 products and `vector/embeddings.f32` matrix into ONE SQLite database
-(`catalogueDb.ts`). The database comes from `@edgeproc/browser/sql`, which runs
+(`catalogueDb.ts`). The database comes from `@gainratio/browser/sql`, which runs
 SQLite + FTS5 + sqlite-vector in its own Worker and persists it in OPFS;
 `catalogueSql.ts` is the only file that imports it. On boot it also deletes
 the old vector pool earlier builds left in OPFS. Keyword search is SQLite FTS5's
@@ -59,10 +59,10 @@ matches `src/edgereco/` line for line.
 ```
 SPA tab
 ├── EngineRuntime.bootstrap(config)
-│     ├── sync Worker   (@edgeproc/browser)
+│     ├── sync Worker   (@gainratio/browser)
 │     │     └── pull /latest -> verify ed25519 -> fetch chunks ->
 │     │         verify sha256 -> reassemble files into OPFS
-│     ├── SQL Worker    (@edgeproc/browser/sql, via catalogueSql.ts)
+│     ├── SQL Worker    (@gainratio/browser/sql, via catalogueSql.ts)
 │     │     └── products + FTS5 + sqlite-vector -> one SQLite database in OPFS
 │     └── embedder Worker (embedderWorker.ts)
 │           └── load Xenova/all-MiniLM-L6-v2 (~25 MB) -> ONNX session
@@ -82,7 +82,7 @@ near-instant and offline-capable.
 - `EngineRuntime` / `RuntimeConfig` / `RuntimeDeps` — the bootstrap front door.
 - `SearchEngine` / `createSearchEngine` — the search surface (`search`,
   `recommend`, `browse`). Built once over the synced bundle.
-- `@edgeproc/browser` supplies `EngineClient`, the sync Worker, OPFS storage,
+- `@gainratio/browser` supplies `EngineClient`, the sync Worker, OPFS storage,
   integrity verification, and the SQLite + sqlite-vector Worker adapter.
 - `Product` / `SearchResult` / `ScoreComponents` / `InteractionEvent` — the
   domain types the engine produces. Same shapes as the Python core's wire
@@ -95,7 +95,7 @@ near-instant and offline-capable.
 
 The `./testing/fixtures` subpath exposes only EdgeReco's product parity fixtures.
 Tests that need generic sync, storage, integrity, or vector seams import them
-from `@edgeproc/browser`; this package does not re-export or copy that substrate.
+from `@gainratio/browser`; this package does not re-export or copy that substrate.
 
 ## Implementation notes
 

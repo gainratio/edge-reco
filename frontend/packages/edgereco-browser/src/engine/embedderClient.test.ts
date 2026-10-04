@@ -2,7 +2,7 @@
 // model load (the classic init failure) must REJECT pending embeds with a
 // typed error — never hang — bounded by a per-request deadline backstop.
 
-import { WorkerCrashError, WorkerTimeoutError } from "@edgeproc/browser";
+import { WorkerCrashError, WorkerTimeoutError } from "@gainratio/browser";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { createWorkerEmbedder, type WorkerLike } from "./embedderClient";
 import type { EmbedRequest, EmbedResponse } from "./embedderWorker";

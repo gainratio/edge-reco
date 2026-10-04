@@ -1,13 +1,13 @@
 // The IndexedDB half of the signed-bundle cache: the anti-rollback floor.
 //
-// @edgeproc/browser keeps its durable active pointer twice — in OPFS and in an
+// @gainratio/browser keeps its durable active pointer twice — in OPFS and in an
 // IndexedDB database — and treats the higher of the two as the rollback floor.
 // `EngineClient.clear()` empties both under the cache's Web Lock. The explicit
 // "clear cached catalog" recovery then ALSO deletes the floor database, awaited
 // and bounded, so a floor can never silently survive the one action meant to
 // remove it. Nothing here runs except from that explicit user action.
 
-import { resolveIndexedDbLayout } from "@edgeproc/browser";
+import { resolveIndexedDbLayout } from "@gainratio/browser";
 
 /**
  * The library's default floor database (`edgeproc-browser-cache`) — the one

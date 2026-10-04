@@ -6,7 +6,7 @@ Local-first product recommendations engine: a store's search-and-rank brain ship
 Python v1 shipped on `main`: full FastAPI runtime + signed-bundle sync + hybrid
 search + session-aware reranker, 90%+ coverage. The Nimbus demo is **backend-free**:
 the React SPA syncs the signed bundle into OPFS and runs the whole engine in the
-browser via the `@edgeproc/browser` workspace package (`frontend/packages/edgeproc-browser/`),
+browser via the `@gainratio/browser` npm package (composed by `frontend/packages/edgereco-browser/`),
 parity-tested against the Python core. The storefront is an **installable,
 offline-capable PWA**: after one online sync it runs fully offline (a Workbox
 service worker via `vite-plugin-pwa` precaches the app shell; the ~23 MB
@@ -41,7 +41,7 @@ Python 3.13 · Pydantic v2 · Polars · FAISS · sentence-transformers · FastAP
   - `backend/scripts/` — fixture generators for browser-tier parity tests
 - `frontend/` — npm workspace root
   - `frontend/app/` — the Nimbus React storefront (Vite + TS)
-  - `frontend/packages/edgeproc-browser/` — `@edgeproc/browser`, the in-browser tier (signed-bundle sync + OPFS + transformers.js embedder + hybrid search engine); parity-tested against the Python core
+  - `frontend/packages/edgereco-browser/` — `@edgereco/browser`, the in-browser product engine over the `@gainratio/browser` npm package (signed-bundle sync + OPFS + transformers.js embedder + hybrid search engine); parity-tested against the Python core
 - `docs/` — ARCHITECTURE / QUICKSTART / DEPLOY / diagrams
 
 ## Invariants (don't break without updating the spec)

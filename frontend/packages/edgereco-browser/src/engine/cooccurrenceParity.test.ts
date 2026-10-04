@@ -8,12 +8,12 @@
 // co_occurrence pool is a local neighbour lookup), so a rejecting stub embedder
 // keeps the model out of the test.
 
-import type { IndexManifest, Verify } from "@edgeproc/browser";
+import type { IndexManifest, Verify } from "@gainratio/browser";
 import {
 	MemoryCacheStore,
 	materializeFile,
 	syncIndex,
-} from "@edgeproc/browser";
+} from "@gainratio/browser";
 import { describe, expect, it } from "vitest";
 import cooccurrenceFixture from "./__fixtures__/cooccurrence_parity.json" with {
 	type: "json",

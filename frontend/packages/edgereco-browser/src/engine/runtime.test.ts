@@ -4,7 +4,7 @@ import {
 	materializeFile,
 	type SyncResult,
 	syncIndex,
-} from "@edgeproc/browser";
+} from "@gainratio/browser";
 import { describe, expect, it, vi } from "vitest";
 import {
 	type CatalogueStore,

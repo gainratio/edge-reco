@@ -144,7 +144,7 @@ test("real search is relevant, local, clean, and inside release budgets", async 
 		return names;
 	});
 	// The catalogue database (products + FTS5 + sqlite-vector) lives in
-	// @edgeproc/browser's SQL pool for name "edgereco-catalogue" since
+	// @gainratio/browser's SQL pool for name "edgereco-catalogue" since
 	// 2026-10-04. main's build used the vector pool for "edgereco-catalog";
 	// boot retires that one (catalogueSql.ts retireLegacyVectorPool).
 	expect(

@@ -2,7 +2,7 @@
 // embeddings.f32 is the L2-normalized vector for state.json faiss_ids[i]
 // (Python's VectorSearcher, src/edgereco/search/vector.py). The verified
 // products and vectors are imported into ONE SQLite database, which
-// @edgeproc/browser runs in its own Worker (catalogueDb.ts, catalogueSql.ts): keyword search is FTS5, similarity is sqlite-vector, and
+// @gainratio/browser runs in its own Worker (catalogueDb.ts, catalogueSql.ts): keyword search is FTS5, similarity is sqlite-vector, and
 // hybrid fusion is a SQL query. Every query crosses that Worker boundary and stays
 // off the UI thread.
 
