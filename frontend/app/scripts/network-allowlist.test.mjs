@@ -6,9 +6,10 @@
 // Three checks, each able to fail on its own:
 //   1. The CSP pins connect-src and img-src to 'self' (data: images only), so
 //      the browser itself refuses fetch/XHR/beacon/pixel traffic elsewhere.
-//   2. The built JS opens no beacon, WebSocket or EventSource channel.
-//   3. Every http(s) host named in the built JS is on the allow-list below,
-//      with the reason it is there. A new uplink, analytics SDK or CDN shows up
+//   2. The built JS opens no beacon, WebSocket, EventSource or WebRTC channel.
+//   3. Every host named in the built JS, HTML and CSS (http(s), ws(s),
+//      scheme-relative `//host`, HTML pixels, CSS url()) is on the allow-list
+//      below, with the reason it is there. A new uplink, analytics SDK or CDN shows up
 //      as a new host and fails here until someone justifies it in review.
 //
 // Run by `pnpm -F frontend run test:artifacts` after `build:pages`.
@@ -52,8 +53,14 @@ const ALLOWED_URL_HOSTS = new Map([
 	["almamesh.com", "sibling-site link"],
 ]);
 
-const URL_HOST = /https?:\/\/([A-Za-z0-9.-]+)/gu;
-const CHANNELS = /\b(?:sendBeacon|new\s+WebSocket|new\s+EventSource)\b/u;
+// A host is anything after `//` that is either schemed (http, https, ws, wss)
+// or scheme-relative inside a string, attribute or CSS url(): `"//host"`,
+// `src='//host'`, `url(//host)`. A JS `// comment` has a space after the
+// slashes, and a host needs at least one dot, so neither matches.
+const URL_HOST =
+	/(?:\b(?:https?|wss?):|(?<=["'`(=\s]))\/\/([A-Za-z0-9-]+(?:\.[A-Za-z0-9-]+)+)/gu;
+const CHANNELS =
+	/\b(?:sendBeacon|new\s+WebSocket|new\s+EventSource|RTCPeerConnection)\b/u;
 
 /** Hosts named in one file's text that are not on the allow-list. */
 function unexpectedHosts(text) {
@@ -87,7 +94,7 @@ async function builtScripts(dir) {
 			if (!["models", "ort", "bundle"].includes(rel)) {
 				out.push(...(await builtScripts(path)));
 			}
-		} else if (/\.m?js$/u.test(entry.name)) {
+		} else if (/\.(?:m?js|html|css)$/u.test(entry.name)) {
 			out.push(path);
 		}
 	}
@@ -100,6 +107,27 @@ test("the allow-list helpers catch a new host and a beacon", () => {
 		["events.example.com"],
 	);
 	assert.deepEqual(unexpectedHosts('"https://github.com/x"'), []);
+	// Scheme-relative, WebSocket and HTML-pixel forms are hosts too.
+	assert.deepEqual(unexpectedHosts('fetch("//t.example.net/p")'), [
+		"t.example.net",
+	]);
+	assert.deepEqual(unexpectedHosts('new URL("wss://ws.example.org/s")'), [
+		"ws.example.org",
+	]);
+	assert.deepEqual(
+		unexpectedHosts('<img src="https://px.example.io/1.gif" alt="">'),
+		["px.example.io"],
+	);
+	assert.deepEqual(unexpectedHosts("<img src='//px2.example.io/1.gif'>"), [
+		"px2.example.io",
+	]);
+	assert.deepEqual(
+		unexpectedHosts("body{background:url(//css.example.co/a.png)}"),
+		["css.example.co"],
+	);
+	// A comment or a path is not a host.
+	assert.deepEqual(unexpectedHosts("a = b; // see notes.txt\n"), []);
+	assert.equal(CHANNELS.test("new RTCPeerConnection(cfg)"), true);
 	assert.equal(CHANNELS.test("navigator.sendBeacon(u, b)"), true);
 	assert.equal(
 		directive("default-src 'self'; connect-src 'self'", "connect-src"),
