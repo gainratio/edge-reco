@@ -1,4 +1,4 @@
-"""End-to-end test: publish signed bundle → from_synced → search → session → recommend."""
+"""End-to-end test: publish signed bundle → from_synced → search → stateless recommend."""
 
 from __future__ import annotations
 
@@ -12,10 +12,8 @@ from fastapi.testclient import TestClient
 from edgereco.api.app import create_app
 from edgereco.api.deps import ServiceContainer
 from edgereco.catalog.loader import load_jsonl
-from edgereco.catalog.models import SessionProfile
 from edgereco.embeddings.encoder import ProductEncoder
 from edgereco.embeddings.index import VectorIndex
-from edgereco.reco.signals import apply_interaction
 from tests.signing import save_seed
 
 FIXTURES_DIR = Path(__file__).parent.parent / "fixtures"
@@ -73,17 +71,8 @@ def client(container: ServiceContainer) -> TestClient:
     return TestClient(app)
 
 
-def _click(container: ServiceContainer, session_id: str, product_id: str) -> None:
-    product = container.by_id[product_id]
-
-    def update(profile: SessionProfile) -> SessionProfile:
-        return apply_interaction(profile, product, "click")
-
-    container.sessions.update(session_id, update)
-
-
 @pytest.mark.e2e
-def test_full_discovery_loop(client: TestClient, container: ServiceContainer) -> None:
+def test_full_discovery_loop(client: TestClient) -> None:
     # 1. Health check
     health = client.get("/healthz")
     assert health.status_code == 200
@@ -105,43 +94,13 @@ def test_full_discovery_loop(client: TestClient, container: ServiceContainer) ->
     result_ids = [r["product"]["id"] for r in payload["results"]]
     assert "B001" in result_ids  # Wireless Bluetooth Headphones in mini_catalog
 
-    # 4. Empty session: recommend returns 50 products in some order
-    rec_initial = client.get(
-        "/recommend",
-        params={"limit": 50},
-        headers={"X-Session-Id": "e2e-session-1"},
-    )
+    # 4. Recommend ranks the whole catalog against an empty profile.
+    rec_initial = client.get("/recommend", params={"limit": 50})
     assert rec_initial.status_code == 200
     assert len(rec_initial.json()["results"]) == 50
 
-    # 5. Fold 3 Electronics clicks into the server session (no event endpoint exists:
-    #    interaction data never leaves the client, so an in-process host does this).
-    for pid in ("B001", "B006", "B007"):
-        _click(container, "e2e-session-1", pid)
-
-    # 6. Recommend after clicks: top results should now lean Electronics
-    rec_after = client.get(
-        "/recommend",
-        params={"limit": 50},
-        headers={"X-Session-Id": "e2e-session-1"},
-    )
-    assert rec_after.status_code == 200
-    after_results = rec_after.json()["results"]
-    after_top_5 = after_results[:5]
-    after_top_ids = [r["product"]["id"] for r in after_top_5]
-
-    # The top-5 should now contain at least one Electronics product that wasn't there before,
-    # OR the proportion of Electronics in the top-5 should increase.
-    after_categories = [r["product"]["category"] for r in after_top_5]
-    electronics_count_after = sum(1 for c in after_categories if c == "Electronics")
-    assert electronics_count_after >= 2, (
-        f"Expected ≥2 Electronics in top 5 after Electronics clicks; "
-        f"got {electronics_count_after} from {after_top_ids}"
-    )
-
-    # 7. session_clicks reflects the 3 clicks
-    assert rec_after.json()["session_clicks"] == 3
-
-    # 8. Repetition penalty: B001 was clicked, should NOT be the top reranked recommendation
-    # (the scorer penalizes recently_viewed by 0.25)
-    assert after_top_ids[0] != "B001"
+    # 5. Stateless: the server keeps no session, so a session header changes nothing
+    #    and the response carries no per-session state.
+    rec_again = client.get("/recommend", params={"limit": 50}, headers={"X-Session-Id": "e2e"})
+    assert rec_again.json() == rec_initial.json()
+    assert set(rec_again.json()) == {"results"}

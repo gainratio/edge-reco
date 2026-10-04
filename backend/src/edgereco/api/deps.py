@@ -3,7 +3,6 @@
 from __future__ import annotations
 
 import logging
-import uuid
 from collections.abc import Callable
 from dataclasses import dataclass, field
 from pathlib import Path
@@ -14,9 +13,8 @@ from edgeproc.bundles.cas import FilesystemCacheStore
 from edgeproc.bundles.manifest import IndexManifest
 from edgeproc.bundles.signing import Verifier
 from edgeproc.bundles.sync import materialize_file, sync_index
-from fastapi import Depends, Header, Request
+from fastapi import Depends, Request
 
-from edgereco.api.sessions import SessionStore
 from edgereco.catalog.models import CatalogManifest, Product
 from edgereco.catalog.publish import CURRENT_META_SCHEMA, CatalogMeta
 from edgereco.embeddings.encoder import DEFAULT_MODEL_NAME, ProductEncoder
@@ -88,7 +86,6 @@ class ServiceContainer:
     keyword: KeywordSearcher
     vector: VectorSearcher
     encoder: ProductEncoder
-    sessions: SessionStore = field(default_factory=SessionStore)
     manifest: CatalogManifest | None = None
     ranking_config: RankingConfig = field(default_factory=lambda: DEFAULT_RANKING_CONFIG)
     cooccurrence: CooccurrenceMatrix = field(default_factory=CooccurrenceMatrix)
@@ -313,11 +310,6 @@ def get_container(request: Request) -> ServiceContainer:
         msg = "app.state.container is not a ServiceContainer; app was not initialized"
         raise RuntimeError(msg)
     return container
-
-
-def get_session_id(x_session_id: Annotated[str | None, Header()] = None) -> str:
-    """FastAPI dependency: return X-Session-Id header value or generate a new UUID."""
-    return x_session_id if x_session_id else str(uuid.uuid4())
 
 
 Container = Annotated[ServiceContainer, Depends(get_container)]

@@ -14,7 +14,6 @@ from pathlib import Path
 import pytest
 
 import edgereco.api.deps as deps
-from edgereco.catalog.loader import dump_jsonl
 from edgereco.catalog.models import Product
 from edgereco.catalog.publish import CURRENT_META_SCHEMA, CatalogMeta
 from edgereco.reco.cooccurrence import CooccurrenceMatrix
@@ -30,7 +29,8 @@ def _materialize_current_schema_dir(tmp_path: Path) -> Path:
     """A materialised bundle dir declaring the CURRENT schema, both files present."""
     local = tmp_path / "local"
     local.mkdir()
-    dump_jsonl(local / "products.jsonl", _PRODUCTS)
+    lines = "".join(p.model_dump_json() + "\n" for p in _PRODUCTS)
+    (local / "products.jsonl").write_text(lines, encoding="utf-8")
     meta = CatalogMeta(
         catalog_id="fail-closed-test",
         version="v1",

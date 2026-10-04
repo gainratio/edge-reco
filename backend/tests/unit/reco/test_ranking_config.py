@@ -69,7 +69,7 @@ def test_committed_default_config_still_validates() -> None:
     assert RankingConfig.model_validate_json(payload) == DEFAULT_RANKING_CONFIG
 
 
-# The historical hardcoded affinity bumps (once ``reco.signals.INTERACTION_WEIGHTS``,
+# The historical hardcoded affinity bumps (once the server-side ``INTERACTION_WEIGHTS``,
 # now retired). Pinned literally so the default config cannot drift from the values
 # every committed bundle and parity fixture was produced with.
 _LEGACY_INTERACTION_WEIGHTS: dict[str, dict[str, float]] = {
@@ -87,15 +87,6 @@ def test_default_interaction_weights_match_legacy_constants() -> None:
         assert graded.category == legacy["category"]
         assert graded.tag == legacy["tag"]
         assert graded.brand == legacy["brand"]
-
-
-def test_for_event_dispatches_to_the_matching_graded_signal() -> None:
-    """``for_event`` mirrors the TS tier's ``weights[eventType]`` lookup exactly."""
-    iw = DEFAULT_RANKING_CONFIG.interaction_weights
-    assert iw.for_event("click") is iw.click
-    assert iw.for_event("view") is iw.view
-    assert iw.for_event("favorite") is iw.favorite
-    assert iw.for_event("cart") is iw.cart
 
 
 def test_default_schema_version_is_three() -> None:

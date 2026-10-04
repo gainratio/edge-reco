@@ -8,15 +8,35 @@ from fastapi.testclient import TestClient
 def test_recommend_returns_requested_limit(client: TestClient) -> None:
     response = client.get("/recommend?limit=5")
     assert response.status_code == 200
-    body = response.json()
-    assert len(body["results"]) == 5
-    assert "session_clicks" in body
+    assert len(response.json()["results"]) == 5
 
 
-def test_recommend_session_clicks_zero_for_new_session(client: TestClient) -> None:
-    response = client.get("/recommend?limit=5", headers={"X-Session-Id": "fresh-session-xyz"})
-    assert response.status_code == 200
-    assert response.json()["session_clicks"] == 0
+def test_recommend_response_carries_no_session_state(client: TestClient) -> None:
+    """The API is stateless: no server-side session, so no per-session counter."""
+    body = client.get("/recommend?limit=5").json()
+    assert set(body) == {"results"}
+
+
+def test_recommend_ignores_a_session_header(client: TestClient) -> None:
+    """A client-sent ``X-Session-Id`` changes nothing: the server keeps no session."""
+    plain = client.get("/recommend?limit=10").json()
+    tagged = client.get("/recommend?limit=10", headers={"X-Session-Id": "s-1"}).json()
+    assert plain == tagged
+
+
+def test_recommend_openapi_declares_no_session_header(client: TestClient) -> None:
+    """The published contract has no session header parameter on any route."""
+    schema = client.get("/openapi.json").json()
+    params = [
+        param["name"].lower()
+        for path in schema["paths"].values()
+        for op in path.values()
+        for param in op.get("parameters", [])
+    ]
+    assert "x-session-id" not in params
+    assert (
+        "session_clicks" not in schema["components"]["schemas"]["RecommendResponse"]["properties"]
+    )
 
 
 def test_recommend_defaults_to_for_you(client: TestClient) -> None:

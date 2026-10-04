@@ -8,8 +8,8 @@ import pytest
 from pytest_bdd import given, parsers, scenarios, then, when
 
 from edgereco.catalog.models import Product, SearchResult, SessionProfile
+from edgereco.reco.ranking_config import DEFAULT_RANKING_CONFIG
 from edgereco.reco.reranker import rerank
-from edgereco.reco.signals import apply_interaction
 
 scenarios("recommendations.feature")
 
@@ -61,10 +61,18 @@ def _three_electronics(ctx: StepContext) -> None:
     ctx.candidates = [SearchResult(product=p, score=0.5) for p in electronics]
 
 
-@when(parsers.parse('I click product "{product_id}"'))
-def _click_product(ctx: StepContext, product_id: str) -> None:
+@when(parsers.parse('the profile holds a click on product "{product_id}"'))
+def _profile_with_click(ctx: StepContext, product_id: str) -> None:
+    """A profile shaped like the browser tier's after one click on ``product_id``."""
     product = ctx.by_id[product_id]
-    ctx.profile = apply_interaction(ctx.profile, product, "click")
+    bump = DEFAULT_RANKING_CONFIG.interaction_weights.click
+    ctx.profile = SessionProfile(
+        category_affinity={product.category: bump.category},
+        tag_affinity=dict.fromkeys(product.tags, bump.tag),
+        brand_affinity={product.brand: bump.brand} if product.brand else {},
+        recently_viewed=[product.id],
+        click_count=1,
+    )
 
 
 @when("I rerank the candidate list")

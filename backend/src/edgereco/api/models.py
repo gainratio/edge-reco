@@ -40,4 +40,3 @@ class RecommendResponse(BaseModel):
     """Response for ``GET /recommend``."""
 
     results: list[SearchResult]
-    session_clicks: int

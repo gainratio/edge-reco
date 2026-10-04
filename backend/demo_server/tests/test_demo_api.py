@@ -3,8 +3,6 @@ from __future__ import annotations
 from fastapi.testclient import TestClient
 
 from demo_server.main import app
-from edgereco.catalog.models import SessionProfile
-from edgereco.reco.signals import apply_interaction
 
 client = TestClient(app)
 
@@ -18,20 +16,12 @@ def test_cors_header_present_for_browser_origin() -> None:
     assert r.headers.get("access-control-allow-origin") == "http://localhost:5174"
 
 
-def test_search_then_session_then_recommend_personalizes() -> None:
-    sid = "demo-test-1"
-    hits = client.get("/search", params={"q": "headphones", "limit": 5}).json()["results"]
-    assert hits
-    container = app.state.container
-    product = container.by_id[hits[0]["product"]["id"]]
-
-    def update(profile: SessionProfile) -> SessionProfile:
-        return apply_interaction(profile, product, "click")
-
-    container.sessions.update(sid, update)
-    rec = client.get("/recommend", params={"limit": 10}, headers={"X-Session-Id": sid}).json()
-    assert rec["session_clicks"] >= 1
-    assert rec["results"][0]["score_components"] is not None
+def test_recommend_is_stateless_and_explained() -> None:
+    """No server session: the same request returns the same ranked, explained list."""
+    first = client.get("/recommend", params={"limit": 10}).json()
+    again = client.get("/recommend", params={"limit": 10}, headers={"X-Session-Id": "s"}).json()
+    assert first == again
+    assert first["results"][0]["score_components"] is not None
 
 
 def test_no_event_endpoint_is_mounted() -> None:
