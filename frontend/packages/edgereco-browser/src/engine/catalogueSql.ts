@@ -1,10 +1,11 @@
-// The ONE file in edge-reco that talks to @gainratio/browser's SQL seam.
+// The ONE module in edge-reco that uses @gainratio/browser's SQL surface (it
+// reaches the library through the package seam, ../gainratio.ts).
 //
 // @gainratio/browser/sql owns the SQLite build (FTS5, JSON1 and sqlite-vector on
 // one connection), its Worker, the OPFS pool, the per-origin owner lock and the
 // memory fallback. edge-reco only names its database and runs SQL. Swapping or
-// upgrading the engine touches this file and nothing else
-// (sqlBoundary.test.ts enforces that).
+// upgrading the SQL engine touches this file and the seam, nothing else
+// (sqlBoundary.test.ts and gainratioBoundary.test.ts enforce that).
 
 import {
 	type OpfsPoolRemoval,
@@ -17,7 +18,7 @@ import {
 	type SqlStorage,
 	type SqlWorkerFactory,
 	sqliteVectorPoolName,
-} from "@gainratio/browser/sql";
+} from "../gainratio";
 
 export type { SqlBind, SqlRow, SqlStatement, SqlStorage };
 

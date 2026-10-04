@@ -40,7 +40,7 @@ const TOAST_MS = 2200;
 
 interface GridView {
 	products: Product[];
-	kicker: string;
+	kicker?: string;
 	title: string;
 }
 
@@ -471,8 +471,8 @@ export function Storefront() {
 	);
 
 	// When a search query is active, surface its results at the TOP of the shop —
-	// a labelled "Results for …" cue plus the grid, pinned right under the search
-	// box — with the personalized rails sliding below. Without this a query paints
+	// the "Search results" grid (with a screen-reader "Results for …" announcement)
+	// pinned right under the search box — with the personalized rails sliding below. Without this a query paints
 	// a 4th section beneath three unchanged rails and reads as if nothing happened.
 	const searchedQuery = debouncedQuery.trim();
 	const isSearching = searchedQuery !== "";
@@ -498,7 +498,7 @@ export function Storefront() {
 	const productGrid = (
 		<ProductGrid
 			products={grid.products}
-			kicker={grid.kicker}
+			{...(grid.kicker === undefined ? {} : { kicker: grid.kicker })}
 			title={grid.title}
 			loading={gridLoading}
 			onPick={onPick}
@@ -557,7 +557,14 @@ export function Storefront() {
 					/>
 				) : isSearching ? (
 					<>
-						<div className="results-cue" role="status" aria-live="polite">
+						{/* Screen-reader-only announcement: sighted shoppers see the query
+						    in the search box; a second visible copy only pushed products
+						    below the fold on phones. */}
+						<div
+							className="results-cue visually-hidden"
+							role="status"
+							aria-live="polite"
+						>
 							{t("grid.resultsFor", { query: searchedQuery })}
 						</div>
 						{productGrid}
@@ -614,8 +621,9 @@ async function loadGridInner(
 			categories: deriveCategories(products),
 			grid: {
 				products,
-				kicker: t("grid.kickerSearch"),
-				title: `"${trimmed}"`,
+				// The query already sits in the search box; the title only labels the
+				// view, so the shopper reads the query once (no kicker/title echo).
+				title: t("grid.titleSearch"),
 			},
 		};
 	}

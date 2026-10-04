@@ -10,8 +10,6 @@
 // `@edgereco/browser/testing/fixtures`. Generic test seams are imported
 // directly from `@gainratio/browser`.
 
-// --- the SyncResult shape leaks through BootStage; expose its type only ---
-export type { SyncResult } from "@gainratio/browser";
 // --- the engine-owned domain contract (single source of truth) ---
 export type {
 	BrowseResponse,
@@ -67,3 +65,5 @@ export {
 	emptyProfile,
 	type SessionProfile,
 } from "./engine/session";
+// --- the SyncResult shape leaks through BootStage; expose its type only ---
+export type { SyncResult } from "./gainratio";

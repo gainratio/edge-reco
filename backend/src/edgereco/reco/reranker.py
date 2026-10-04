@@ -22,7 +22,16 @@ from edgereco.catalog.models import SearchResult, SessionProfile
 from edgereco.reco.ranking_config import DEFAULT_RANKING_CONFIG, ScoringWeights
 from edgereco.reco.scorer import score_product
 
-_SEARCH_RELEVANCE_WEIGHT: Final[float] = 0.2
+#: Search intent is the primary signal. RRF is min-max scaled over the admitted set
+#: (best hit 1, weakest 0) before this weight applies. RRF at k=60 is flat (rank 6
+#: still scores ~0.9 of rank 1), so the old rule — divide by the best hit, weight
+#: 0.2 — let retrieval vary by ~0.04 across a page while popularity (weight 0.4)
+#: varied by up to 0.4: "stadium seat" led with car seat covers although both
+#: retrievers put every Stadium Seats product first. A weight of 1 is at least the
+#: sum of the query-independent signals (popularity 0.4 + freshness 0.1), so they can
+#: reorder near-ties but never overturn the query. Pinned on both tiers by
+#: tests/unit/reco/test_reranker.py.
+SEARCH_RELEVANCE_WEIGHT: Final[float] = 1.0
 
 #: The absolute semantic floor: the cosine below which a document is, empirically,
 #: not an answer. CALIBRATED, NOT CHOSEN — 0.3970 is the highest cosine any document
@@ -84,11 +93,16 @@ def retrieval_evidence(
     }
 
 
-def _retrieval_score(score: float, maximum: float) -> float:
-    """Normalize non-negative RRF into the query-relevance component."""
-    if maximum <= 0.0:
+def _retrieval_score(score: float, low: float, high: float) -> float:
+    """Min-max scale non-negative RRF into the query-relevance component.
+
+    No positive score means no scale (0.0); a flat set takes the full weight.
+    """
+    if high <= 0.0:
         return 0.0
-    return _SEARCH_RELEVANCE_WEIGHT * max(0.0, score) / maximum
+    if high == low:
+        return SEARCH_RELEVANCE_WEIGHT
+    return SEARCH_RELEVANCE_WEIGHT * (max(0.0, score) - low) / (high - low)
 
 
 def rerank(
@@ -112,13 +126,15 @@ def rerank_search(
     retrievers actually measured gets an empty page, never a silent full one.
     """
     admitted = [r for r in results if meets_relevance_floor(evidence.get(r.product.id))]
-    maximum = max((result.score for result in admitted), default=0.0)
+    scores = [max(0.0, result.score) for result in admitted]
+    high = max(scores, default=0.0)
+    low = min(scores, default=0.0)
     rescored = [
         score_product(
             result.product,
             profile,
             weights,
-            retrieval=_retrieval_score(result.score, maximum),
+            retrieval=_retrieval_score(result.score, low, high),
         )
         for result in admitted
     ]

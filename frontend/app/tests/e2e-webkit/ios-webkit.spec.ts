@@ -29,11 +29,39 @@ test.afterAll(async () => {
 	await origin?.close();
 });
 
-test("the storefront starts on WebKit and renders products", async ({
+/** The `storage` object catalogueSql.ts logs once the catalogue database opens. */
+interface CatalogueStorage {
+	readonly persistence: "opfs" | "memory";
+	readonly reason?: string;
+	readonly detail?: string;
+}
+
+const STORAGE_LOG = "[edge-reco] catalogue database storage";
+
+/**
+ * Where WebKit's catalogue database ACTUALLY ended up. Ephemeral WebKit (the
+ * Safari Private Browsing stand-in) refuses OPFS — getDirectory() throws
+ * UnknownError — so the engine must land in memory with reason
+ * "opfs-unavailable". Pinning the exact mode catches a regression either way:
+ * a storefront that silently stopped exercising the fallback, or a fallback
+ * that started firing for the wrong reason (e.g. "pool-in-use").
+ */
+const EXPECTED_STORAGE: CatalogueStorage = {
+	persistence: "memory",
+	reason: "opfs-unavailable",
+};
+
+test("the storefront starts on WebKit, searches, and reports its storage mode", async ({
 	page,
 }) => {
 	const pageErrors: string[] = [];
 	page.on("pageerror", (error) => pageErrors.push(String(error)));
+	const storage = new Promise<CatalogueStorage>((resolve) => {
+		page.on("console", async (message) => {
+			if (!message.text().startsWith(STORAGE_LOG)) return;
+			resolve((await message.args()[1]?.jsonValue()) as CatalogueStorage);
+		});
+	});
 
 	await page.goto(`${origin.url}/`);
 	await page.getByRole("button", { name: "▶ Launch the live demo" }).click();
@@ -45,6 +73,28 @@ test("the storefront starts on WebKit and renders products", async ({
 	await expect(page.getByRole("heading", { name: "Browse" })).toBeVisible();
 	await expect(page.getByRole("article").first()).toBeVisible();
 	await expect(page.getByRole("article")).toHaveCount(24);
+
+	const opened = await storage;
+	expect({ persistence: opened.persistence, reason: opened.reason }).toEqual(
+		EXPECTED_STORAGE,
+	);
+
+	// A real hybrid search (real model, real SQLite FTS5 + vector leg) on the
+	// fallback database.
+	await page
+		.getByRole("searchbox", { name: "Search products" })
+		.fill("mechanical gaming keyboard");
+	await expect
+		.poll(
+			() =>
+				page
+					.locator("main article.card .card__title")
+					.first()
+					.innerText()
+					.catch(() => ""),
+			{ message: "search on WebKit should rank a keyboard first" },
+		)
+		.toMatch(/keyboard/i);
 	expect(pageErrors).toEqual([]);
 });
 

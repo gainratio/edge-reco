@@ -179,12 +179,18 @@ describe("hybrid fusion (RRF in SQL)", () => {
 		db = await openCatalogue();
 	});
 
+	it("uses the standard RRF constant k = 60", () => {
+		expect(RRF_K).toBe(60);
+	});
+
 	it("sums 1/(60 + rank) over both lists and explains every input", async () => {
 		const rows = await db.hybrid("polo", FAR, 2);
 		// keyword: [a]; semantic top-2 from 180°: [c, b] (b and d tie; row order).
 		const a = rows.find((row) => row.id === "a");
 		expect(a).toMatchObject({ lexicalRank: 1, semanticRank: null });
-		expect(a?.fused).toBeCloseTo(1 / (RRF_K + 1), 12);
+		// Pin the literal k=60 the docs promise: 1/61, not 1/(RRF_K + 1), which
+		// would pass at any k.
+		expect(a?.fused).toBeCloseTo(1 / 61, 12);
 		const c = rows.find((row) => row.id === "c");
 		expect(c).toMatchObject({ lexicalRank: null, semanticRank: 1 });
 		expect(c?.semanticScore).toBeCloseTo(1, 6);
@@ -194,7 +200,7 @@ describe("hybrid fusion (RRF in SQL)", () => {
 		const towardC = new Float32Array([-1, 0.01]);
 		const rows = await db.hybrid("cotton", towardC, 3);
 		expect(rows[0]?.id).toBe("c");
-		expect(rows[0]?.fused).toBeCloseTo(2 / (RRF_K + 1), 12);
+		expect(rows[0]?.fused).toBeCloseTo(2 / 61, 12);
 	});
 
 	it("puts the keyword list first when fused scores tie", async () => {

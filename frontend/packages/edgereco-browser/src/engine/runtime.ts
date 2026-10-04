@@ -18,15 +18,15 @@
 
 import {
 	EngineClient,
+	EngineWorker,
 	fetchBytes,
 	MAX_TRUST_ROOT_BYTES,
 	parseTrustRoot,
 	type SyncResult,
-} from "@gainratio/browser";
+} from "../gainratio";
 import { deleteBundleFloorDatabase } from "./cacheFloor";
 import type { CatalogueStoreFactory } from "./catalogueDb";
 import { type CooccurrenceMatrix, parseCooccurrence } from "./cooccurrence";
-import EdgeProcWorker from "./edgeprocWorker?worker";
 import { createEmbedder, type Embedder } from "./embedder";
 import { createWorkerEmbedder, spawnEmbedderWorker } from "./embedderClient";
 import { parseRankingConfig, type RankingConfig } from "./rankingConfig";
@@ -123,7 +123,7 @@ const defaultLoadPublisherKey = (url: string): Promise<Uint8Array> =>
 
 /** Bundle the shared side-effect Worker entry from this Vite consumer. */
 export function spawnEngineClient(): EngineClient {
-	return new EngineClient(new EdgeProcWorker());
+	return new EngineClient(new EngineWorker());
 }
 
 const defaultDeps: RuntimeDeps = {

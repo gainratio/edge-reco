@@ -17,6 +17,8 @@
 		"test:e2e": "playwright test",
 		"test:e2e:c1": "node scripts/download-model.mjs && node scripts/stage-ort-wasm.mjs && playwright test -c playwright.c1.config.ts",
 		"test:e2e:webkit": "pnpm run build:pages && playwright test -c playwright.webkit.config.ts",
+		"test:e2e:browsers": "pnpm run build:pages && pnpm run test:e2e:browsers:built",
+		"test:e2e:browsers:built": "playwright test -c playwright.browsers.config.ts",
 		"test:e2e:offline": "VITE_BUNDLE_BASE_URL=http://localhost:8921/catalog pnpm run build && playwright test -c playwright.offline.config.ts",
 		"typecheck": "tsc -b",
 		"gen-icons": "node scripts/gen-icons.mjs",

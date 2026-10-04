@@ -44,7 +44,9 @@ The flow, end to end:
 4. **The loop that matters:** a product click folds into the in-tab **session profile** (no
    network); the next recommend re-ranks toward your taste. Click → re-rank, entirely in-tab.
 
-The same engine code is parity-tested against the Python backend; the backend is no longer in
+The engine is parity-tested against the Python backend: search returns the same top result and
+at least 80% of the same top-10 (keyword scoring differs, see
+`packages/edgereco-browser/README.md`). The backend is no longer in
 the request path for this demo (it remains available for the API-server use case — see below).
 
 ## Screenshot

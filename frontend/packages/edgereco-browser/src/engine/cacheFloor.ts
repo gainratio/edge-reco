@@ -7,7 +7,7 @@
 // and bounded, so a floor can never silently survive the one action meant to
 // remove it. Nothing here runs except from that explicit user action.
 
-import { resolveIndexedDbLayout } from "@gainratio/browser";
+import { resolveIndexedDbLayout } from "../gainratio";
 
 /**
  * The library's default floor database (`edgeproc-browser-cache`) — the one

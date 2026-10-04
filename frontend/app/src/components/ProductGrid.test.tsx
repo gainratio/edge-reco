@@ -48,6 +48,25 @@ function renderGrid(overrides: Overrides = {}) {
 afterEach(cleanup);
 
 describe("ProductGrid", () => {
+	it("renders no kicker line when none is given (search view)", () => {
+		const { container } = render(
+			<ProductGrid
+				products={[]}
+				title="Search results"
+				loading={false}
+				onPick={vi.fn()}
+				onFavorite={vi.fn()}
+				onAddToCart={vi.fn()}
+				favoritedIds={new Set()}
+				registerDwell={() => () => {}}
+			/>,
+		);
+		expect(container.querySelector(".section-head__kicker")).toBeNull();
+		expect(
+			screen.getByRole("heading", { level: 1, name: "Search results" }),
+		).toBeInTheDocument();
+	});
+
 	it("shows skeleton cards and no count while loading", () => {
 		const { container } = renderGrid({ loading: true });
 		expect(container.querySelectorAll(".skeleton")).toHaveLength(8);

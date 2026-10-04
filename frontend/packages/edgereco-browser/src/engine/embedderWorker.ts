@@ -5,7 +5,7 @@
 
 /// <reference lib="webworker" />
 
-import { installNetworkSentinel } from "@gainratio/browser";
+import { installNetworkSentinel } from "../gainratio";
 import { createEmbedder, type Embedder } from "./embedder";
 
 // The embedder Worker outlives boot and owns the model transport, so it is the

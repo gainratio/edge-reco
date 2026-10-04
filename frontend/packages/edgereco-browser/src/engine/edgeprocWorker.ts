@@ -1,1 +1,0 @@
-import "@gainratio/browser/worker";

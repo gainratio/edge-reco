@@ -27,6 +27,34 @@ const BENCHMARK_QUERIES = [
 	"nonstick cooking pan",
 ];
 
+// main's build kept its vector index in @gainratio/browser's vector pool for
+// "edgereco-catalog": `.edgeproc-vector-` + the first 16 bytes of
+// sha256("edgereco-catalog"), hex. Pinned literally so a renamed pool fails here.
+const LEGACY_VECTOR_POOL_DIR =
+	".edgeproc-vector-aee9d7e7fe483930ecfa7c84cc1508f0";
+const LEGACY_POOL_LOG = "[edge-reco] legacy vector pool edgereco-catalog";
+
+/** Runs in the page: plant main's legacy pool, return its directory name. */
+async function seedLegacyVectorPool(): Promise<string> {
+	const digest = new Uint8Array(
+		await crypto.subtle.digest(
+			"SHA-256",
+			new TextEncoder().encode("edgereco-catalog"),
+		),
+	);
+	const hex = [...digest.slice(0, 16)]
+		.map((byte) => byte.toString(16).padStart(2, "0"))
+		.join("");
+	const name = `.edgeproc-vector-${hex}`;
+	const root = await navigator.storage.getDirectory();
+	const pool = await root.getDirectoryHandle(name, { create: true });
+	const file = await pool.getFileHandle("legacy.sqlite3", { create: true });
+	const writable = await file.createWritable();
+	await writable.write(new Uint8Array(4096).fill(1));
+	await writable.close();
+	return name;
+}
+
 function percentile(samples: readonly number[], quantile: number): number {
 	const ordered = [...samples].sort((left, right) => left - right);
 	return (
@@ -67,11 +95,23 @@ test("real search is relevant, local, clean, and inside release budgets", async 
 			return route.abort();
 		});
 	}
+	const legacyPoolLog = new Promise<string>((resolve) => {
+		page.on("console", (message) => {
+			const text = message.text();
+			if (text.startsWith(LEGACY_POOL_LOG)) resolve(text);
+		});
+	});
 	await page.goto("/");
+	// A returning visitor from main's build still holds the legacy vector pool.
+	// Seed it before boot so the retirement check below proves a removal, not
+	// merely that nothing was ever there.
+	const seededPool = await page.evaluate(seedLegacyVectorPool);
+	expect(seededPool).toBe(LEGACY_VECTOR_POOL_DIR);
 	await page.getByRole("button", { name: "▶ Launch the live demo" }).click();
 	await expect(page.locator(PRODUCT_CARD).first()).toBeVisible({
 		timeout: 120_000,
 	});
+	expect(await legacyPoolLog).toBe(`${LEGACY_POOL_LOG}: removed`);
 
 	await page.getByRole("searchbox").fill("waterproof hiking boot");
 	await expect(page.locator(".results-cue")).toContainText(

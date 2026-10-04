@@ -1,4 +1,5 @@
 /// <reference types="vitest/config" />
+import { fileURLToPath } from "node:url";
 import { defineConfig } from "vite";
 
 // The package is consumed as TS source by the demo's Vite build; this config
@@ -7,6 +8,15 @@ import { defineConfig } from "vite";
 // the same environment the demo uses.
 export default defineConfig({
 	test: {
+		alias: {
+			// The seam's `?worker` import needs Vite's Worker bundler; see the stub.
+			"@gainratio/browser/worker?worker": fileURLToPath(
+				new URL(
+					"./src/engine/__fixtures__/engineWorkerStub.ts",
+					import.meta.url,
+				),
+			),
+		},
 		environment: "jsdom",
 		globals: false,
 		maxWorkers: 2,

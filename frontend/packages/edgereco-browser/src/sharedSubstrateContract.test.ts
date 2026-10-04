@@ -54,13 +54,15 @@ describe("shared browser substrate dependency", () => {
 		}
 	});
 
-	it("bundles the shared Worker through a consumer-owned one-line entry", () => {
-		const engine = join(process.cwd(), "src", "engine");
-		const entry = readFileSync(join(engine, "edgeprocWorker.ts"), "utf8");
-		const runtime = readFileSync(join(engine, "runtime.ts"), "utf8");
+	it("bundles the shared Worker as this app's own chunk, through the seam", () => {
+		const src = join(process.cwd(), "src");
+		const seam = readFileSync(join(src, "gainratio.ts"), "utf8");
+		const runtime = readFileSync(join(src, "engine", "runtime.ts"), "utf8");
 
-		expect(entry.trim()).toBe('import "@gainratio/browser/worker";');
-		expect(runtime).toContain('from "./edgeprocWorker?worker"');
+		expect(seam).toContain(
+			'export { default as EngineWorker } from "@gainratio/browser/worker?worker";',
+		);
+		expect(runtime).toContain("new EngineClient(new EngineWorker())");
 		expect(runtime).not.toContain("EngineClient.spawn(");
 	});
 });

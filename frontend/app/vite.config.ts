@@ -202,11 +202,9 @@ export default defineConfig({
 		setupFiles: ["./src/test-setup.ts"],
 		exclude: [
 			...configDefaults.exclude,
-			"tests/e2e/**",
-			"tests/e2e-c1/**",
-			"tests/e2e-live/**",
-			"tests/e2e-offline/**",
-			"tests/e2e-webkit/**",
+			// Every Playwright lane (e2e, e2e-c1, e2e-browsers, e2e-live, …): one
+			// glob, so a new lane directory cannot leak into the unit run.
+			"tests/e2e*/**",
 			"scripts/**",
 		],
 		coverage: {

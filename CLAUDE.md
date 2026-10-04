@@ -7,7 +7,8 @@ Python v1 shipped on `main`: full FastAPI runtime + signed-bundle sync + hybrid
 search + session-aware reranker, 90%+ coverage. The Nimbus demo is **backend-free**:
 the React SPA syncs the signed bundle into OPFS and runs the whole engine in the
 browser via the `@gainratio/browser` npm package (composed by `frontend/packages/edgereco-browser/`),
-parity-tested against the Python core. The storefront is an **installable,
+parity-tested against the Python core (search: same top-1 and ≥80% of the top-10, not
+exact — browser keywords use SQLite FTS5 `bm25()`, Python uses rank_bm25). The storefront is an **installable,
 offline-capable PWA**: after one online sync it runs fully offline (a Workbox
 service worker via `vite-plugin-pwa` precaches the app shell; the ~23 MB
 embedding model is SELF-HOSTED under `/models/` and survives offline in
@@ -46,7 +47,7 @@ Python 3.13 · Pydantic v2 · Polars · FAISS · sentence-transformers · FastAP
 
 ## Invariants (don't break without updating the spec)
 - **Scoring formula**: Assay executes, left to right, `retrieval + popularity + category + tag + brand + freshness + similarity + cooccurrence − repetition_penalty`; the live raw signals are multiplied by the strategy's coefficients (retrieval coefficient 1). The weights are **bundle-carried config**, not hardcoded constants: the signed `ranking_config.json` holds them (typed `RankingConfig`, `reco/ranking_config.py`), the scorer reads them off the loaded config, and `DEFAULT_RANKING_CONFIG` reproduces the default coefficients. Every publish writes an Avow-signed static `edgereco.ranking-proof/v1` with the full config hash and a probe for every strategy; personalized results are never signed.
-- **Hybrid search**: BM25 + FAISS vector + Reciprocal Rank Fusion
+- **Hybrid search**: BM25 + exact vector search + Reciprocal Rank Fusion (k=60). Python: rank_bm25 (k1=1.5, whitespace split) + FAISS. Browser: SQLite FTS5 `bm25()` (k1=1.2/b=0.75 hard-coded, `unicode61` tokenizer) + sqlite-vector, fused in one SQL query. The tiers agree on top-1 and ≥80% of the top-10 (`hybridParity.test.ts`), not exactly. Search rerank: retrieval = min-max scaled RRF × 1 (`SEARCH_RELEVANCE_WEIGHT`, mirrored)
 - **Catalog sync**: signed, content-addressed bundle (`latest` → `manifest/<hash>` → `chunk/<hash>`), Ed25519-verified fail-closed; Caddy edge cache. Bundle ships the prebuilt FAISS `vector/` (zero recompute on the edge) + the signed `ranking_config.json` (scoring weights + strategy map) + the signed `cooccurrence.json` (item-to-item neighbour map for the "also bought" strategies; missing file ⇒ co-occurrence strategies degrade to empty).
 - **Architecture**: all-Pydantic models throughout v1 (wire/domain split is a future concern); DI via the concrete `ServiceContainer` (`api/deps.py`) — Protocol seams for swappable infrastructure are a future concern (introduce alongside any index swap)
 - **Zero backend calls after sync** — runtime is offline-capable
@@ -56,7 +57,7 @@ Python 3.13 · Pydantic v2 · Polars · FAISS · sentence-transformers · FastAP
 - **Live-user storage covenant** — real shoppers hold client-side state: the OPFS bundle cache and the SW/CacheStorage caches. No storage-format, cache-name, or storage-key changes without an explicit upgrade path; precache config may change, cache NAMES may not.
 
 ## House standard declarations
-- **§8 (WASM/edge-compute): applicable.** Pattern **(b)** followed — vendored/self-hosted ORT-WASM with explicit `dtype: "q8"`, `allowLocalModels` + `localModelPath = "/models/"`, `wasmPaths = "/ort/"`, download/stage build scripts, worker isolation, parity fixtures (`__fixtures__/*_parity.json`) pinning browser output to Python golden, and a cold-network-blocked e2e. Pattern **(c)**: the bundle cache uses raw OPFS files (content-addressed chunks — file storage, not structured queries), so sqlite-wasm is not needed; adopt it if structured browser queries ever appear.
+- **§8 (WASM/edge-compute): applicable.** Pattern **(b)** followed — vendored/self-hosted ORT-WASM with explicit `dtype: "q8"`, `allowLocalModels` + `localModelPath = "/models/"`, `wasmPaths = "/ort/"`, download/stage build scripts, worker isolation, parity fixtures (`__fixtures__/*_parity.json`) pinning browser output to Python golden (search to the top-1 / ≥80% top-10 contract), and a cold-network-blocked e2e. Pattern **(c)**: the bundle cache uses raw OPFS files (content-addressed chunks); the catalogue itself is imported into SQLite (FTS5 + sqlite-vector) from `@gainratio/browser/sql`, which runs in its own Worker on an OPFS pool (`edgereco-catalogue`) rebuilt from the verified bundle every boot.
 
 ## Quality gates (non-negotiable — each rule carries the scar that made it)
 - **`make gate` green before any claim of done** (backend `poe gate` + frontend `pnpm gate`; CI runs these exact commands). *Scar: CI/local drift — `poe lint` once lacked `ruff format --check` and CI went red on a locally-green tree.*

@@ -504,21 +504,37 @@ input {
 	white-space: nowrap;
 }
 
-/* Search-results cue: a labelled banner pinned at the top of the shop the
-   moment a query is active, so a search reads as an obvious change of state
-   rather than a silent 4th section below the rails. */
-.results-cue {
-	display: flex;
-	align-items: center;
-	gap: 10px;
-	padding: 12px 18px;
-	border-radius: 12px;
-	background: var(--signal-soft);
-	border: 1px solid var(--line);
-	border-left: 3px solid var(--signal);
-	color: var(--ink);
-	font-size: 15px;
-	font-weight: 600;
+/* Screen-reader-only text: announced, but takes no space on screen. The
+   search "Results for …" live region uses it — sighted shoppers already see
+   the query in the search box, so a visible echo only cost phone height. */
+.visually-hidden {
+	position: absolute;
+	width: 1px;
+	height: 1px;
+	padding: 0;
+	margin: -1px;
+	overflow: hidden;
+	clip-path: inset(50%);
+	white-space: nowrap;
+	border: 0;
+}
+
+/* Phones: tighten the section head so the first product card lands in the
+   first viewport (the h1's desktop margins alone cost ~46px here). */
+@media (max-width: 720px) {
+	.shop {
+		padding-top: 16px;
+	}
+
+	.section-head {
+		padding-bottom: 10px;
+		margin-bottom: 14px;
+	}
+
+	.section-head__title {
+		font-size: 24px;
+		margin-block: 0.2em;
+	}
 }
 
 /* =========================================================================
@@ -1884,7 +1900,9 @@ input {
 .metrics-strip {
 	max-width: 1320px;
 	margin: 0 auto;
-	padding: 0 var(--gut) 12px;
+	/* Top padding: without it the pills butt against the sticky header's rule
+	   and read as cut off. */
+	padding: 10px var(--gut) 12px;
 	display: flex;
 	flex-wrap: wrap;
 	gap: 8px;
@@ -1922,15 +1940,27 @@ input {
 	text-transform: lowercase;
 }
 
+/* Phones: wrap compact tiles instead of a hidden-scrollbar row, which clipped
+   the last tiles off the right edge with no hint that more existed. */
 @media (max-width: 720px) {
 	.metrics-strip {
-		overflow-x: auto;
-		flex-wrap: nowrap;
-		scrollbar-width: none;
+		gap: 6px;
+		padding-top: 8px;
+		padding-bottom: 10px;
 	}
 
 	.metrics-strip__tile {
-		flex-shrink: 0;
+		gap: 5px;
+		padding: 4px 9px;
+	}
+
+	.metrics-strip__value {
+		font-size: 13px;
+	}
+
+	.metrics-strip__label {
+		font-size: 10.5px;
+		letter-spacing: 0.02em;
 	}
 }
 

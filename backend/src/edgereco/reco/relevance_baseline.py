@@ -5,7 +5,7 @@ implementation.
 WHY THIS FILE EXISTS
 The engine's parity tests prove the browser reproduces the server. They cannot tell
 you both are wrong. ``relevance_export.json`` (written by the frontend suite) records
-what the engine actually returned for the 50 golden queries; this module turns that
+what the engine actually returned for the 51 golden queries; this module turns that
 record into precision/recall/nDCG/MRR/MAP so a threshold can be asserted against it.
 
 WHY THE METRIC IS PYTHON'S

@@ -17,7 +17,7 @@
 import {
 	isNetworkSentinelReport,
 	NETWORK_SENTINEL_CHANNEL,
-} from "@gainratio/browser";
+} from "../gainratio";
 import { classifyResource } from "./classify";
 import { record } from "./store";
 

@@ -8,7 +8,7 @@
 //   - w_repetition*was_recently_viewed
 //
 // tag_match is the MEAN tag affinity over the product's tags (0 if it has none).
-// Retrieval is normalized RRF for search and zero for recommendation-only rails.
+// Retrieval is min-max scaled RRF for search and zero for recommendation-only rails.
 
 import type { ScoreResult } from "@gainratio/assay";
 import type { Product, ScoreComponents, SearchResult } from "./domain";
@@ -16,9 +16,21 @@ import { explainScore, type FormulaSignals } from "./formula";
 import { DEFAULT_RANKING_CONFIG, type ScoringWeights } from "./rankingConfig";
 import type { SessionProfile } from "./session";
 
-// Search intent is the primary signal. RRF is normalized to [0, 1] before this
-// weight is applied, so popularity can refine the fused ranking without erasing it.
-const SEARCH_RELEVANCE_WEIGHT = 0.2;
+/**
+ * Search intent is the primary signal. RRF is min-max scaled over the admitted
+ * set (best hit 1, weakest 0) before this weight is applied.
+ *
+ * WHY 1, AND WHY MIN-MAX. RRF at k=60 is flat: rank 1 scores 1/61 and rank 6
+ * still scores ~0.9 of that. The old rule divided by the best hit and weighted
+ * the result 0.2, so retrieval varied by ~0.04 across a page while popularity
+ * (weight 0.4) varied by up to 0.4. The query-independent signal outvoted the
+ * query: "stadium seat" led with car seat covers although both retrievers put
+ * every Stadium Seats product first. Min-max uses the whole range, and a weight
+ * of 1 is at least the sum of every query-independent signal (popularity 0.4 +
+ * freshness 0.1), so those can reorder near-ties but never overturn the query.
+ * Mirrored in backend reco/reranker.py; test_reranker.py pins both literals.
+ */
+export const SEARCH_RELEVANCE_WEIGHT = 1;
 
 /**
  * What each retriever actually measured for one candidate, on its own scale and
@@ -182,6 +194,27 @@ export function scoreProduct(
 }
 
 /**
+ * Map a fused RRF score to the retrieval component: SEARCH_RELEVANCE_WEIGHT times
+ * its min-max position in `scores`. No positive score means no scale (0 for
+ * all); a flat set gives every candidate the full weight.
+ */
+export function retrievalScale(
+	scores: ReadonlyArray<number>,
+): (score: number) => number {
+	const clamped = scores.map((score) => Math.max(0, score));
+	const max = Math.max(0, ...clamped);
+	const min = Math.min(max, ...clamped);
+	if (max === 0) {
+		return () => 0;
+	}
+	if (max === min) {
+		return () => SEARCH_RELEVANCE_WEIGHT;
+	}
+	return (score) =>
+		(SEARCH_RELEVANCE_WEIGHT * (Math.max(0, score) - min)) / (max - min);
+}
+
+/**
  * Drop every candidate that fails the absolute floor, then re-score the survivors
  * against the profile and sort descending. Mirrors reranker.rerank_search: a stable
  * descending sort (ties keep input order), matching Python's list.sort stability so
@@ -205,18 +238,9 @@ export function rerank(
 	const admitted = results.filter((r) =>
 		meetsRelevanceFloor(evidence.get(r.product.id)),
 	);
-	const maxRetrieval = Math.max(0, ...admitted.map((result) => result.score));
+	const scale = retrievalScale(admitted.map((result) => result.score));
 	const rescored = admitted.map((r, index) => ({
-		result: scoreProduct(
-			r.product,
-			profile,
-			weights,
-			0,
-			0,
-			maxRetrieval === 0
-				? 0
-				: SEARCH_RELEVANCE_WEIGHT * (Math.max(0, r.score) / maxRetrieval),
-		),
+		result: scoreProduct(r.product, profile, weights, 0, 0, scale(r.score)),
 		index,
 	}));
 	rescored.sort((a, b) => b.result.score - a.result.score || a.index - b.index);

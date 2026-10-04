@@ -74,7 +74,7 @@
 	},
 	"grid": {
 		"kickerCatalog": "Catalog",
-		"kickerSearch": "Search results",
+		"titleSearch": "Search results",
 		"titleBrowse": "Browse",
 		"resultsFor": "Results for “{{query}}”",
 		"empty": "Nothing here yet. Try another search or category.",
