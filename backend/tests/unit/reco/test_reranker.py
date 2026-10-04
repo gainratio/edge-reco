@@ -1,6 +1,8 @@
 import re
 from pathlib import Path
 
+import pytest
+
 from edgereco.catalog.models import Product, SearchResult, SessionProfile
 from edgereco.reco.reranker import (
     MIN_LEXICAL_RELEVANCE,
@@ -61,7 +63,62 @@ def test_should_keep_strong_retrieval_ahead_of_popularity() -> None:
 
     # Then
     assert [result.product.id for result in reranked] == ["relevant", "popular"]
-    assert reranked[0].score_components["retrieval"] == 0.2
+    assert reranked[0].score_components["retrieval"] == 1.0
+
+
+def test_should_rank_stadium_seat_first_when_a_seat_cover_is_more_popular() -> None:
+    """REGRESSION: "stadium seat" led with car seat covers.
+
+    Both retrievers put the Stadium Seats products first, but RRF at k=60 is flat
+    (rank 1 = 0.0328, rank 6 = 0.0294). Dividing by the best hit left retrieval
+    spanning 0.18-0.20 while popularity spans 0-0.4, so the query-independent signal
+    outvoted the query. Fused scores and popularity are the measured catalogue values.
+    """
+    # Given
+    results = [
+        _result("NB-00533", 0.0328, pop=0.3359),
+        _result("NB-00667", 0.0294, pop=0.8414),
+        _result("NB-00408", 0.0286, pop=0.5388),
+    ]
+    reranked = rerank_search(results, SessionProfile(), _admit("NB-00533", "NB-00667", "NB-00408"))
+    assert reranked[0].product.id == "NB-00533"
+
+
+def test_should_span_retrieval_zero_to_one_when_scores_differ() -> None:
+    """Pinned literals: best admitted hit 1.0, weakest 0.0, the rest on the line."""
+    # Given
+    results = [_result("best", 0.04), _result("mid", 0.03), _result("worst", 0.02)]
+
+    # When
+    reranked = rerank_search(results, SessionProfile(), _admit("best", "mid", "worst"))
+
+    # Then
+    retrieval = {r.product.id: r.score_components["retrieval"] for r in reranked}
+    assert retrieval["best"] == 1.0
+    assert retrieval["mid"] == pytest.approx(0.5, abs=1e-12)
+    assert retrieval["worst"] == 0.0
+
+
+def test_should_give_full_weight_when_fused_scores_tie() -> None:
+    # Given
+    results = [_result("a", 0.02), _result("b", 0.02)]
+
+    # When
+    reranked = rerank_search(results, SessionProfile(), _admit("a", "b"))
+
+    # Then
+    assert [r.score_components["retrieval"] for r in reranked] == [1.0, 1.0]
+
+
+def test_should_match_browser_relevance_weight_when_reading_reranker_ts() -> None:
+    """Pin the literal on both sides, so the two tiers cannot rank differently."""
+    source = (
+        Path(__file__).resolve().parents[3].parent
+        / "frontend/packages/edgereco-browser/src/engine/reranker.ts"
+    ).read_text(encoding="utf-8")
+    weight = re.search(r"SEARCH_RELEVANCE_WEIGHT = ([\d.]+);", source)
+    assert weight is not None, "reranker.ts no longer declares SEARCH_RELEVANCE_WEIGHT"
+    assert float(weight.group(1)) == 1.0
 
 
 def test_the_floor_is_the_measured_noise_ceiling() -> None:
@@ -124,7 +181,7 @@ def test_retrieval_is_renormalized_over_the_survivors() -> None:
     }
     reranked = rerank_search(results, SessionProfile(), evidence)
     assert [result.product.id for result in reranked] == ["kept"]
-    assert reranked[0].score_components["retrieval"] == 0.2
+    assert reranked[0].score_components["retrieval"] == 1.0
 
 
 def test_admitted_results_with_no_retrieval_signal_score_zero_retrieval() -> None:

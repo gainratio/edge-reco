@@ -1,4 +1,4 @@
-// The relevance golden set: 50 queries with hand-written intents and ground-truth
+// The relevance golden set: 51 queries with hand-written intents and ground-truth
 // relevant sets that are derived WITHOUT consulting the ranker.
 //
 // WHY THIS EXISTS
@@ -42,7 +42,7 @@
 // therefore an upper bound on true generalization, not a clean measurement.
 //
 // PROVENANCE OF THE QUERIES
-// The 50 queries and their label nodes were written against an earlier catalog (a
+// The first 50 queries and their label nodes were written against an earlier catalog (a
 // third-party dataset since replaced by the synthetic one). The synthetic catalog
 // keeps every label node, so the labels still apply, but the natural wording was
 // picked from the OLD descriptions. Some anchors ("iphone", "apple", "android") name
@@ -368,6 +368,16 @@ const NATURAL: ReadonlyArray<GoldenQuery> = [
 		rationale:
 			"breadcrumb 'Collagen' = 5 products; anchor 'hair' is in 80% of their descriptions and in no relevant category/tags",
 	},
+	{
+		// Added after the query was found ranking car seat covers above every
+		// stadium seat. "seat" also hits 6 Automotive seat covers and 5 patio
+		// cushions, so this case measures whether the ranker can tell them apart.
+		query: "stadium seat",
+		segment: "natural",
+		labelNodes: ["Stadium Seats"],
+		rationale:
+			"breadcrumb 'Stadium Seats' = 4 products; 'stadium' is in 2 of their 4 titles and 'seat' in 3; their tag 'stadium-seats' is ONE FTS5 token, so neither word hits the label field",
+	},
 ];
 
 /** The 12 top-level breadcrumb categories, typed verbatim as queries. These match
@@ -455,7 +465,7 @@ const NEGATIVE: ReadonlyArray<GoldenQuery> = [
 	},
 ];
 
-/** The whole golden set: 30 natural + 12 taxonomy-word + 8 negative = 50 queries. */
+/** The whole golden set: 31 natural + 12 taxonomy-word + 8 negative = 51 queries. */
 export const GOLDEN_QUERIES: ReadonlyArray<GoldenQuery> = [
 	...NATURAL,
 	...TAXONOMY,

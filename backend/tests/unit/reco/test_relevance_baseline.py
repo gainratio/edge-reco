@@ -93,19 +93,31 @@ class Floor(NamedTuple):
 #:     natural       nDCG@10 0.5178  R@10 0.5121  P@10 0.3366  nDCG@24 0.6160  R@24 0.7358
 #:     taxonomy-word nDCG@10 0.9631  R@10 0.1583  P@10 0.9500  nDCG@24 0.9368  R@24 0.3680
 #:     negative results 2 -> 2
+#:
+#: RAISED 2026-10-04 by min-max scaling the fused RRF score and weighting it 1.0 in
+#: the search rerank (reco/reranker.py + reranker.ts; was divide-by-best, weight 0.2).
+#: RRF at k=60 is flat, so retrieval varied by ~0.04 across a page while popularity
+#: varied by up to 0.4, and popularity outvoted the query. The golden set also grew
+#: by one natural query, "stadium seat" (the bug report: it led with car seat
+#: covers). Adding that query alone, on the OLD ranker, pulled natural nDCG@10 below
+#: its floor (0.5203 -> 0.5136); the fix is what clears it. Every floor moved up;
+#: none was lowered. Prior values, for the record (n=30 natural):
+#:     natural       nDCG@10 0.5203  R@10 0.5135  P@10 0.3366  nDCG@24 0.6200  R@24 0.7413
+#:     taxonomy-word nDCG@10 0.9779  R@10 0.1625  P@10 0.9750  nDCG@24 0.9606  R@24 0.3805
+#:     negative results 2 -> 2
 BASELINE: Final[tuple[Floor, ...]] = (
-    # natural (n=30): wording held out of both retrieval representations.
-    Floor("natural", "mean_ndcg_at_k", 10, 0.5203),
-    Floor("natural", "mean_recall_at_k", 10, 0.5135),
-    Floor("natural", "mean_precision_at_k", 10, 0.3366),
-    Floor("natural", "mean_ndcg_at_k", 24, 0.6200),
-    Floor("natural", "mean_recall_at_k", 24, 0.7413),
+    # natural (n=31): wording held out of both retrieval representations.
+    Floor("natural", "mean_ndcg_at_k", 10, 0.7924),
+    Floor("natural", "mean_recall_at_k", 10, 0.7576),
+    Floor("natural", "mean_precision_at_k", 10, 0.5000),
+    Floor("natural", "mean_ndcg_at_k", 24, 0.8383),
+    Floor("natural", "mean_recall_at_k", 24, 0.8734),
     # taxonomy-word (n=12): the leaky control group, gated so the leak cannot widen.
-    Floor("taxonomy-word", "mean_ndcg_at_k", 10, 0.9779),
-    Floor("taxonomy-word", "mean_recall_at_k", 10, 0.1625),
-    Floor("taxonomy-word", "mean_precision_at_k", 10, 0.9750),
-    Floor("taxonomy-word", "mean_ndcg_at_k", 24, 0.9606),
-    Floor("taxonomy-word", "mean_recall_at_k", 24, 0.3805),
+    Floor("taxonomy-word", "mean_ndcg_at_k", 10, 1.0000),
+    Floor("taxonomy-word", "mean_recall_at_k", 10, 0.1666),
+    Floor("taxonomy-word", "mean_precision_at_k", 10, 1.0000),
+    Floor("taxonomy-word", "mean_ndcg_at_k", 24, 0.9974),
+    Floor("taxonomy-word", "mean_recall_at_k", 24, 0.3986),
 )
 
 #: Not one of the 8 unanswerable queries may come back holding a full page. Was 8
@@ -148,12 +160,12 @@ def test_export_is_the_committed_demo_baseline(export: RelevanceExport) -> None:
     assert export.catalog_id == "amazon-demo"
     assert export.label_method == "breadcrumb-node-membership"
     assert export.k == 24
-    assert len(export.queries) == 50
+    assert len(export.queries) == 51
 
 
 def test_every_segment_is_populated(export: RelevanceExport) -> None:
     """A segment silently emptied would make its floors vacuously true."""
-    assert len(export.in_segment("natural")) == 30
+    assert len(export.in_segment("natural")) == 31
     assert len(export.in_segment("taxonomy-word")) == 12
     assert len(export.in_segment("negative")) == 8
 

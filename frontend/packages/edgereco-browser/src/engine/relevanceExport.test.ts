@@ -59,6 +59,9 @@ import type { VectorIndexFiles } from "./vectorIndex";
 
 const SKIP = process.env.EDGE_RECO_SKIP_EMBEDDING_PARITY === "1";
 const TIMEOUT_MS = 300_000;
+/** The tokenizer guard builds the whole catalogue database (no model); vitest's
+ * 5 s default is too tight for it on a loaded CI runner. */
+const TOKENIZER_GUARD_TIMEOUT_MS = 60_000;
 const DECODER = new TextDecoder();
 const acceptVerify: Verify = () => Promise.resolve();
 
@@ -157,37 +160,41 @@ function matchesCommitted(payload: RelevanceExport): boolean {
 }
 
 describe("relevance golden set: the labels are independent of the ranker", () => {
-	it("restates the keyword index's tokenizer exactly (ftsTokens == FTS5)", async () => {
-		const products = await catalogProducts();
-		const sql = await openCatalogueSql();
-		const catalogue = await CatalogueDb.open(sql, 1);
-		await catalogue.replace({
-			products,
-			vectors: new Float32Array(products.length).fill(1),
-		});
-		await sql.exec(
-			"CREATE VIRTUAL TABLE temp.vocab USING fts5vocab(main, products_fts, instance)",
-		);
-		const indexed = new Map<number, Set<string>>();
-		for (const row of await sql.query("SELECT doc, term FROM temp.vocab")) {
-			const doc = Number(row.doc);
-			const terms = indexed.get(doc) ?? new Set<string>();
-			terms.add(String(row.term));
-			indexed.set(doc, terms);
-		}
-		products.forEach((product, row) => {
-			const text = [
-				product.title,
-				product.category,
-				...product.tags,
-				product.brand,
-			].join(" ");
-			expect(new Set(ftsTokens(text)), product.id).toEqual(
-				indexed.get(row) ?? new Set(),
+	it(
+		"restates the keyword index's tokenizer exactly (ftsTokens == FTS5)",
+		async () => {
+			const products = await catalogProducts();
+			const sql = await openCatalogueSql();
+			const catalogue = await CatalogueDb.open(sql, 1);
+			await catalogue.replace({
+				products,
+				vectors: new Float32Array(products.length).fill(1),
+			});
+			await sql.exec(
+				"CREATE VIRTUAL TABLE temp.vocab USING fts5vocab(main, products_fts, instance)",
 			);
-		});
-		await catalogue.dispose();
-	});
+			const indexed = new Map<number, Set<string>>();
+			for (const row of await sql.query("SELECT doc, term FROM temp.vocab")) {
+				const doc = Number(row.doc);
+				const terms = indexed.get(doc) ?? new Set<string>();
+				terms.add(String(row.term));
+				indexed.set(doc, terms);
+			}
+			products.forEach((product, row) => {
+				const text = [
+					product.title,
+					product.category,
+					...product.tags,
+					product.brand,
+				].join(" ");
+				expect(new Set(ftsTokens(text)), product.id).toEqual(
+					indexed.get(row) ?? new Set(),
+				);
+			});
+			await catalogue.dispose();
+		},
+		TOKENIZER_GUARD_TIMEOUT_MS,
+	);
 
 	it("gives every natural query a relevant set and no hit on the label field", async () => {
 		const products = await catalogProducts();
@@ -306,6 +313,24 @@ describe.skipIf(SKIP)("relevance export", () => {
 				writeFileSync(EXPORT_PATH, `${JSON.stringify(payload, null, "\t")}\n`);
 			}
 			expect(queries).toHaveLength(GOLDEN_QUERIES.length);
+		},
+		TIMEOUT_MS,
+	);
+});
+
+describe.skipIf(SKIP)("relevance regressions through the real engine", () => {
+	// "stadium seat" led with car seat covers: both retrievers ranked every Stadium
+	// Seats product first, then popularity outvoted them in the rerank.
+	it(
+		"puts a Stadium Seats product first for 'stadium seat'",
+		async () => {
+			const engine = await realEngine();
+			const response = await engine.search("stadium seat", {
+				limit: RELEVANCE_K,
+			});
+			expect(response.results[0]?.product.subcategories).toContain(
+				"Stadium Seats",
+			);
 		},
 		TIMEOUT_MS,
 	);

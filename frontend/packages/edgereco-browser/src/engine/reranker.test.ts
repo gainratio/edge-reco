@@ -181,8 +181,75 @@ describe("rerank", () => {
 		const out = rerank(input, allAdmitted("p1", "p2"), emptyProfile());
 		// Search relevance is the primary signal; popularity may refine, not erase it.
 		expect(out.map((r) => r.product.id)).toEqual(["p2", "p1"]);
-		expect(out[0]?.score_components?.retrieval).toBe(0.2);
+		expect(out[0]?.score_components?.retrieval).toBe(1);
 		expect(out[0]?.score_components).not.toBeNull();
+	});
+
+	// REGRESSION: "stadium seat". Both retrievers put the four Stadium Seats
+	// products at fused ranks 1-4, yet the page led with car seat covers. RRF at
+	// k=60 is flat (rank 1 = 0.0328, rank 6 = 0.0294), so dividing by the best hit
+	// left retrieval spanning only 0.18-0.20 while popularity spans 0-0.4: the
+	// query-independent signal outvoted the query. The fused scores and popularity
+	// below are the measured ones from the committed catalogue.
+	it("ranks a stadium seat above a more popular car seat cover (stadium seat regression)", () => {
+		const stadium = product({
+			id: "NB-00533",
+			title: "Kestrow Stadium Seat with Back Support",
+			popularity_score: 0.3359,
+		});
+		const seatCover = product({
+			id: "NB-00667",
+			title: "Roadwise Front Seat Covers",
+			popularity_score: 0.8414,
+		});
+		const patio = product({
+			id: "NB-00408",
+			title: "Rainhollow Patio Seat Cushions",
+			popularity_score: 0.5388,
+		});
+		const out = rerank(
+			[
+				{ product: stadium, score: 0.0328, score_components: null },
+				{ product: seatCover, score: 0.0294, score_components: null },
+				{ product: patio, score: 0.0286, score_components: null },
+			],
+			allAdmitted("NB-00533", "NB-00667", "NB-00408"),
+			emptyProfile(),
+		);
+		expect(out[0]?.product.id).toBe("NB-00533");
+	});
+
+	// Pinned literals: the best admitted hit takes the full weight of 1, the
+	// weakest takes 0, and the rest sit on the line between by fused score.
+	it("spreads retrieval over the whole admitted range (best 1, weakest 0)", () => {
+		const mid = product({ id: "mid" });
+		const out = rerank(
+			[
+				{ product: P1, score: 0.04, score_components: null },
+				{ product: mid, score: 0.03, score_components: null },
+				{ product: P2, score: 0.02, score_components: null },
+			],
+			allAdmitted("p1", "mid", "p2"),
+			emptyProfile(),
+		);
+		const retrieval = new Map(
+			out.map((r) => [r.product.id, r.score_components?.retrieval]),
+		);
+		expect(retrieval.get("p1")).toBe(1);
+		expect(retrieval.get("mid")).toBeCloseTo(0.5, 12);
+		expect(retrieval.get("p2")).toBe(0);
+	});
+
+	it("gives every candidate the full weight when all fused scores tie", () => {
+		const out = rerank(
+			[
+				{ product: P1, score: 0.02, score_components: null },
+				{ product: P2, score: 0.02, score_components: null },
+			],
+			allAdmitted("p1", "p2"),
+			emptyProfile(),
+		);
+		expect(out.map((r) => r.score_components?.retrieval)).toEqual([1, 1]);
 	});
 
 	it("keeps input order on ties (stable, matching Python list.sort)", () => {
@@ -257,7 +324,7 @@ describe("the absolute relevance floor", () => {
 		expect(out.map((r) => r.product.id)).toEqual(["p2"]);
 		// p2 is now the best admitted hit, so it takes the full relevance weight —
 		// the dropped p1's score of 100 no longer sets the scale.
-		expect(out[0]?.score_components?.retrieval).toBe(0.2);
+		expect(out[0]?.score_components?.retrieval).toBe(1);
 	});
 });
 
