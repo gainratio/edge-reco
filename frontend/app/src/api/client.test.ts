@@ -13,9 +13,9 @@ import {
 } from "@edgereco/browser";
 import { catalogFetch } from "@edgereco/browser/testing/fixtures";
 import {
-	type SharedCatalogue,
-	sharedCatalogue,
-} from "@edgereco/browser/testing/sharedCatalogue";
+	type SharedUserDb,
+	sharedUserDb,
+} from "@edgereco/browser/testing/sharedUserDb";
 import {
 	type IndexManifest,
 	MemoryCacheStore,
@@ -372,12 +372,12 @@ describe("bundle-supplied interaction weights drive the in-tab fold", () => {
 });
 
 // One SQLite database shared across "reloads", like a tab reopening OPFS.
-let shared: SharedCatalogue;
+let shared: SharedUserDb;
 
 const freshDeps = () => ({
 	spawnEngine: () => fakeEnginePort(),
 	makeEmbedder: () => stubEmbedder,
-	makeCatalogue: shared.factory,
+	openTasteStore: shared.open,
 });
 
 /** Click 3 same-category products (the standard warm-up used across this file). */
@@ -400,11 +400,11 @@ async function clickThreeSameCategory(): Promise<Product[]> {
 describe("durable taste: replay on boot, reset, replayed count", () => {
 	beforeEach(async () => {
 		localStorage.clear();
-		shared = await sharedCatalogue();
+		shared = await sharedUserDb();
 		__setRuntimeForTests(freshDeps());
 	});
 
-	it("keeps the taste log in the SQLite database, not in browser storage", async () => {
+	it("keeps the taste log in the user SQLite database, not in browser storage", async () => {
 		await bootstrap();
 		await clickThreeSameCategory();
 		const [row] = await shared.sql.query(
@@ -435,7 +435,7 @@ describe("durable taste: replay on boot, reset, replayed count", () => {
 	it("reports whether the taste log survives a reload", async () => {
 		await bootstrap();
 		expect(tasteDurable()).toBe(true);
-		shared = await sharedCatalogue(false);
+		shared = await sharedUserDb("volatile");
 		__setRuntimeForTests(freshDeps());
 		await bootstrap();
 		expect(tasteDurable()).toBe(false);

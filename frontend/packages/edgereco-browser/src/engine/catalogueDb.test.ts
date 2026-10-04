@@ -315,13 +315,4 @@ describe("openCatalogueStore", () => {
 		expect((await store.vectorSearch(FAR, 1)).map((h) => h.id)).toEqual(["c"]);
 		await store.dispose();
 	});
-
-	it("keeps the taste log in the same database, untouched by a catalogue replace", async () => {
-		const store = await openCatalogueStore({ dimension: 2 });
-		const event = { ts: "t", type: "click", productId: "a" } as const;
-		await store.taste.append(event);
-		await store.replace({ products: PRODUCTS, vectors: VECTORS });
-		expect(await store.taste.list()).toEqual([event]);
-		await store.dispose();
-	});
 });

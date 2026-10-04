@@ -31,7 +31,6 @@ import {
 	type SqlBind,
 	type SqlRow,
 } from "./catalogueSql";
-import { SqlTasteStore, type TasteStore } from "./tasteStore";
 
 /** The product fields the keyword index reads. */
 export interface CatalogueProduct {
@@ -198,8 +197,6 @@ export interface CatalogueStore {
 		k: number,
 	): Promise<ReadonlyArray<ScoredId>>;
 	nearest(id: string, k: number): Promise<ReadonlyArray<ScoredId>>;
-	/** The shopper's taste log, in the same database (tasteStore.ts). */
-	readonly taste: TasteStore;
 	dispose(): Promise<void>;
 }
 
@@ -228,18 +225,15 @@ export class CatalogueDb implements CatalogueStore {
 	readonly #sql: CatalogueSql;
 	readonly #dimension: number;
 	readonly #weights: LexicalWeights;
-	public readonly taste: TasteStore;
 
 	private constructor(
 		sql: CatalogueSql,
 		dimension: number,
 		weights: LexicalWeights,
-		taste: TasteStore,
 	) {
 		this.#sql = sql;
 		this.#dimension = dimension;
 		this.#weights = weights;
-		this.taste = taste;
 	}
 
 	/** Create the schema and register the vector column; closes `sql` on failure. */
@@ -257,8 +251,7 @@ export class CatalogueDb implements CatalogueStore {
 				"SELECT vector_init('products', 'embedding', ?) AS initialized",
 				[`dimension=${dimension},type=FLOAT32,distance=COSINE`],
 			);
-			const taste = await SqlTasteStore.open(sql);
-			return new CatalogueDb(sql, dimension, weights, taste);
+			return new CatalogueDb(sql, dimension, weights);
 		} catch (error) {
 			await sql.close();
 			throw error;

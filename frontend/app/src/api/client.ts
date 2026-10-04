@@ -27,11 +27,13 @@ import {
 	emptyProfile,
 	type InteractionWeights,
 	type OnStage,
+	openTasteStore,
 	type RankingProofEvidence,
 	type RuntimeConfig,
 	type RuntimeDeps,
 	type SearchEngine,
 	type SessionProfile,
+	type TasteStore,
 } from "@edgereco/browser";
 import { record } from "../metrics/store";
 import { retireLegacyLocalStorage } from "../signals/legacyStorage";
@@ -160,8 +162,29 @@ export interface DataClient {
  * the production app uses `defaultRuntimeDeps()` (real Workers) with an
  * optional embedder override from `window.__edgeprocDemoTestHooks`.
  */
-export function createDataClient(deps: Partial<RuntimeDeps> = {}): DataClient {
+/** Runtime deps plus the user-database opener (tests inject a shared one). */
+export interface ClientDeps extends Partial<RuntimeDeps> {
+	readonly openTasteStore?: () => Promise<TasteStore>;
+}
+
+/**
+ * Open the shopper's user database once per client. A failure degrades to
+ * session-only taste (appends/reads no-op) and makes Reset fail visibly.
+ */
+async function openUserStore(
+	open: () => Promise<TasteStore>,
+): Promise<TasteStore | null> {
+	try {
+		return await open();
+	} catch (error) {
+		console.warn("[edge-reco] user database unavailable", error);
+		return null;
+	}
+}
+
+export function createDataClient(deps: ClientDeps = {}): DataClient {
 	const runtime = new EngineRuntime(resolveDeps(deps));
+	let userStore: Promise<TasteStore | null> | null = null;
 	let profile: SessionProfile = emptyProfile();
 	let productById: ReadonlyMap<string, Product> = new Map();
 	// The SIGNED BUNDLE's per-event-type affinity bumps, captured at bootstrap.
@@ -190,11 +213,16 @@ export function createDataClient(deps: Partial<RuntimeDeps> = {}): DataClient {
 			});
 			productById = new Map(engine.catalog().map((p) => [p.id, p]));
 			interactionWeights = engine.interactionWeights();
-			// The taste log lives in the engine's SQLite database. Bind it, copy
-			// in anything an older build left outside SQLite, and drop the old
-			// localStorage keys (session id, uplink queue) — no longer used.
-			bindTasteStore(engine.taste());
-			await migrateLegacyTaste(engine.taste());
+			// The taste log lives in the shopper's own SQLite database, separate
+			// from the disposable catalogue. Bind it, copy in anything an older
+			// build left outside SQLite, and drop the old localStorage keys
+			// (session id, uplink queue) — no longer used.
+			userStore ??= openUserStore(deps.openTasteStore ?? openTasteStore);
+			const store = await userStore;
+			bindTasteStore(store);
+			if (store !== null) {
+				await migrateLegacyTaste(store);
+			}
 			retireLegacyLocalStorage();
 			// Deterministic replay: rebuild the taste profile from the durable
 			// log through the SAME fold used live (buildProfile ≡ repeated
@@ -333,7 +361,7 @@ function warnIfExpired(stage: BootStage): void {
  * The demo test hook is honored only for `makeEmbedder`; everything else uses
  * the real Worker-backed defaults from `@edgereco/browser`.
  */
-function resolveDeps(deps: Partial<RuntimeDeps>): RuntimeDeps {
+function resolveDeps(deps: ClientDeps): RuntimeDeps {
 	const base = defaultRuntimeDeps();
 	const hookEmbedder =
 		typeof window !== "undefined"
@@ -362,7 +390,7 @@ let active: DataClient = createDataClient();
  * browser. Not used by the app, which always uses the default Worker-backed
  * client.
  */
-export function __setRuntimeForTests(deps: RuntimeDeps): void {
+export function __setRuntimeForTests(deps: RuntimeDeps & ClientDeps): void {
 	active = createDataClient(deps);
 }
 

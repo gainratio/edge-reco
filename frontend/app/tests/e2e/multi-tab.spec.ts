@@ -109,3 +109,41 @@ test("closing the owning tab leaves other tabs working; new tabs and reloads boo
 	await expectVectorRail(second);
 	await expectVectorRail(third);
 });
+
+const FOR_YOU = "section.rail--row:has(h2:text-is('Recommended for you'))";
+const FOR_YOU_BADGE = `${FOR_YOU} .clicks-badge`;
+
+/** Click `n` grid products in `page`, returning home after each PDP visit. */
+async function clickProducts(page: Page, n: number): Promise<void> {
+	for (let i = 0; i < n; i += 1) {
+		await page.locator(PRODUCT_CARD).nth(i).click();
+		await expect(page.locator(".pdp__title")).toBeVisible();
+		await page.locator("button.pdp__back").click();
+		await expect(page.locator(FOR_YOU_BADGE)).toHaveText(String(i + 1));
+	}
+}
+
+test("Reset taste in a SECOND tab wipes the owner tab's durable activity", async ({
+	context,
+}) => {
+	await stubEmbedder(context);
+	const owner = await openStoreTab(context);
+	await clickProducts(owner, 3);
+
+	// The second tab cannot own the user database; it runs on a memory copy
+	// and says so. Its reset must reach the owner, not just its own copy.
+	const second = await openStoreTab(context);
+	await expect(second.locator(".storage-badge")).toContainText(
+		"this tab can’t save your activity",
+	);
+	await second.locator(`${FOR_YOU} button.rail__reset`).click();
+	await expect(second.locator(".toast[role='status']")).toContainText(
+		"stored only in this browser",
+	);
+	await expect(second.locator(".banner--error")).toHaveCount(0);
+
+	// The durable copy is gone: the owner tab reloads cold.
+	await owner.reload();
+	await expectStorefront(owner);
+	await expect(owner.locator(FOR_YOU_BADGE)).toHaveText("0");
+});

@@ -62,6 +62,33 @@ export async function openCatalogueSql(
 	return sql;
 }
 
+/**
+ * The shopper's own database: taste history and any future preferences. It is
+ * SEPARATE from the catalogue on purpose. The catalogue database is disposable
+ * (rebuilt from the signed bundle every boot); this one is user data, so it is
+ * never rebuilt, never deleted on a catalogue refresh, and it is the one a
+ * future export/import covers.
+ */
+export const USER_DATABASE = "edgereco-user";
+
+/**
+ * Open the user database in OPFS. When OPFS is refused it runs in memory
+ * ("opfs-unavailable"); when another tab owns the pool it runs in memory
+ * ("pool-in-use") and the owner tab holds the durable copy.
+ */
+export async function openUserSql(
+	deps: OpenCatalogueSqlDeps = {},
+): Promise<CatalogueSql> {
+	const sql = await openSqlDatabase(
+		{ name: USER_DATABASE, persistence: "opfs", fallback: "memory" },
+		deps.workerFactory === undefined
+			? {}
+			: { workerFactory: deps.workerFactory },
+	);
+	console.info("[edge-reco] user database storage", sql.storage);
+	return sql;
+}
+
 export type LegacyPoolResult = OpfsPoolRemoval | "failed";
 
 export interface RetireLegacyVectorPoolDeps {

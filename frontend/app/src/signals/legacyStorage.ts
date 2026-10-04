@@ -84,8 +84,13 @@ export function legacyTasteFile(): LegacyTasteFile | null {
 			const root = await navigator.storage.getDirectory();
 			try {
 				await root.removeEntry(LOG_DIR, { recursive: true });
-			} catch {
-				// Already gone.
+			} catch (error) {
+				// Already gone is fine; anything else must reach the caller.
+				if (
+					!(error instanceof DOMException && error.name === "NotFoundError")
+				) {
+					throw error;
+				}
 			}
 		},
 	};

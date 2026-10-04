@@ -48,7 +48,6 @@ import {
 	retrievalEvidence,
 } from "./reranker";
 import { emptyProfile, type SessionProfile } from "./session";
-import type { TasteStore } from "./tasteStore";
 import {
 	loadVectorIndex,
 	type VectorIndex,
@@ -127,8 +126,6 @@ export interface SearchEngine {
 	interactionWeights(): InteractionWeights;
 	/** Static publisher evidence for the live ranking config and Assay formula. */
 	rankingProofEvidence(): RankingProofEvidence;
-	/** The shopper's taste log, in the same on-device SQLite database. */
-	taste(): TasteStore;
 	/** Release the SQLite-vector Worker and its OPFS handle. */
 	dispose(): Promise<void>;
 }
@@ -422,10 +419,6 @@ class HybridSearchEngine implements SearchEngine {
 			total: filtered.length,
 			categories,
 		};
-	}
-
-	public taste(): TasteStore {
-		return this.#index.taste();
 	}
 
 	public dispose(): Promise<void> {

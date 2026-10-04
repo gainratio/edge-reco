@@ -9,7 +9,7 @@
 		".": "./src/index.ts",
 		"./testing/fixtures": "./src/engine/fixtures.ts",
 		"./testing/catalogue": "./src/engine/__fixtures__/nodeSqlWorker.ts",
-		"./testing/sharedCatalogue": "./src/engine/__fixtures__/sharedCatalogue.ts"
+		"./testing/sharedUserDb": "./src/engine/__fixtures__/sharedUserDb.ts"
 	},
 	"scripts": {
 		"lint": "biome check .",

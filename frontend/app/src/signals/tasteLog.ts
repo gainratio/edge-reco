@@ -1,24 +1,26 @@
 // The taste log seam — the one place the app reads and writes interaction
 // history.
 //
-// WHERE IT LIVES: a `taste_events` table in the on-device SQLite database (the
-// same database as the catalogue, owned by @edgereco/browser). SQLite is the
-// only store for app data: no localStorage, no IndexedDB, no raw OPFS files.
+// WHERE IT LIVES: a `taste_events` table in the shopper's OWN on-device SQLite
+// database (edgereco-user), separate from the disposable catalogue database.
+// SQLite is the only store for app data: no localStorage, no IndexedDB, no raw
+// OPFS files.
 //
 // WHAT IS STORED: timestamp, event type and product id. No user id, no session
 // id, no PII. Nothing here ever leaves the device; the log exists so a reload
 // can rebuild the taste profile by replaying the events through the same fold
 // used live (api/client.ts bootstrap). A rolling window keeps the newest 500.
 //
-// LIFECYCLE: the engine opens the database at boot; bootstrap binds the store
-// here. Before that (or if the database failed to open) every call no-ops.
-// A storage failure degrades to session-only behavior and never throws into
-// the interaction path.
+// FAILURE POLICY: appends and reads degrade to session-only behavior and never
+// throw into the interaction path. RESET is the opposite: it either wipes and
+// verifies every copy of the shopper's data, or it throws so the UI says so.
+// A reset in a tab that does not own the database is routed to the owner tab
+// (resetCoordinator.ts).
 //
 // MIGRATION: older builds kept this log in an OPFS file. migrateLegacyTaste
-// copies it into SQLite (rows and a marker commit in one transaction), then
-// removes the file — but only when the database is durable, so a tab running
-// on an in-memory database never deletes the only lasting copy.
+// copies it into SQLite (idempotent per event), then removes the file — but
+// only in the owner tab, so a tab on an in-memory copy never deletes the only
+// lasting copy.
 
 import type { EventType, TasteRecord, TasteStore } from "@edgereco/browser";
 import {
@@ -27,12 +29,48 @@ import {
 	parseLegacyTasteLog,
 	retireLegacyLocalStorage,
 } from "./legacyStorage";
+import {
+	broadcastBus,
+	type ResetBus,
+	ResetCoordinator,
+} from "./resetCoordinator";
 
 let store: TasteStore | null = null;
+let coordinator: ResetCoordinator | null = null;
 
-/** Bind the engine's store after boot (null unbinds). */
-export function bindTasteStore(next: TasteStore | null): void {
+/** Raised when Reset is pressed but the saved activity could not be opened. */
+export class TasteStoreUnavailableError extends Error {
+	public constructor() {
+		super("Couldn’t clear your saved activity: it could not be opened.");
+		this.name = "TasteStoreUnavailableError";
+	}
+}
+
+/**
+ * Bind the user store after boot (null unbinds) and join the cross-tab reset
+ * channel. `bus` defaults to the real BroadcastChannel.
+ */
+export function bindTasteStore(
+	next: TasteStore | null,
+	bus: ResetBus | null = next === null ? null : broadcastBus(),
+	file: () => LegacyTasteFile | null = legacyTasteFile,
+): void {
+	coordinator?.dispose();
 	store = next;
+	coordinator =
+		next === null
+			? null
+			: new ResetCoordinator(bus, next, () => wipeOwnerCopy(next, file()));
+}
+
+/** Everything this tab can wipe, verified: legacy leftovers, then the table. */
+async function wipeOwnerCopy(
+	target: TasteStore,
+	file: LegacyTasteFile | null,
+): Promise<void> {
+	retireLegacyLocalStorage();
+	await file?.remove();
+	await target.clear();
 }
 
 /** True when the taste log survives a reload (database in OPFS). */
@@ -74,20 +112,14 @@ export function readTasteEvents(): Promise<ReadonlyArray<TasteRecord>> {
 
 /**
  * The "Reset taste" wipe: the SQLite table, plus anything an older build left
- * outside SQLite (the OPFS file and the old localStorage keys).
+ * outside SQLite (the OPFS file and the old localStorage keys), in whichever
+ * tab owns them. Throws unless every copy was wiped and verified.
  */
 export async function clearTasteLog(): Promise<void> {
-	retireLegacyLocalStorage();
-	await removeLegacyFile(legacyTasteFile());
-	await safely((bound) => bound.clear(), undefined);
-}
-
-async function removeLegacyFile(file: LegacyTasteFile | null): Promise<void> {
-	try {
-		await file?.remove();
-	} catch (error) {
-		console.warn("[edge-reco] could not remove the legacy taste file", error);
+	if (coordinator === null) {
+		throw new TasteStoreUnavailableError();
 	}
+	await coordinator.reset();
 }
 
 export type LegacyMigration =
@@ -98,8 +130,9 @@ export type LegacyMigration =
 
 /**
  * Copy-then-retire for the old OPFS taste file. Idempotent and crash-resumable:
- * the copy is guarded by a marker written in the same transaction, so a rerun
- * after a crash copies nothing and only finishes the retire step.
+ * the copy skips events already present, so a rerun after a crash copies
+ * nothing new and only finishes the retire step, and a rollback-then-forward
+ * imports exactly the events the old build logged in between.
  */
 export async function migrateLegacyTaste(
 	target: TasteStore,
