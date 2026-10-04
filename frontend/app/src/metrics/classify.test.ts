@@ -2,7 +2,6 @@ import { describe, expect, it } from "vitest";
 import { classifyResource } from "./classify";
 
 const EDGE_ORIGIN = "https://cdn.example.com";
-const EVENTS_URL = "https://events.example.com/api/events";
 
 describe("classifyResource", () => {
 	describe("image bucket", () => {
@@ -72,35 +71,8 @@ describe("classifyResource", () => {
 		});
 	});
 
-	describe("uplink bucket", () => {
-		it("classifies a URL at the eventsUrl origin as uplink", () => {
-			expect(
-				classifyResource("https://events.example.com/api/events", {
-					edgeOrigin: EDGE_ORIGIN,
-					eventsUrl: EVENTS_URL,
-				}),
-			).toBe("uplink");
-		});
-
-		it("classifies any path under the eventsUrl origin as uplink", () => {
-			expect(
-				classifyResource("https://events.example.com/other/path", {
-					edgeOrigin: EDGE_ORIGIN,
-					eventsUrl: EVENTS_URL,
-				}),
-			).toBe("uplink");
-		});
-
-		it("returns other when eventsUrl is null", () => {
-			expect(
-				classifyResource("https://events.example.com/api/events", {
-					edgeOrigin: EDGE_ORIGIN,
-					eventsUrl: null,
-				}),
-			).toBe("other");
-		});
-
-		it("returns other when eventsUrl is not set", () => {
+	describe("no uplink exemption", () => {
+		it("buckets an events-collector URL as other (a backend call), never exempt", () => {
 			expect(
 				classifyResource("https://events.example.com/api/events", {
 					edgeOrigin: EDGE_ORIGIN,

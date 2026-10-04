@@ -65,5 +65,11 @@ export {
 	emptyProfile,
 	type SessionProfile,
 } from "./engine/session";
+// --- the shopper's taste log, stored in the on-device SQLite database ---
+export {
+	MAX_TASTE_EVENTS,
+	type TasteRecord,
+	type TasteStore,
+} from "./engine/tasteStore";
 // --- the SyncResult shape leaks through BootStage; expose its type only ---
 export type { SyncResult } from "./gainratio";

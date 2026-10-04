@@ -11,9 +11,11 @@ from fastapi.testclient import TestClient
 
 from edgereco.api.app import create_app
 from edgereco.api.deps import ServiceContainer
-from edgereco.catalog.models import Product
+from edgereco.catalog.models import Product, SessionProfile
+from edgereco.reco.signals import apply_interaction
 
-_SESSION = {"X-Session-Id": "affinity-pool-session"}
+_SESSION_ID = "affinity-pool-session"
+_SESSION = {"X-Session-Id": _SESSION_ID}
 
 
 def _catalog() -> list[Product]:
@@ -37,13 +39,19 @@ def _catalog() -> list[Product]:
     return rail + niche
 
 
-def _client() -> TestClient:
-    return TestClient(create_app(ServiceContainer.from_catalog(_catalog())))
+def _client() -> tuple[TestClient, ServiceContainer]:
+    container = ServiceContainer.from_catalog(_catalog())
+    return TestClient(create_app(container)), container
 
 
-def _click(client: TestClient, product_id: str) -> None:
-    event = {"event_type": "click", "product_id": product_id, "timestamp": "2026-06-01T00:00:00Z"}
-    assert client.post("/events", json={"events": [event]}, headers=_SESSION).status_code == 200
+def _click(container: ServiceContainer, product_id: str) -> None:
+    """Fold a click into the server session the way an in-process host would."""
+    product = container.by_id[product_id]
+
+    def update(profile: SessionProfile) -> SessionProfile:
+        return apply_interaction(profile, product, "click")
+
+    container.sessions.update(_SESSION_ID, update)
 
 
 def _rail_ids(client: TestClient) -> list[str]:
@@ -52,17 +60,17 @@ def _rail_ids(client: TestClient) -> list[str]:
 
 
 def test_clicked_category_sibling_surfaces_in_rail() -> None:
-    client = _client()
+    client, container = _client()
     assert "sibling" not in _rail_ids(client)  # cold start: popularity-only, niche item absent
 
-    _click(client, "clicked")
+    _click(container, "clicked")
 
     # affinity pool makes the unpopular sibling eligible and it ranks in
     assert "sibling" in _rail_ids(client)
 
 
 def test_clicked_item_itself_is_not_re_recommended() -> None:
-    client = _client()
-    _click(client, "clicked")
+    client, container = _client()
+    _click(container, "clicked")
     # repetition penalty keeps the exact clicked item out
     assert "clicked" not in _rail_ids(client)

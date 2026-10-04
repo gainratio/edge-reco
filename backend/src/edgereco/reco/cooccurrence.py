@@ -2,7 +2,7 @@
 
 A pure, deterministic data transform. From a set of sessions — each a list of
 ``(product_id, event_type)`` interactions — it builds a sparse top-N neighbour map
-per product. Each interaction contributes its retrain ``ENGAGEMENT_WEIGHTS`` (cart 4,
+per product. Each interaction contributes its ``ENGAGEMENT_WEIGHTS`` (cart 4,
 favorite 3, click 1, view 0.2) to that product's per-session engagement; a product's
 engagement vector indexes sessions. Neighbour scores are the **cosine similarity**
 between two products' engagement vectors:
@@ -13,7 +13,8 @@ so two products that are co-engaged with similar intensity across the same sessi
 rank highest, self is excluded, pairs are symmetric, and only the top-N neighbours
 are kept. Cosine (over Jaccard) so high-intent baskets weigh more than passive views.
 
-Carried in the signed bundle as ``cooccurrence.json`` and recomputed by retrain.
+Carried in the signed bundle as ``cooccurrence.json``; the publisher builds it from a
+session log (the shipped seed uses labeled synthetic baskets).
 Mirrored in the browser tier — keep the normalisation (cosine), the ``ENGAGEMENT_WEIGHTS``,
 and the top-N cut in sync.
 """
@@ -26,7 +27,15 @@ from collections import defaultdict
 from pydantic import BaseModel
 
 from edgereco.catalog.models import EventType
-from edgereco.reco.retrain import ENGAGEMENT_WEIGHTS
+
+#: Per-event-type weight of one interaction toward a product's per-session engagement.
+#: Higher-intent signals (cart, favorite) count for more than a passive view.
+ENGAGEMENT_WEIGHTS: dict[EventType, float] = {
+    "click": 1.0,
+    "view": 0.2,
+    "favorite": 3.0,
+    "cart": 4.0,
+}
 
 #: Default neighbour cap kept per product.
 DEFAULT_TOP_N = 10

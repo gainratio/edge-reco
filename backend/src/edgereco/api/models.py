@@ -10,7 +10,6 @@ from __future__ import annotations
 from pydantic import BaseModel
 
 from edgereco.catalog.models import SearchResult
-from edgereco.reco.retrain import EngagementStat
 
 
 class IndexStats(BaseModel):
@@ -42,21 +41,3 @@ class RecommendResponse(BaseModel):
 
     results: list[SearchResult]
     session_clicks: int
-
-
-class EventsResponse(BaseModel):
-    """Response for ``POST /events``."""
-
-    received: int
-
-
-class EngagementExport(BaseModel):
-    """Response for ``GET /events/export`` — the cloud retrain read seam.
-
-    Aggregated weighted engagement per product over the collector's event buffer.
-    The ``edgereco retrain`` job pulls this, blends it into ``popularity_score``,
-    and republishes the signed bundle.
-    """
-
-    total_events: int
-    stats: list[EngagementStat]

@@ -192,18 +192,14 @@ mypy_path = [
 [[tool.mypy.overrides]]
 module = [
   "edgereco.api.models",
-  "edgereco.api.routes.events",
   "edgereco.catalog.models",
   "edgereco.catalog.publish",
   "edgereco.catalog.synthetic",
   "edgereco.config",
-  "edgereco.reco.audit",
   "edgereco.reco.cooccurrence",
   "edgereco.reco.ranking_config",
   "edgereco.reco.score_receipt",
   "edgereco.reco.relevance_baseline",
-  "edgereco.reco.retrain",
-  "edgereco.republish",
 ]
 disallow_any_explicit = false
 
@@ -299,33 +295,3 @@ cwd = "../frontend"            # poe resolves this relative to the project root 
 # allocates random free ports per run and wires them through compose/Vite/CORS/the
 # preflight. Kept in sync with poe_tasks.toml's [tasks.demo].
 shell = "node app/scripts/demo.mjs"
-
-# Same demo, PLUS the flywheel uplink: interaction events are captured in-tab and
-# periodically flushed to a mimicked-cloud collector (the FastAPI /events). Inference
-# stays 100% local — the uplink is an optional, off-path beacon.
-# Kept in sync with poe_tasks.toml's [tasks.demo-flywheel].
-[tool.poe.tasks.demo-flywheel]
-help = "Demo + flywheel uplink — events flush to a mimicked cloud collector (free port)."
-cwd = "../frontend"
-shell = "node app/scripts/demo.mjs --flywheel"
-
-# The CLOUD half of the flywheel: recompute popularity from the collected events
-# and republish a freshly signed bundle into the runtime origin. The edge
-# revalidates `latest` within 30s, so a browser refresh re-ranks the rail toward
-# what you clicked. The collector's randomly-chosen port is read from the
-# demo-ports.env the flywheel run wrote. Kept in sync with poe_tasks.toml's
-# [tasks.demo-retrain].
-[tool.poe.tasks.demo-retrain]
-help = "Flywheel retrain — recompute popularity from collected events, republish the signed bundle."
-shell = """
-set -e
-ORIGIN=../frontend/.demo-origin
-[ -d "$ORIGIN/manifest" ] || { echo 'No runtime origin yet — run `poe demo-flywheel` first, click around, then retrain.'; exit 1; }
-[ -f examples/keys/private.key ] || { echo 'Missing examples/keys/private.key (gitignored). Retrain re-signs the bundle, so the maintainer signing key is required.'; exit 1; }
-# The flywheel run records its randomly-chosen collector port here; fall back to 8000.
-COLLECTOR_PORT=8000
-[ -f "$ORIGIN/demo-ports.env" ] && . "$ORIGIN/demo-ports.env"
-echo ">> retrain -> syncing the current bundle, folding in collected engagement, republishing… (collector :$COLLECTOR_PORT)"
-uv run edgereco retrain "$ORIGIN" "$ORIGIN" examples/keys/private.key examples/keys/public.key --events-url "http://localhost:${COLLECTOR_PORT}/events/export" --alpha 0.5 --cache-dir .retrain-cache
-echo '>> done. Refresh the SPA tab — the rail re-ranks toward what you clicked.'
-"""

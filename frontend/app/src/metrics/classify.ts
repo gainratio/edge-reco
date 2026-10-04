@@ -1,9 +1,10 @@
 /**
  * Classify a network request URL into a semantic bucket.
- * Used to count "real backend calls" vs images, uplink beacons, and edge CDN syncs.
+ * Used to count "real backend calls" vs images and edge CDN syncs. There is no
+ * exempt telemetry bucket: any other request counts as a backend call.
  */
 
-export type ResourceBucket = "asset" | "edge" | "image" | "uplink" | "other";
+export type ResourceBucket = "asset" | "edge" | "image" | "other";
 
 /** Root assets browsers may request lazily after the storefront is ready. */
 const STATIC_ASSET_PATHS = new Set([
@@ -15,8 +16,6 @@ const STATIC_ASSET_PATHS = new Set([
 export interface ClassifyOptions {
 	/** The signed-bundle CDN origin (e.g. "https://cdn.example.com"). */
 	readonly edgeOrigin: string;
-	/** The optional analytics uplink URL. `null` or `undefined` means disabled. */
-	readonly eventsUrl?: string | null;
 	/**
 	 * The app's own origin (e.g. `location.origin`). When set, same-origin
 	 * release-owned static assets are excluded from backend calls. Omit to
@@ -26,15 +25,14 @@ export interface ClassifyOptions {
 }
 
 /**
- * Bucket a URL into one of five categories.
+ * Bucket a URL into one of four categories.
  * Matching order (first match wins):
  *   1. "asset"  — a known same-origin static/PWA root asset
  *   2. "image"  — a product image: a same-origin `/images/…` asset baked into
  *                 the bundle and served locally, OR a host ending in
  *                 `media-amazon.com`
- *   3. "uplink" — URL starts with the origin of `opts.eventsUrl` (when set)
- *   4. "edge"   — URL's origin equals `opts.edgeOrigin`
- *   5. "other"  — everything else (including unparseable URLs)
+ *   3. "edge"   — URL's origin equals `opts.edgeOrigin`
+ *   4. "other"  — everything else (including unparseable URLs)
  */
 export function classifyResource(
 	url: string,
@@ -78,19 +76,7 @@ export function classifyResource(
 		return "image";
 	}
 
-	// 3. Optional flywheel uplink — off the inference path, never gates the rail.
-	if (opts.eventsUrl != null) {
-		try {
-			const eventsOrigin = new URL(opts.eventsUrl).origin;
-			if (parsed.origin === eventsOrigin) {
-				return "uplink";
-			}
-		} catch {
-			// If eventsUrl is itself unparseable, skip the uplink check.
-		}
-	}
-
-	// 4. Edge CDN — signed-bundle sync requests.
+	// 3. Edge CDN — signed-bundle sync requests.
 	if (parsed.origin === opts.edgeOrigin) {
 		return "edge";
 	}

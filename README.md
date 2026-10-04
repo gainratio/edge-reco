@@ -48,9 +48,18 @@ ranking weights. It signs that bundle with a private key. The shopper's browser 
 the bundle, checks every piece against a public key built into the app, and refuses to
 load anything that does not match. After that, each search runs a keyword match and a
 meaning match side by side, merges the two lists, and re-orders the result using what
-this shopper has clicked. An optional learning loop, off by default and off on the live
-demo, can send anonymous grouped clicks to the store's own server so it can publish a
-better-ranked catalog later.
+this shopper has clicked.
+
+## Your data stays on your device
+
+No user data leaves the device. What you click, view, favorite or add to the cart is
+stored only in a SQLite database inside your own browser, and nothing is sent to or
+stored on any server or cloud. The data is yours. Wipe it with **Reset taste** or by
+clearing the site's data in your browser. There is no export/import yet.
+
+If your browser won't let the tab keep a database (private mode, or the store is open in
+another tab), the store still works but forgets your activity on reload, and a note at
+the top says so.
 
 EdgeReco is built on three sibling projects by the same author:
 
@@ -130,7 +139,7 @@ local traps to know about. Also see [CONTRIBUTING.md](CONTRIBUTING.md).
 - [Explore the interactive architecture map](docs/architecture/index.html): the runtime
   flow in an offline viewer.
 - [Python library and CLI](docs/USAGE.md): run the same search in Python, tune the
-  ranking weights, the learning loop, the command line, and configuration.
+  ranking weights, the command line, and configuration.
 - [Quickstart](docs/QUICKSTART.md): the longer walkthrough, including `make demo` with
   Docker and building a catalog from your own CSV.
 - [Deploy](docs/DEPLOY.md): hosting as static files, and the server-backed variant.

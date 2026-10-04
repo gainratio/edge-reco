@@ -1,8 +1,8 @@
 # Python library, CLI and configuration
 
 The browser demo needs no Python. This page is for the optional Python side: the same
-search engine as a library, the `edgereco` command line tool, the API server, the
-optional learning loop, and the settings both halves read.
+search engine as a library, the `edgereco` command line tool, the API server, and the
+settings both halves read.
 
 Everything here runs from `backend/` after the setup in
 [GETTING_STARTED.md](GETTING_STARTED.md) (Python 3.13, uv, then
@@ -171,27 +171,18 @@ ValidationError: Input should be greater than or equal to 0
   [type=greater_than_equal, input_value=-1.0, input_type=float]
 ```
 
-## The learning loop (optional)
+## Where the shopper's data lives
 
-`make demo` makes zero backend calls. That is the default. Two more commands show the
-optional loop that lets a store improve its ranking:
+No user data leaves the device. The shopper's clicks, views, favorites and cart adds are
+stored only in a `taste_events` table in the SQLite database inside their own browser
+(timestamp, event type, product id; the newest 500). Nothing is sent to or stored on any
+server or cloud, and there is no command that collects it. **Reset taste** or clearing
+the site's data wipes it. Export/import is not built yet.
 
-1. **Send activity up.** `poe demo-flywheel` adds a pretend cloud collector. Clicks are
-   captured in the tab and sent in batches, without waiting for an answer. Signals are
-   weighted by intent: a cart-add counts 4 times, a favorite 3 times, a click once, and a
-   lingering view 0.2. Search and ranking still run entirely in the tab. Watch the
-   `POST /events` requests and the "N interactions synced to cloud" badge.
-2. **Learn and republish.** `poe demo-retrain` recomputes each product's popularity from
-   the collected events, and the "customers also bought" map from the session log, then
-   republishes a freshly signed catalog. Refresh the page and the rows re-rank toward
-   what you clicked. The scoring formula and the language model do not change.
-
-Re-signing needs the maintainer's private key, so step 2 works only for repo owners. The
-published demo ships the result.
-
-To preview what a retrain would change without doing it, run
-`edgereco audit ORIGIN VERIFY_KEY --sessions LOG`. It prints event counts, the biggest
-popularity movers and the changed "also bought" links. It never signs or publishes.
+The "customers also bought" map (`cooccurrence.json`) is catalog data. The publisher
+builds it once from a session log; the shipped demo uses labeled synthetic baskets
+(`backend/examples/source/demo_sessions.jsonl`, via
+`scripts/rebuild_example_bundle.py`). It is never recomputed from real shoppers.
 
 ## Server-side variant: publish, sync, serve
 
@@ -238,13 +229,6 @@ edgereco serve CACHE_DIR INDEX_DIR [--host HOST] [--port PORT]
 edgereco search QUERY CACHE_DIR INDEX_DIR [--limit N] [--category CAT] [--json]
     # reads a flat preprocess-style dir (products.jsonl + manifest.json + vector/).
     # To search a signed bundle, sync it first, as in the Python example above.
-edgereco retrain BUNDLE_BASE_URL ORIGIN_DIR PRIVATE_KEY VERIFY_KEY
-    # the cloud half of the loop: sync, recompute popularity (from the collector's
-    # --events-url) + co-occurrence (from a --sessions JSONL log), re-sign, republish.
-    # Pure data transform; the scoring formula never changes.
-    [--events-url URL] [--sessions LOG.jsonl] [--alpha 0.5] [--version V]
-edgereco audit BUNDLE_BASE_URL VERIFY_KEY [--sessions LOG.jsonl] [--alpha 0.5]
-    # read-only preview of what a retrain would change. Never signs or publishes.
 ```
 
 `uv run edgereco --help` lists the same commands.
@@ -269,12 +253,10 @@ The settings that change what a shopper's browser does (read at build time):
 | --- | --- | --- |
 | `VITE_BUNDLE_BASE_URL` | `bundle` in the static build (same origin) | Where the signed catalog is fetched from. The public key is always read from the app's own origin, never from here. |
 | `VITE_BUNDLE_ID` / `VITE_BUNDLE_CHANNEL` | `amazon-demo` / `stable` | The catalog identity the browser expects. Keep them stable, or returning shoppers refuse the new release. |
-| `VITE_EVENTS_URL` | unset (learning loop off) | Where the optional learning loop sends batched clicks. Unset means nothing is sent. |
 | `VITE_BASE` | `/` | The path the app is served under (for example `/<repo>/` on a GitHub Pages project site). |
 
 Server-side secrets never go in the committed copies: the signing key
-(`backend/examples/keys/private.key`) is gitignored, and the collector token is set with
-`EDGERECO_EVENTS_TOKEN` in the environment. The recommender's `EDGERECO_*` settings
+(`backend/examples/keys/private.key`) is gitignored. The recommender's `EDGERECO_*` settings
 (model, `EDGERECO_RRF_K`, search limit, bundle URL and verify key) are listed in
 [`backend/.env.example`](../backend/.env.example).
 

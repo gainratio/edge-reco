@@ -1,6 +1,6 @@
 // The PerformanceObserver wiring is hard to drive in jsdom, so the per-entry
 // counting is factored into the pure `countBackendCalls` helper and tested here
-// directly: edge/other count, image/uplink don't, pre-readyAt entries are
+// directly: edge/other count, images don't, pre-readyAt entries are
 // ignored, and unparseable URLs fall through to "other" (i.e. counted).
 
 import {
@@ -26,7 +26,6 @@ const READY_AT = 100;
 const OPTS: ObserveOptions = {
 	readyAt: READY_AT,
 	edgeOrigin: "https://cdn.example.com",
-	eventsUrl: "https://events.example.com/events",
 	appOrigin: "http://localhost:4173",
 };
 
@@ -79,9 +78,9 @@ describe("countBackendCalls", () => {
 		expect(countBackendCalls(entries, OPTS)).toBe(1);
 	});
 
-	it("does NOT count the optional uplink beacon", () => {
+	it("counts an events-collector request: no uplink is exempt", () => {
 		const entries = [entry("https://events.example.com/events", 150)];
-		expect(countBackendCalls(entries, OPTS)).toBe(0);
+		expect(countBackendCalls(entries, OPTS)).toBe(1);
 	});
 
 	it("ignores entries that started before readyAt", () => {
@@ -101,11 +100,11 @@ describe("countBackendCalls", () => {
 		const entries = [
 			entry("https://cdn.example.com/manifest", 200), // edge  -> count
 			entry("https://m.media-amazon.com/x.jpg", 210), // image -> skip
-			entry("https://events.example.com/events", 220), // uplink -> skip
+			entry("https://events.example.com/events", 220), // other -> count
 			entry("https://api.foo.com/infer", 230), // other -> count
 			entry("https://cdn.example.com/early", 10), // pre-ready -> skip
 		];
-		expect(countBackendCalls(entries, OPTS)).toBe(2);
+		expect(countBackendCalls(entries, OPTS)).toBe(3);
 	});
 });
 
@@ -198,7 +197,6 @@ function setHeapBytes(bytes: number | null): void {
 const LIVE_OPTS: ObserveOptions = {
 	readyAt: 0,
 	edgeOrigin: "https://cdn.example.com",
-	eventsUrl: null,
 };
 
 describe("startMetricsObservers", () => {

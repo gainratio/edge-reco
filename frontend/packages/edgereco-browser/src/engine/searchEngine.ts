@@ -48,6 +48,7 @@ import {
 	retrievalEvidence,
 } from "./reranker";
 import { emptyProfile, type SessionProfile } from "./session";
+import type { TasteStore } from "./tasteStore";
 import {
 	loadVectorIndex,
 	type VectorIndex,
@@ -120,12 +121,14 @@ export interface SearchEngine {
 	 * The per-event-type affinity bumps from the synced config. The app's
 	 * sendEvent fold (and its boot-time replay) MUST use these — not the typed
 	 * defaults — so a republished bundle retunes the in-tab fold exactly like
-	 * the backend /events fold. Falls back to the typed defaults only for a
+	 * the Python session fold. Falls back to the typed defaults only for a
 	 * bundle that predates ranking_config.json (parseRankingConfig handles that).
 	 */
 	interactionWeights(): InteractionWeights;
 	/** Static publisher evidence for the live ranking config and Assay formula. */
 	rankingProofEvidence(): RankingProofEvidence;
+	/** The shopper's taste log, in the same on-device SQLite database. */
+	taste(): TasteStore;
 	/** Release the SQLite-vector Worker and its OPFS handle. */
 	dispose(): Promise<void>;
 }
@@ -419,6 +422,10 @@ class HybridSearchEngine implements SearchEngine {
 			total: filtered.length,
 			categories,
 		};
+	}
+
+	public taste(): TasteStore {
+		return this.#index.taste();
 	}
 
 	public dispose(): Promise<void> {

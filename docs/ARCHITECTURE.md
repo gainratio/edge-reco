@@ -43,17 +43,13 @@ flowchart TB
   build --> sign --> origin
   origin --> browser
   origin --> api
-  browser -.->|"optional, off by default"| events["Event collector → edgereco retrain<br>recompute popularity, re-sign, republish"]
-  events -.-> build
 
   classDef pub fill:#f0e8f8,stroke:#9472b0,color:#171717;
   classDef cdn fill:#f8f0e8,stroke:#c2925a,color:#171717;
   classDef local fill:#e8f8e8,stroke:#5fa85f,color:#171717;
-  classDef opt fill:#e8f4f8,stroke:#5b9bbf,color:#171717;
   class build,sign pub;
   class origin cdn;
   class browser,api local;
-  class events opt;
 ```
 
 The publisher signs the bundle once. The CDN/edge serves immutable chunks and a short-TTL `latest` pointer. Both runtimes verify it against a pinned ed25519 public key. Python opens the prebuilt FAISS artifact; the browser imports the authenticated `embeddings.f32` rows into SQLite + sqlite-vector in a dedicated Worker and persists that database in OPFS. No browser FAISS or packed in-memory vector fallback exists. After sync, the runtime is offline-capable.
@@ -123,7 +119,7 @@ The **product-detail page (PDP)** that hosts the seed-based rails is **state-bas
 
 ### Co-occurrence ("customers also bought")
 
-`cooccurrence.json` (`reco/cooccurrence.py`, typed `CooccurrenceMatrix`) is a sparse top-N item-to-item neighbour map. It is computed in **retrain**, not at serve time: from the collected session log, each interaction contributes its retrain engagement weight (cart 4, favorite 3, click 1, view 0.2) to that product's per-session engagement vector, and a neighbour's score is the **cosine similarity** between two products' engagement vectors (high-intent baskets weigh more than passive views; self excluded, pairs symmetric, top-N kept). The result ships in the signed bundle as one more artifact; the `co_occurrence` strategies read the seed's neighbours as their candidate pool. The browser mirror (`cooccurrence.ts`) parses the **same verified bytes** and **fails closed** on a malformed-but-signed matrix (a non-finite neighbour score throws rather than feeding NaN into the scorer), keeping the two tiers byte-identical. It is parity-fixture-gated like the rest of the engine (see [Cross-tier parity](#cross-tier-parity)).
+`cooccurrence.json` (`reco/cooccurrence.py`, typed `CooccurrenceMatrix`) is a sparse top-N item-to-item neighbour map. It is computed at **publish time**, not at serve time, and never from real shoppers' activity: from a publisher-supplied session log (the shipped seed uses labeled synthetic baskets, `backend/examples/source/demo_sessions.jsonl`), each interaction contributes its engagement weight (cart 4, favorite 3, click 1, view 0.2) to that product's per-session engagement vector, and a neighbour's score is the **cosine similarity** between two products' engagement vectors (high-intent baskets weigh more than passive views; self excluded, pairs symmetric, top-N kept). The result ships in the signed bundle as one more artifact; the `co_occurrence` strategies read the seed's neighbours as their candidate pool. The browser mirror (`cooccurrence.ts`) parses the **same verified bytes** and **fails closed** on a malformed-but-signed matrix (a non-finite neighbour score throws rather than feeding NaN into the scorer), keeping the two tiers byte-identical. It is parity-fixture-gated like the rest of the engine (see [Cross-tier parity](#cross-tier-parity)).
 
 ### Scoring formula
 
@@ -174,10 +170,9 @@ The personalized weights are **not hardcoded** — they ride in the signed bundl
 | `embeddings/` | Sentence-transformers `all-MiniLM-L6-v2` encoder + FAISS `IndexFlatIP` build |
 | `search/` | BM25 keyword search, vector search, hybrid (RRF) fusion |
 | `reco/` | Session-aware reranker, scoring, signals (click/view/favorite/cart) |
-| `api/` | FastAPI routes (`/search`, `/recommend`, `/events`), CORS, deps wiring |
+| `api/` | FastAPI routes (`/search`, `/recommend`, `/catalog/info`, `/healthz`), CORS, deps wiring. There is no event route. |
 | `edge/` | Signed-bundle sync (via edge-proc), publish, manifest, materialize |
-| `telemetry/` | Bounded ring buffer of recent envelopes |
-| `cli.py` | Typer entrypoints (`build-catalog`, `preprocess`, `index`, `bundle`, `serve`, `search`, `retrain`, `audit`) |
+| `cli.py` | Typer entrypoints (`build-catalog`, `preprocess`, `index`, `bundle`, `serve`, `search`) |
 | `config.py` | Pydantic-settings: env-driven bundle URL / verify key / cache dir |
 
 Publish-side: `edgereco bundle` chunks the index dir under GearCDC, writes each chunk under its sha256, builds a manifest, signs a `/latest` pointer.
@@ -196,8 +191,8 @@ flowchart LR
   embed["Embedder worker — embedderWorker.ts<br>transformers.js, all-MiniLM-L6-v2"]
   sqlw["SQL worker — @gainratio/browser/sql<br>SQLite: FTS5 bm25 + sqlite-vector,<br>RRF in one query"]
   opfs[("OPFS bundle cache<br>content-addressed chunks")]
-  catdb[("OPFS catalogue pool<br>edgereco-catalogue SQLite DB")]
-  profile["Session profile<br>in memory, never persisted"]
+  catdb[("OPFS catalogue pool<br>edgereco-catalogue SQLite DB<br>catalogue + taste_events")]
+  profile["Session profile<br>in memory, rebuilt from taste_events"]
 
   app --> engine
   engine --> sync
@@ -207,6 +202,7 @@ flowchart LR
   opfs -->|"verified products + vectors"| sqlw
   sqlw <--> catdb
   engine <--> profile
+  profile -->|"append click / view / favorite / cart"| sqlw
 
   classDef ui fill:#e8f4f8,stroke:#5b9bbf,color:#171717;
   classDef work fill:#f0e8f8,stroke:#9472b0,color:#171717;
@@ -220,7 +216,7 @@ flowchart LR
 - **Embedder** — `Xenova/all-MiniLM-L6-v2` via transformers.js. Parity-tested against the Python encoder at cosine ≥ 0.99.
 - **SQL Worker** — `@gainratio/browser/sql` runs SQLite (FTS5 + sqlite-vector) in its own Worker. `catalogueSql.ts` is the only file that talks to it; `catalogueDb.ts` holds the SQL. Keyword ranking is FTS5's `bm25()`, similarity is sqlite-vector's exact cosine scan, and RRF (`k=60`) is one SQL query.
 - **Engine** — same pipeline shape as the backend (keyword + vector, RRF, session rerank), in TypeScript over that database. It does **not** reproduce Python's ranking exactly. Python scores keywords with `rank_bm25` (`BM25Okapi`: k1=1.5, b=0.75, negative IDF floored to 0.25 × the mean IDF, one bag of words split on whitespace). FTS5 hard-codes k1=1.2 and b=0.75, floors IDF at 1e-6, normalizes length per column, and tokenizes with `unicode61` (splits on punctuation, folds diacritics). Neither knob is reachable without a custom C auxiliary function compiled into the SQLite build. The measured contract, enforced by `hybridParity.test.ts`: the same top-1 result and at least 80% of the same top-10 for every fixture query, with the one query that orders differently named in the test.
-- **Storage** — OPFS for the bundle cache (plus the library's IndexedDB anti-rollback floor) and a second OPFS pool for the catalogue database (`edgereco-catalogue`, rebuilt from the verified bundle on every boot; the in-memory fallback is used when OPFS is unavailable). In-memory for the session profile.
+- **Storage** — OPFS for the bundle cache (plus the library's IndexedDB anti-rollback floor) and a second OPFS pool for the catalogue database (`edgereco-catalogue`, catalogue tables rebuilt from the verified bundle on every boot; the in-memory fallback is used when OPFS is refused or another tab owns the database). The shopper's taste log is the `taste_events` table in that same database (timestamp, event type, product id; newest 500; `tasteStore.ts`). SQLite is the only store for app data, and nothing in it leaves the device. When the database is in memory the storefront says the tab can't save activity and that it resets on reload. The session profile is in memory, rebuilt from the taste log on boot.
 - **Worker boundary** — sync runs in a Worker so the UI thread is never blocked on a multi-MB bundle fetch.
 
 The SPA consumes the private `@edgereco/browser` workspace package and the standalone `@gainratio/browser` npm dependency (caret range, exact version in the lockfile). No shared source or sibling checkout is required.
@@ -270,8 +266,8 @@ that are not floats remain exact.
 - **Hybrid search**: BM25 + exact vector search + RRF, in that order. The vector implementation is FAISS on Python and SQLite + sqlite-vector/OPFS in the browser.
 - **Catalog sync**: signed, content-addressed, fail-closed on tampering. No exception.
 - **Zero backend calls after sync**: once the bundle is local, the runtime is offline-capable. Don't introduce a runtime backend dep.
-- **Uplink is optional & off the inference path**: search / recommend / rerank / sync make zero backend calls. The flywheel uplink (a click is captured in-tab, persisted, then batched as a fire-and-forget beacon to the `/events` collector) is gated by `VITE_EVENTS_URL` — **unset = fully disabled** — and must never block or break the app. It feeds the cloud's retrain; it never gates the in-tab rail re-rank.
-- **Retrain is a data change, not a formula change**: the cloud retrain (`edgereco retrain`) aggregates collected events, recomputes `popularity_score` (from the collector's `--events-url`) **and the `cooccurrence.json` neighbour map (from a `--sessions` JSONL log)**, and republishes a re-signed bundle. It must *only* move those data artifacts — never the scoring weights — so both tiers pick up the new ranking on sync with no code change. It reuses the prebuilt FAISS `vector/` verbatim (embeddings are text-derived, popularity-independent). Republish to a runtime origin; the committed seed bundle and the browser parity fixtures stay byte-stable. The read-only `edgereco audit` surface previews exactly what a retrain would change — event counts, top popularity movers, changed co-occurrence edges — and must never sign, publish, or touch the inference path.
+- **No user data leaves the device**: the shopper's activity lives only in the on-device SQLite `taste_events` table. There is no event route, uplink, collector or retrain-from-events. `frontend/app/src/storageBoundary.test.ts` keeps app data out of localStorage/sessionStorage/IndexedDB, `frontend/app/scripts/network-allowlist.test.mjs` fails the build if the app can reach a host outside its allow-list or opens a beacon/WebSocket/EventSource, and `backend/tests/unit/api/test_no_event_sink.py` fails if a `POST /events` route returns.
+- **Ranking changes are data changes**: popularity and the `cooccurrence.json` neighbour map are set at publish time and republished as a re-signed bundle; both tiers pick them up on sync with no code change.
 
 ## Release reliability and performance contract
 
@@ -307,19 +303,14 @@ flowchart TB
   sync["Download once, then check it<br>Ed25519 + SHA-256<br>any mismatch aborts the load"]
   engine["Search + rank in the tab<br>keywords + meaning → fuse → personalize"]
   recs["Results and recommendations<br>0 backend calls · works offline"]
-  learn["Optional, off by default<br>batched anonymous activity retrains<br>ranking and re-signs the catalog"]
 
   build -->|"one small signed file, served by any CDN"| sync
   sync --> engine --> recs
-  recs -.->|"only if you switch it on"| learn
-  learn -.-> build
 
   classDef cloud fill:#f0e8f8,stroke:#9472b0,color:#171717;
   classDef device fill:#e8f8e8,stroke:#5fa85f,color:#171717;
-  classDef opt fill:#e8f4f8,stroke:#5b9bbf,color:#171717;
   class build cloud;
   class sync,engine,recs device;
-  class learn opt;
 ```
 
 Everything in green happens on the shopper's own device. Your cloud is touched only to
@@ -358,7 +349,7 @@ works.
 
 Updates are a patch, not a re-download. Because every piece is named by the hash of its
 bytes, a client compares the new manifest with what it already has and fetches only the
-pieces that changed, reusing the rest (notably the large vector index). A retrain that
+pieces that changed, reusing the rest (notably the large vector index). A republish that
 only moves popularity scores and "also bought" links re-fetches a few small pieces. As
 [DEPLOY.md](DEPLOY.md) puts it: *"a one-line edit re-publishes one chunk; every consumer
 fetches one chunk and reuses the rest."*
@@ -500,7 +491,7 @@ without a coverage gap.
 
 - `.github/`: exact-head CI, security scans, and serialized Cloudflare deployment.
 - `backend/`: Python project root (`pyproject.toml`, `uv.lock`).
-  - `backend/src/edgereco/`: runtime: `catalog/` `embeddings/` `search/` `reco/` `edge/` `telemetry/` `api/` `cli.py` `config.py`
+  - `backend/src/edgereco/`: runtime: `catalog/` `embeddings/` `search/` `reco/` `edge/` `api/` `cli.py` `config.py`
   - `backend/features/`: Gherkin behaviour specs, decoupled from step implementations
   - `backend/tests/`: `unit/` `bdd/` `integration/` `e2e/`
   - `backend/deploy/`: `Dockerfile`, `docker-compose.yml`, Caddy edge config
@@ -517,7 +508,7 @@ without a coverage gap.
 ## Further reading
 
 - [`GETTING_STARTED.md`](GETTING_STARTED.md) — developer setup, the full check, a first change.
-- [`USAGE.md`](USAGE.md) — the Python library, CLI, learning loop and configuration.
+- [`USAGE.md`](USAGE.md) — the Python library, CLI, where shopper data lives, and configuration.
 - [`QUICKSTART.md`](QUICKSTART.md) — clone → run.
 - [`DEPLOY.md`](DEPLOY.md) — backend-free in-browser vs edge-origin shapes.
 - [`SECURITY-PRIVACY.md`](SECURITY-PRIVACY.md) — threat boundaries, data flow,

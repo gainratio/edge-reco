@@ -1,4 +1,4 @@
-"""End-to-end test: publish signed bundle → from_synced → search → click → recommend."""
+"""End-to-end test: publish signed bundle → from_synced → search → session → recommend."""
 
 from __future__ import annotations
 
@@ -12,8 +12,10 @@ from fastapi.testclient import TestClient
 from edgereco.api.app import create_app
 from edgereco.api.deps import ServiceContainer
 from edgereco.catalog.loader import load_jsonl
+from edgereco.catalog.models import SessionProfile
 from edgereco.embeddings.encoder import ProductEncoder
 from edgereco.embeddings.index import VectorIndex
+from edgereco.reco.signals import apply_interaction
 from tests.signing import save_seed
 
 FIXTURES_DIR = Path(__file__).parent.parent / "fixtures"
@@ -71,8 +73,17 @@ def client(container: ServiceContainer) -> TestClient:
     return TestClient(app)
 
 
+def _click(container: ServiceContainer, session_id: str, product_id: str) -> None:
+    product = container.by_id[product_id]
+
+    def update(profile: SessionProfile) -> SessionProfile:
+        return apply_interaction(profile, product, "click")
+
+    container.sessions.update(session_id, update)
+
+
 @pytest.mark.e2e
-def test_full_discovery_loop(client: TestClient) -> None:
+def test_full_discovery_loop(client: TestClient, container: ServiceContainer) -> None:
     # 1. Health check
     health = client.get("/healthz")
     assert health.status_code == 200
@@ -103,23 +114,10 @@ def test_full_discovery_loop(client: TestClient) -> None:
     assert rec_initial.status_code == 200
     assert len(rec_initial.json()["results"]) == 50
 
-    # 5. Click 3 Electronics products via /events
-    electronics_clicks: list[dict[str, str | dict[str, str]]] = [
-        {
-            "event_type": "click",
-            "product_id": pid,
-            "timestamp": "2026-04-30T00:00:00Z",
-            "metadata": {},
-        }
-        for pid in ("B001", "B006", "B007")
-    ]
-    events = client.post(
-        "/events",
-        json={"events": electronics_clicks},
-        headers={"X-Session-Id": "e2e-session-1"},
-    )
-    assert events.status_code == 200
-    assert events.json() == {"received": 3}
+    # 5. Fold 3 Electronics clicks into the server session (no event endpoint exists:
+    #    interaction data never leaves the client, so an in-process host does this).
+    for pid in ("B001", "B006", "B007"):
+        _click(container, "e2e-session-1", pid)
 
     # 6. Recommend after clicks: top results should now lean Electronics
     rec_after = client.get(

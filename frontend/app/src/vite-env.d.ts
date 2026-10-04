@@ -12,14 +12,6 @@ interface ImportMetaEnv {
 	readonly VITE_BUNDLE_BASE_URL: string;
 	/** Space-separated https origins a REMOTE-mode build may load product photos from. */
 	readonly VITE_REMOTE_IMAGE_HOSTS?: string;
-	/**
-	 * Optional "mimicked cloud" collector for the interaction-event uplink
-	 * (the flywheel). UNSET/empty → the uplink is fully disabled and the demo
-	 * makes zero backend calls (the headline invariant). When set (e.g. by
-	 * `poe demo-flywheel`), clicks are batched and flushed here off the
-	 * inference path.
-	 */
-	readonly VITE_EVENTS_URL?: string;
 }
 
 interface ImportMeta {

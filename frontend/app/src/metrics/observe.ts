@@ -1,7 +1,7 @@
 // Live observers that feed the metrics store from real browser signals:
 //   - PerformanceObserver on "resource" entries -> count POST-READY backend calls
-//     (edge/other), excluding 3rd-party product images and the optional uplink
-//     beacon. In the normal backend-free demo this stays 0 after sync.
+//     (edge/other), excluding product images. No request is exempt as
+//     telemetry. In the normal backend-free demo this stays 0 after sync.
 //   - The Worker network sentinel -> the SAME count, over the traffic of every
 //     Worker the engine owns. A Worker keeps its own resource-timing timeline,
 //     so the observer above is blind to it: without this the counter would keep
@@ -31,8 +31,6 @@ export interface ObserveOptions {
 	readonly readyAt: number;
 	/** The signed-bundle CDN origin (VITE_BUNDLE_BASE_URL). */
 	readonly edgeOrigin: string;
-	/** The optional analytics uplink URL (VITE_EVENTS_URL); may be undefined. */
-	readonly eventsUrl?: string | null | undefined;
 	/** The app's own origin; release-owned static assets are not backend calls. */
 	readonly appOrigin?: string | null | undefined;
 }
@@ -78,7 +76,7 @@ export function toResourceEntries(
  * Pure counting helper (unit-tested directly). Given the resource entries seen
  * so far and the classify options, return the count of entries that represent a
  * real backend call: classified "edge" or "other", and starting at/after
- * `readyAt`. Static assets, images, and the uplink beacon are excluded;
+ * `readyAt`. Static assets and images are excluded;
  * pre-ready entries (the sync itself, the model fetch) are ignored.
  */
 export function countBackendCalls(
@@ -92,7 +90,6 @@ export function countBackendCalls(
 		}
 		const bucket = classifyResource(entry.name, {
 			edgeOrigin: opts.edgeOrigin,
-			eventsUrl: opts.eventsUrl ?? null,
 			appOrigin: opts.appOrigin ?? null,
 		});
 		if (bucket === "edge" || bucket === "other") {

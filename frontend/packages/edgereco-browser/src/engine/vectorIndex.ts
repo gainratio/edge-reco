@@ -14,6 +14,7 @@ import {
 	openCatalogueStore,
 } from "./catalogueDb";
 import type { Product } from "./domain";
+import type { TasteStore } from "./tasteStore";
 
 const DECODER = new TextDecoder();
 
@@ -324,6 +325,11 @@ export class VectorIndex {
 			return Promise.reject(new Error(`unknown product id: ${productId}`));
 		}
 		return this.#store.nearest(productId, Math.max(0, k));
+	}
+
+	/** The shopper's taste log, stored in the same catalogue database. */
+	public taste(): TasteStore {
+		return this.#store.taste;
 	}
 
 	public dispose(): Promise<void> {

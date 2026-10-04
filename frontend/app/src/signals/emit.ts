@@ -1,7 +1,7 @@
 // Interaction-signal emit rules — the ONE place that decides whether a user
 // action becomes an engine event, and what the UI says about it.
 //
-// The engine, uplink, and retrain already grade the full vocabulary
+// The engine already grades the full vocabulary
 // (click | view | favorite | cart); this module owns the per-type EMIT RULES
 // (one rule per signal type):
 //
@@ -22,7 +22,7 @@ import { sendEvent } from "../api/client";
 import type { EventType, Product } from "../api/types";
 
 export interface SignalOutcome {
-	/** Whether an event was actually sent (engine fold + optional uplink). */
+	/** Whether an event was actually sent (in-tab engine fold + on-device taste log). */
 	readonly emitted: boolean;
 	/** Toast copy; null for silent signals (views) and capped no-ops. */
 	readonly message: string | null;
@@ -81,7 +81,7 @@ function toastFor(eventType: EventType, product: Product): string | null {
 
 /**
  * Apply the per-type emit rule and, if allowed, send the event down the
- * existing path (in-tab engine fold + optional flywheel uplink). Errors
+ * existing path (in-tab engine fold + on-device taste log). Errors
  * propagate: explicit-action handlers surface them in the UI; the ambient
  * dwell path deliberately swallows them.
  */

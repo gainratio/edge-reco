@@ -11,6 +11,6 @@ startup and exposes `/search`, `/recommend`, and `/products`. Useful if you
 want to consume the engine over HTTP from a non-browser client.
 
 To run it: `make backend` from `frontend/` (it launches `demo_server.serve` from
-`backend/`). The collector image uses only the `backend/` build context; uv resolves
+`backend/`). Its Docker image (`demo_server/Dockerfile`) uses only the `backend/` build context; uv resolves
 the substrate from the release tags pinned in `uv.lock`, so sibling repositories and
 parent-workspace secrets are never sent to Docker.

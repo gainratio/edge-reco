@@ -11,9 +11,9 @@ On disk, ``vector/`` is EdgeReco's SIGNED BUNDLE format, not edge-proc's persist
 format: exactly ``index.faiss`` + ``state.json`` + ``embeddings.f32``, flat and
 deterministic. edge-proc >=0.4.1 persists to crash-atomic ``snapshots/`` generations
 (random names, a lock file) and migrates a writable legacy pair into them on load,
-deleting the pair. The browser tier reads ``vector/state.json`` and a retrain copies
-the synced ``vector/`` verbatim into the next bundle, so this adapter writes the flat
-layout itself and loads it from a private copy, never touching the source directory.
+deleting the pair. The browser tier reads ``vector/state.json`` and ``embeddings.f32``
+straight out of the bundle, so this adapter writes the flat layout itself and loads it
+from a private copy, never touching the source directory.
 """
 
 from __future__ import annotations

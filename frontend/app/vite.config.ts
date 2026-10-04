@@ -210,7 +210,7 @@ export default defineConfig({
 		coverage: {
 			// Off by default; enabled by `test:coverage` + the CI coverage gate.
 			// The React view layer — Storefront (orchestration root), Header,
-			// ProductGrid, RailStack/RailCard, ProductDetail, SyncBadge, BootScreen,
+			// ProductGrid, RailStack/RailCard, ProductDetail, StorageBadge, BootScreen,
 			// the metrics observer — now carries real @testing-library/react behavior
 			// specs (rendered output + interactions, engine boundary mocked), so the
 			// floor reflects genuine unit coverage rather than a placeholder.
@@ -218,9 +218,9 @@ export default defineConfig({
 			// What stays e2e-only (proven by the Playwright e2e/offline suites, NOT
 			// gamed with hollow units): the IntersectionObserver dwell path
 			// (useDwellViews no-ops under jsdom by design; Storefront onDwell), motion
-			// enter/exit animation internals, and the optional fire-and-forget uplink
-			// transport internals (uplink.ts — its emit rules are unit-tested, the
-			// network/batching/retry path is integration territory).
+			// enter/exit animation internals, and the legacy OPFS taste-file reader
+			// (legacyStorage.ts legacyTasteFile — jsdom has no OPFS; the returning-
+			// visitor migration is proven by the Playwright persistent-taste suite).
 			provider: "v8",
 			reporter: ["text", "json-summary"],
 			include: ["src/**/*.{ts,tsx}"],

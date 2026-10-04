@@ -1,6 +1,6 @@
 // Random-port helpers for the demo orchestrator (demo.mjs).
 //
-// Why: the demo used to pin :8081 (edge), :8000 (collector) and :5174 (SPA).
+// Why: the demo used to pin :8081 (edge) and :5174 (SPA).
 // Those collide with stale containers and sibling projects, surfacing as
 // confusing "port in use" / "signature verification failed" errors. Allocating
 // free ports per run removes that whole class of failure.

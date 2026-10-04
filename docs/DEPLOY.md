@@ -38,7 +38,7 @@ There is **no application backend in the request path**. The browser does the wo
 
 ```yaml
 # frontend/docker-compose.yml — abridged (omits the `name: nimbus-demo`
-# project name, the demo `collector` service, and healthchecks; see the
+# project name and healthchecks; see the
 # file itself for the full config). Modulo your TLS cert.
 services:
   origin:
@@ -89,7 +89,7 @@ A one-line edit to the index re-publishes one chunk; every consumer fetches one 
 
 The live demo at **https://edge-reco.com** is the backend-free shape served as plain
 static files from Cloudflare Pages — no Caddy, no origin server. The build bundles the
-signed catalog **same-origin** (copied into `dist/bundle`), so the whole flywheel runs
+signed catalog **same-origin** (copied into `dist/bundle`), so the whole app runs
 from one domain with zero CORS and zero application backend.
 
 Create the existing `edge-reco` Pages project in Cloudflare with this build config. The
@@ -106,8 +106,9 @@ green on hosted `main` and the exact live SHA has been independently verified:
 | Node version | from `frontend/.nvmrc` (24.16.0) — the single pin Dagger, deploy, and the local gate all install |
 
 No build environment variables are required: `build:pages` defaults to `VITE_BASE=/`
-(apex root) and `VITE_BUNDLE_BASE_URL=bundle` (the same-origin copy), and leaves
-`VITE_EVENTS_URL` unset so the hosted demo makes **zero backend calls after sync**. The
+(apex root) and `VITE_BUNDLE_BASE_URL=bundle` (the same-origin copy). The hosted demo
+makes **zero backend calls after sync**, and the app has no code that sends shopper data
+anywhere (`frontend/app/scripts/network-allowlist.test.mjs` fails the build otherwise). The
 SPA has no client-side router (state-based Landing → Boot → Storefront), so no SPA
 fallback / 404 rule is needed.
 
@@ -265,7 +266,7 @@ workflow remains red and production must not be reported healthy.
 
 ## Shape 2 — Edge-origin API server
 
-The same engine, but the **FastAPI runtime** does the search server-side. The SPA (or any client) calls `/search`, `/recommend`, `/events`.
+The same engine, but the **FastAPI runtime** does the search server-side. The SPA (or any client) calls `/search`, `/recommend`, `/catalog/info`. There is no event route.
 
 ```yaml
 # backend/deploy/docker-compose.yml — server-side deployment
@@ -297,7 +298,7 @@ For multi-region: stamp the same container in each region; each replica syncs th
 ### The server images and the embedding model
 
 Both server images (`backend/deploy/Dockerfile` for `edgereco serve`, and
-`backend/demo_server/Dockerfile` for the flywheel collector) embed queries in Python,
+`backend/demo_server/Dockerfile` for the optional demo API server) embed queries in Python,
 so they need the `sentence-transformers/all-MiniLM-L6-v2` weights. edge-proc never
 downloads a model unless told it may. Both images set `EDGEPROC_ALLOW_MODEL_DOWNLOAD=1`,
 so the first boot fetches the model from Hugging Face's `main` branch.
@@ -392,8 +393,7 @@ Everything an attacker could swap (chunks, manifest, pointer) is verified locall
 
 Every signed `latest` pointer carries a `sequence` (`edgereco bundle --sequence N`,
 which defaults to one more than the origin dir's current `latest` and refuses anything
-at or below it; `edgereco retrain` signs one more than the higher of the release it
-synced and the one its target origin already serves). Each browser keeps the highest pointer it has
+at or below it). Each browser keeps the highest pointer it has
 accepted as an **anti-rollback floor**, in OPFS and in IndexedDB. It keeps that floor
 even when the currently pinned key can't verify the stored pointer, so a key change
 can never be used to push an old release. That has three consequences for publishers:
@@ -423,7 +423,7 @@ can never be used to push an old release. That has three consequences for publis
   trust root with `@gainratio/browser`'s `parseTrustRoot`, and
   `frontend/app/scripts/trust-root-contract.test.mjs` fails the gate if the committed
   copies disagree or stop parsing. The optional Python/FastAPI tier
-  (`EDGERECO_VERIFY_KEY_PATH`, and the `retrain` / `audit` verify key) still reads one
+  (`EDGERECO_VERIFY_KEY_PATH`) still reads one
   raw key, so rotating that tier means swapping its key in step with the publisher.
 
 #### Revocation lag: the service worker serves the trust root from its precache
@@ -471,7 +471,5 @@ self-hosted model (`transformers-cache`), and the on-device taste log are left a
 
 - **Cold start**: the first sync downloads the full bundle (~10 MB for the demo catalog). Subsequent syncs only fetch chunks that changed.
 - **Offline**: once synced, both tiers are fully offline-capable. The SPA keeps working with `origin` + `edge` down; the FastAPI runtime keeps serving from cache.
-- **Observability**: the backend tier exports a bounded telemetry ring (`backend/src/edgereco/telemetry/`). Hook it up to your sink of choice.
-- **Flywheel uplink (the "events back to the cloud" loop)**: the SPA captures each interaction in-tab (clicks, favorites, cart-adds, capped dwell views), persists it (localStorage), and periodically flushes a batched, fire-and-forget beacon to the FastAPI `/events` collector — entirely **off the inference path**. It's **off by default** (`VITE_EVENTS_URL` unset → zero backend calls, the headline). `poe demo-flywheel` brings up the worked example: the `collector` container (the `demo_server` `/events` + CORS) is the mimicked cloud, and the SPA runs with `VITE_EVENTS_URL` pointing at the per-run collector port (`:8000` only on the standalone `docker compose up` path). The collector records into the telemetry ring above.
-- **Flywheel retrain (the cloud half that closes the loop)**: `edgereco retrain` (and the `poe demo-retrain` worked example) pulls aggregated engagement from the collector's `GET /events/export`, recomputes each product's `popularity_score` (intent-graded: cart 4× · favorite 3× · click 1× · view 0.2×) **and the `cooccurrence.json` item-to-item neighbour map** (from a `--sessions` JSONL session log, same engagement grading via cosine similarity), and **republishes a freshly signed bundle** (new `latest`) — reusing the prebuilt FAISS `vector/` verbatim (both are text-independent data, so nothing is re-embedded). Both tiers re-sync the new popularity + co-occurrence with **no scoring-formula change**. In the demo, the edge serves a writable **runtime origin** (`.demo-origin`, gitignored) seeded from the committed bundle, so retrain republishes there without mutating the committed seed; the edge's short-TTL `latest` (30s, `must-revalidate`) means a browser refresh picks up the new bundle. Re-signing requires the producer's private key (`examples/keys/private.key`, gitignored) — retrain is a maintainer/cloud operation, like `edgereco bundle`. The read-only `edgereco audit BUNDLE_BASE_URL VERIFY_KEY --sessions LOG` previews exactly what a retrain would change (event counts, top popularity movers, changed co-occurrence edges) without signing, publishing, or touching the inference path.
-- **Sibling repos in Docker**: the demo_server `Dockerfile` builds with the context rooted at `~/dev/oss/` (three repos side-by-side) so `../edge-proc` and `../shared-libs-python` resolve. See its top comment.
+- **Shopper data**: none leaves the device. The SPA keeps the shopper's activity in a `taste_events` table in the on-device SQLite database and never sends it anywhere; there is no event route, collector or retrain-from-events job to deploy. Popularity and the `cooccurrence.json` "also bought" map are set at publish time and shipped in the signed bundle.
+- **Docker build context**: the demo_server `Dockerfile` builds with `backend/` as the context; uv resolves edge-proc/edgeproc-core from the release tags pinned in `uv.lock`, so no sibling checkout is sent to Docker. See its top comment.

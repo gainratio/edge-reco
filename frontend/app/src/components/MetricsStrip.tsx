@@ -6,7 +6,7 @@ import { useMetrics } from "../metrics/store";
  * Every value is measured in-tab and updates as the user searches/clicks:
  *   - latency      — last recommend() (falls back to search()) round-trip, ms
  *   - backend calls — post-sync edge/other requests; the headline 0 of the
- *                     backend-free demo (images + uplink excluded upstream)
+ *                     backend-free demo (images excluded upstream)
  *   - cold start    — engine boot → ready, seconds
  *   - JS heap       — main-thread heap (Chromium-only); the tile is HIDDEN when
  *                     unavailable so non-Chromium users never see a blank

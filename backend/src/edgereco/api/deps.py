@@ -25,7 +25,6 @@ from edgereco.reco.cooccurrence import CooccurrenceMatrix
 from edgereco.reco.ranking_config import DEFAULT_RANKING_CONFIG, RankingConfig
 from edgereco.search.keyword import KeywordSearcher
 from edgereco.search.vector import VectorSearcher
-from edgereco.telemetry.buffer import EventBuffer
 
 _log = logging.getLogger(__name__)
 
@@ -90,7 +89,6 @@ class ServiceContainer:
     vector: VectorSearcher
     encoder: ProductEncoder
     sessions: SessionStore = field(default_factory=SessionStore)
-    events: EventBuffer = field(default_factory=EventBuffer)
     manifest: CatalogManifest | None = None
     ranking_config: RankingConfig = field(default_factory=lambda: DEFAULT_RANKING_CONFIG)
     cooccurrence: CooccurrenceMatrix = field(default_factory=CooccurrenceMatrix)
@@ -200,7 +198,7 @@ def sync_and_materialize(*, base_url: str, cache_root: Path, verifier: Verifier)
 
     Fail-closed on a bad signature or tampered chunk. Returns the dir holding the
     materialized ``products.jsonl`` + ``vector/`` + ``catalog_meta.json`` — the
-    base inputs both ``from_synced`` (edge) and the retrain job (cloud) build on.
+    base inputs ``from_synced`` builds the serving container on.
     """
     store, manifest = _sync_and_load_manifest(
         base_url=base_url, cache_root=cache_root, verifier=verifier

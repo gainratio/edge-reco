@@ -13,7 +13,7 @@
 		"test": "vitest run",
 		"test:coverage": "vitest run --coverage",
 		"test:preflight": "node --test scripts/*.test.mjs",
-		"test:artifacts": "PRODUCTION_ARTIFACT_DIR=dist node --test scripts/production-artifacts.test.mjs",
+		"test:artifacts": "PRODUCTION_ARTIFACT_DIR=dist node --test scripts/production-artifacts.test.mjs scripts/network-allowlist.test.mjs",
 		"test:e2e": "playwright test",
 		"test:e2e:c1": "node scripts/download-model.mjs && node scripts/stage-ort-wasm.mjs && playwright test -c playwright.c1.config.ts",
 		"test:e2e:webkit": "pnpm run build:pages && playwright test -c playwright.webkit.config.ts",

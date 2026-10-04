@@ -1,3 +1,4 @@
+import { readFileSync } from "node:fs";
 import { expect, test } from "@playwright/test";
 
 /**
@@ -5,18 +6,23 @@ import { expect, test } from "@playwright/test";
  *
  *   (a) clicks re-rank the For-You rail (explicit here; also guarded by
  *       storefront.spec.ts's hero-loop test);
- *   (b) a FULL RELOAD retains the taste: the OPFS taste log replays through
- *       the same fold on boot, so the badge restores and the rail stays
- *       personalized — the "0 backend calls" headline stays true because the
- *       log lives in the browser's own origin-private file system;
+ *   (b) a FULL RELOAD retains the taste: the taste log (a table in the
+ *       on-device SQLite database, kept in OPFS) replays through the same fold
+ *       on boot, so the badge restores and the rail stays personalized — the
+ *       "0 backend calls" headline stays true because nothing leaves the tab;
  *   (c) browser Back from the PDP stays IN-APP (hash history + popstate — no
  *       document unload), and a reload on a PDP hash restores the PDP with
  *       taste intact;
  *   (d) "Reset taste" returns the rail to the baseline a brand-new visitor
  *       sees and zeroes the badge.
  *
+ *   (e) a RETURNING visitor from an older build (taste in the OPFS file
+ *       taste/events.jsonl, a session id and an uplink queue in localStorage)
+ *       is migrated: the taste is copied into SQLite and replayed, then the
+ *       file and both localStorage keys are gone.
+ *
  * REAL vs STUBBED matches storefront.spec.ts: real sync/OPFS/search engine
- * and real main-thread OPFS for the taste log; only the embedder transport is
+ * and the real SQLite database for the taste log; only the embedder transport is
  * a deterministic stub so no ~25 MB model download gates the run.
  */
 
@@ -123,7 +129,7 @@ test("(a)+(b) clicks personalize the rail, and a FULL RELOAD retains the taste",
 	await launch(page);
 	await expect(page.getByRole("button", { name: LAUNCH })).toHaveCount(0);
 
-	// The badge restores from the replayed OPFS log (views never count) …
+	// The badge restores from the replayed SQLite log (views never count) …
 	await expect(page.locator(FOR_YOU_BADGE)).toHaveText("3");
 	// … and the rail is still personalized, not back to the cold order.
 	await expect
@@ -205,4 +211,74 @@ test("(d) Reset taste returns the For-You rail to baseline and zeroes the badge"
 	await page.reload();
 	await launch(page);
 	await expect(page.locator(FOR_YOU_BADGE)).toHaveText("0");
+});
+
+/** The first `n` product ids of the committed signed catalog's source. */
+function catalogIds(n: number): string[] {
+	const path = new URL(
+		"../../../../backend/examples/source/catalog.csv",
+		import.meta.url,
+	);
+	return readFileSync(path, "utf8")
+		.split("\n")
+		.slice(1, n + 1)
+		.map((line) => line.split(",")[0] ?? "");
+}
+
+test("(e) a returning visitor's old OPFS taste file and localStorage keys migrate into SQLite", async ({
+	page,
+}) => {
+	const ids = catalogIds(3);
+	await page.goto("/");
+	// What an older build left behind, written while the engine is still cold.
+	await page.evaluate(async (productIds: string[]) => {
+		localStorage.setItem("nimbus_session_id", "old-session-id");
+		localStorage.setItem(
+			"nimbus_uplink_queue",
+			JSON.stringify([{ event_type: "click", product_id: productIds[0] }]),
+		);
+		const root = await navigator.storage.getDirectory();
+		const dir = await root.getDirectoryHandle("taste", { create: true });
+		const file = await dir.getFileHandle("events.jsonl", { create: true });
+		const writable = await file.createWritable();
+		const lines = productIds.map((productId) =>
+			JSON.stringify({
+				v: 1,
+				ts: "2026-09-01T00:00:00.000Z",
+				type: "click",
+				productId,
+				sessionId: "old-session-id",
+			}),
+		);
+		await writable.write(`${lines.join("\n")}\n`);
+		await writable.close();
+	}, ids);
+
+	await launch(page);
+	// The three old clicks were copied into SQLite and replayed.
+	await expect(page.locator(FOR_YOU_BADGE)).toHaveText("3");
+	await expect(
+		page.getByRole("status").filter({ hasText: "on-device" }),
+	).toContainText("saved only in this browser");
+	// Copy-then-retire: the old file and both old keys are gone.
+	const leftovers = await page.evaluate(async () => {
+		const root = await navigator.storage.getDirectory();
+		let tasteDir = true;
+		try {
+			await root.getDirectoryHandle("taste");
+		} catch {
+			tasteDir = false;
+		}
+		return {
+			tasteDir,
+			session: localStorage.getItem("nimbus_session_id"),
+			queue: localStorage.getItem("nimbus_uplink_queue"),
+		};
+	});
+	expect(leftovers).toEqual({ tasteDir: false, session: null, queue: null });
+
+	// And the taste now lives in SQLite: it survives a reload with no file.
+	await page.reload();
+	await launch(page);
+	await expect(page.locator(FOR_YOU_BADGE)).toHaveText("3");
 });

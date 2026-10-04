@@ -33,17 +33,13 @@ name: nimbus-demo
 
 services:
   # Static-file origin: serves a signed bundle (flat `latest`, `manifest/<hash>`,
-  # `chunk/<hash>`). Defaults to the committed seed (../backend/examples/catalog/);
-  # the flywheel-retrain path overrides NIMBUS_ORIGIN_DIR to a writable runtime
-  # copy (.demo-origin) so `edgereco retrain` can republish without touching the
-  # committed seed. Mount is :ro for the CONTAINER (it only serves); the host-side
-  # retrain job writes the runtime dir directly, which :ro does not restrict.
+  # `chunk/<hash>`) from the committed seed (../backend/examples/catalog/), read-only.
   origin:
     image: python:3.13-slim
     container_name: nimbus-origin
     working_dir: /catalog
     volumes:
-      - ${NIMBUS_ORIGIN_DIR:-../backend/examples/catalog}:/catalog:ro
+      - ../backend/examples/catalog:/catalog:ro
     command: ["python", "-m", "http.server", "8080"]
     healthcheck:
       # `/latest` is the bundle's version pointer (the old flat `/manifest.json`
@@ -79,51 +75,15 @@ services:
       retries: 5
       start_period: 5s
 
-  # Mimicked cloud: the FastAPI `/events` collector (demo_server) — the uplink
-  # SINK for the flywheel. NOT part of the backend-free default demo; brought up
-  # only by `poe demo-flywheel` (and via the `flywheel` compose profile). It
-  # SYNCS the same signed bundle from the edge (prebuilt FAISS, zero recompute)
-  # and serves CORS so the browser can POST batched interaction events to it.
-  collector:
-    profiles: ["flywheel"]
-    build:
-      # Backend-only context: release-tagged dependencies come from uv.lock, and
-      # host secrets/sibling repositories never enter Docker's build context.
-      context: ../backend
-      dockerfile: demo_server/Dockerfile
-    container_name: nimbus-collector
-    depends_on:
-      edge:
-        condition: service_healthy
-    environment:
-      DEMO_HOST: 0.0.0.0
-      DEMO_PORT: "8000"
-      # CORS allowlist for the browser SPA. Defaults to the standalone SPA port;
-      # the demo orchestrator overrides it with the SPA's random port per run.
-      DEMO_CORS_ORIGINS: ${DEMO_CORS_ORIGINS:-http://localhost:5174}
-      # Sync the SAME signed bundle the browser uses (prebuilt vector/, no rebuild).
-      EDGERECO_BUNDLE_BASE_URL: http://edge:8081
-      EDGERECO_VERIFY_KEY_PATH: /app/examples/keys/public.key
-    ports:
-      - "${COLLECTOR_HOST_PORT:-8000}:8000"
-    healthcheck:
-      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8000/healthz')"]
-      interval: 5s
-      timeout: 3s
-      retries: 10
-      start_period: 40s
-
   # The Nimbus SPA: a static bundle. VITE_BUNDLE_BASE_URL is baked at build time
   # to the host-mapped edge origin, because the BROWSER (not this container) is
-  # what syncs the signed bundle from it. VITE_EVENTS_URL is the optional uplink
-  # sink — empty by default (backend-free); set it to enable the flywheel.
+  # what syncs the signed bundle from it.
   frontend:
     build:
       context: .
       dockerfile: app/Dockerfile
       args:
         VITE_BUNDLE_BASE_URL: http://localhost:8081
-        VITE_EVENTS_URL: ${VITE_EVENTS_URL:-}
     container_name: nimbus-frontend
     ports:
       - "5174:5174"

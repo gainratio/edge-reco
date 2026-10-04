@@ -2,11 +2,16 @@
 
 ## TL;DR
 
+No user data leaves the device. The shopper's activity is stored only in their own
+browser's SQLite database, and nothing is sent to or stored on any server or cloud.
+
 The hosted Nimbus demo downloads a public, signed catalog and runs queries and
-personalization inside the browser. The production build has no analytics uplink or
-application API configured. Catalog integrity fails closed; personal signals stay in
-tab memory; product photos are self-hosted on the app origin, so showing them makes
-no third-party requests. This document separates those facts from the optional collector.
+personalization inside the browser. There is no analytics, no event uplink, no collector
+and no application API in the build. Catalog integrity fails closed. Product photos are
+self-hosted on the app origin, so showing them makes no third-party requests.
+
+The data belongs to the shopper. They can wipe it with **Reset taste** or by clearing the
+site's data. Export/import is not built yet.
 
 ## Trust boundaries and threat model
 
@@ -14,12 +19,11 @@ no third-party requests. This document separates those facts from the optional c
 |---|---|---|---|
 | Browser app origin | Reviewed static JS, public key, model and WASM | CSP limits code/data connections to self; no third-party fonts, model, runtime, or query API | A first-load compromise of the app origin can replace both JS and its key. Bundle signing does not cure a compromised application origin. |
 | Catalog CDN / bundle bytes | Ed25519 public key shipped with the app | Signed pointer, manifest and chunk hashes verify before promotion; malformed ranking/vector/co-occurrence data fails closed | A previously valid signed release can be replayed unless the deployment layer enforces freshness. Do not expose the signing private key to CI or Docker. |
-| Browser device | OPFS, CacheStorage and in-memory profile | Catalog/model caches contain public artifacts; search and recommendation use local Workers with 60 s engine and 300 s first-embed deadlines; the taste log keeps at most 500 no-PII interaction records in OPFS | Anyone with device/browser-profile access can inspect public catalog artifacts, the local taste log (product IDs + event types only), and the optional local event queue. |
-| Optional event collector | Explicit `VITE_EVENTS_URL` and operator-set bearer token | Batches ≤1,000; session IDs ≤200 chars; event ring ≤10,000; sessions ≤10,000 and expire after 1 hour idle | The demo permits an intentionally open collector when `EDGERECO_EVENTS_TOKEN` is unset. Never expose that shape to an untrusted network. |
+| Browser device | OPFS, CacheStorage and in-memory profile | Catalog/model caches contain public artifacts; search and recommendation use local Workers with 60 s engine and 300 s first-embed deadlines; the taste log keeps at most 500 no-PII interaction records in the on-device SQLite database | Anyone with device/browser-profile access can inspect public catalog artifacts and the local taste log (product IDs, event types, timestamps only). |
 | Production deploy | GitHub CI SHA and scoped Cloudflare credentials | Missing secrets fail red; Cloudflare must report the exact successful commit; `www` must permanently redirect to the apex | DNS/Cloudflare settings are external state and still require post-deploy verification and rollback drills. |
 
 The main hostile cases are tampered or truncated bundle bytes, malformed signed data,
-Worker crash/silence, oversized event input, session-memory exhaustion, dependency or
+Worker crash/silence, oversized API input, API session-memory exhaustion, dependency or
 container-context leakage, and a deploy that reports success without serving the
 reviewed commit. The tests and release workflow name each corresponding failure
 boundary; no integrity error falls back to unverified data.
@@ -29,25 +33,39 @@ boundary; no integrity error falls back to unverified data.
 | Data | Default hosted demo | Storage / retention | Network egress |
 |---|---|---|---|
 | Search text | Processed in the embedder/search Workers | Memory for the active operation; not persisted by EdgeReco | None after bundle/model sync |
-| Click, view, favorite, cart | Folded into the in-tab session profile | In-browser OPFS taste log (`taste/events.jsonl`): product ID, event type, timestamp, random browser session ID — no PII; rolling window of the newest 500 events; replayed locally on boot to rebuild the profile; erased by the in-app "Reset taste" control or by clearing site data | None (`VITE_EVENTS_URL` is unset) |
+| Click, view, favorite, cart | Folded into the in-tab session profile | `taste_events` table in the on-device SQLite database (`edgereco-catalogue`, OPFS pool): product ID, event type, timestamp. No user ID, no session ID, no PII. Rolling window of the newest 500 events, replayed locally on boot to rebuild the profile. When OPFS is refused or another tab holds the database, SQLite runs in memory and the log resets on reload; a status pill says so. Erased by "Reset taste" or by clearing site data | None. The app has no code that sends it anywhere |
 | Catalog, embeddings, model, WASM, public key | Public release artifacts | OPFS, service-worker/transformers caches, HTTP cache | Same-origin sync/download only |
 | Product images | Generated SVG product cards (a Lucide icon for the product's shelf on a pastel backdrop), self-hosted with the app under `/images/<product-id>.svg` (720 files, about 0.8 MB); the signed catalog's `image_url` is root-relative and no third-party image is loaded | Browser HTTP cache only; not precached by the service worker. The same cards are also signed into the bundle as `images/<id>.svg`, and a build guard (`frontend/app/scripts/check-product-images.mjs`) fails the build if any product's card is missing | Same-origin image requests only (`img-src 'self' data:`) |
-| Optional flywheel events | Product ID, event type, timestamp, random browser session ID | Queue capped at 500 in `localStorage` until acknowledged; collector ring capped at 10,000; session profile expires after 1 hour idle | Only to the explicitly configured `VITE_EVENTS_URL` |
-| API-server search | Query and random/header session ID | Session profile in bounded memory | Client-to-API request; normal access logs may contain the URL query and must be governed by the operator |
+| Self-hosted API-server search (optional, not in the demo) | Query and an `X-Session-Id` header (or a server-generated UUID) | Session profile in bounded memory | Client-to-API request; normal access logs may contain the URL query and must be governed by the operator |
+
+SQLite is the only store for app data. Other browser storage holds no shopper data:
+the signed-bundle cache (content-addressed OPFS chunks plus `@gainratio/browser`'s
+IndexedDB anti-rollback record `edgeproc-browser-cache`), the service-worker
+CacheStorage (app shell and model), the transformers.js model cache, and a per-tab
+sessionStorage "launched" flag.
 
 There are no prompts, LLM providers, user embeddings, account records, backups, or
-personal-data exports in this repository. Clearing site data removes OPFS/CacheStorage
-(including the taste log), the optional queue, and the persisted session ID; the
-in-app "Reset taste" control erases the taste log and live profile without touching
-the cached catalog/model. The default demo's disabled uplink is a no-op and does not
-create a queue.
+personal-data exports in this repository. Export/import of the shopper's data is not
+built yet. Clearing site data removes all of it. "Reset taste" clears the SQLite taste
+table and the live profile without touching the cached catalog/model.
+
+Returning visitors from older builds are migrated on boot. The old OPFS file
+`taste/events.jsonl` is copied into SQLite with an `app_migrations` marker in the same
+transaction, then deleted (only when the database is durable). The old localStorage
+keys `nimbus_session_id` and `nimbus_uplink_queue` are removed and their contents
+dropped, never sent. Production never sent events: no deploy ever set an events URL.
+
+Guards that fail the build if this changes:
+
+- `frontend/app/src/storageBoundary.test.ts`: non-test source may not use
+  localStorage, sessionStorage or IndexedDB outside a short allow-list.
+- `frontend/app/scripts/network-allowlist.test.mjs` (in `test:artifacts`): the built app
+  may not name a host outside the allow-list, open a beacon, WebSocket or EventSource,
+  or loosen CSP `connect-src` / `img-src` from `'self'`.
+- `backend/tests/unit/api/test_no_event_sink.py`: fails if a `POST /events` route returns.
 
 ## Operator requirements
 
-- Keep `VITE_EVENTS_URL` unset for the zero-backend public demo. If enabling it,
-  disclose the collector and retention, set `EDGERECO_EVENTS_TOKEN`, terminate TLS,
-  restrict CORS, apply edge rate limits, and define deletion/export operations before
-  accepting real-user traffic.
 - Keep the Ed25519 private key outside Git, CI build artifacts, Docker contexts, logs,
   and backups that are not explicitly protected as signing-key material.
 - Treat API access logs as search-history data. Disable query logging or set a short,

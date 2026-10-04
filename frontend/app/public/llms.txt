@@ -37,6 +37,17 @@
 - Repository: hseshadr/edge-reco
 - Status: experimental / beta
 
+## Privacy
+
+- No user data leaves the device. The shopper's activity (clicks, views, favorites,
+  cart adds: timestamp, event type, product id) is stored only in the on-device SQLite
+  database in their own browser. Nothing is sent to or stored on any server or cloud.
+  There is no analytics, event uplink, or collector.
+- The data belongs to the shopper. They can wipe it with "Reset taste" or by clearing
+  the site's data. Export/import is not built yet.
+- If the browser refuses durable storage or another tab holds the database, SQLite runs
+  in memory and the activity resets on reload; the store says so on screen.
+
 ## Related project: EdgeProc
 
 EdgeProc (also written edge-proc, hseshadr/edge-proc) is the reusable substrate that
