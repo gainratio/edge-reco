@@ -206,6 +206,7 @@ export default defineConfig({
 			"tests/e2e-c1/**",
 			"tests/e2e-live/**",
 			"tests/e2e-offline/**",
+			"tests/e2e-webkit/**",
 			"scripts/**",
 		],
 		coverage: {

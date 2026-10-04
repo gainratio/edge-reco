@@ -43,7 +43,7 @@ PREVIEW_ARGS: Final = tuple(shell_split("pnpm -C app exec vite preview --host --
 ASSAY_INSTALL: Final = tuple(
     shell_split("uv pip install --python /opt/venv --no-cache --reinstall --no-deps assay-engine==0.5.0.dev6")
 )
-PLAYWRIGHT_INSTALL: Final = tuple(shell_split("pnpm -C app exec playwright install --with-deps chromium"))
+PLAYWRIGHT_INSTALL: Final = tuple(shell_split("pnpm -C app exec playwright install --with-deps chromium webkit"))
 FIXTURES: Final = tuple(shell_split("search_parity cooccurrence_parity strategy_parity embedding_parity hybrid_parity"))
 FIXTURE_DIR: Final = "../frontend/packages/edgereco-browser/src/engine/__fixtures__"
 SOURCE_EXCLUDES: Final = list(
