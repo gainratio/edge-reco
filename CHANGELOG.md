@@ -16,6 +16,18 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 - **Scheduled live probe.** `.github/workflows/live-probe.yml` runs the `@fresh`
   smoke against https://edge-reco.com every 4 hours (`dagger call live-probe`).
 
+### Fixed
+- **The storefront starts on WebKit contexts that have no OPFS.** In an ephemeral
+  WebKit context `navigator.storage.getDirectory()` throws `UnknownError`; the vector
+  store failed to open and the page stopped at "Couldn’t start the engine". The
+  vector store now falls back to the same SQLite engine in memory (it was never a warm
+  start) and logs why. This reverses the earlier "do not hide a real OPFS failure"
+  contract. A new WebKit lane (`test:e2e:webkit`, iPhone 13 emulation, in `gate:e2e`)
+  loads the production build. Not a regression of the 2026-10-03 dependency bump:
+  the 2026-10-02 build fails the same way.
+- `llms.txt` now says what is true: only the vector search uses SQLite (BM25 is an
+  in-JavaScript port, the query embedder is ONNX Runtime Web).
+
 ### Changed
 - **Own libraries moved to their newest releases.** Python `assay-engine` 0.5.0.dev3
   -> 0.5.0.dev6 (still an exact pin, matched by the npm side, so both tiers run the

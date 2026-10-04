@@ -78,10 +78,15 @@ async function openOwned(
 	try {
 		return await open({ ...options, persistence: "opfs" });
 	} catch (error) {
-		if (!isVectorStoreBusyError(error)) {
-			throw error;
-		}
-		// e.g. a tab still running a build that never took the lock.
+		// Busy (e.g. a tab still running a build that never took the lock) or
+		// unusable (ephemeral WebKit contexts have no OPFS:
+		// navigator.storage.getDirectory() throws UnknownError). The
+		// persistent copy is never a warm start, so memory loses nothing. If memory
+		// cannot open either, that error is the one the caller sees.
+		console.warn(
+			"[edge-reco] on-device vector store: OPFS unavailable, using the in-memory index for this tab",
+			error,
+		);
 		return open({ ...options, persistence: "memory" });
 	}
 }

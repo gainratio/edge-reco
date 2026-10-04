@@ -116,14 +116,41 @@ describe("tabSafeVectorIndexFactory — one OPFS owner per browser profile", () 
 		await index.dispose();
 	});
 
-	it("does not hide a real OPFS failure behind the memory fallback", async () => {
-		const broken = new Error("could not open the local vector database (boom)");
+	// Reverses the old contract ("does not hide a real OPFS failure"). Playwright's
+	// default (ephemeral) WebKit context has no OPFS at all
+	// (navigator.storage.getDirectory() throws UnknownError), and the persistent
+	// copy is never a warm start, so refusing to run there bought nothing.
+	it("falls back to memory when OPFS is unusable for any reason, and says why", async () => {
+		const warn = vi.spyOn(console, "warn").mockImplementation(() => undefined);
+		const broken = new Error(
+			"could not open the local vector database (The operation failed for an unknown transient reason (e.g. out of memory).)",
+		);
+		const { calls, open } = recordingOpener((o) =>
+			o.persistence === "opfs" ? broken : undefined,
+		);
+
+		const index = await tabSafeVectorIndexFactory({
+			locks: new FakeLocks(),
+			open,
+		})(OPTIONS);
+
+		expect(calls.map((c) => c.persistence)).toEqual(["opfs", "memory"]);
+		expect(warn).toHaveBeenCalledWith(
+			expect.stringContaining("in-memory"),
+			broken,
+		);
+		await index.dispose();
+		warn.mockRestore();
+	});
+
+	it("still fails loudly when the in-memory store cannot open either", async () => {
+		const broken = new Error("wasm unavailable");
 		const { calls, open } = recordingOpener(() => broken);
 
 		await expect(
 			tabSafeVectorIndexFactory({ locks: new FakeLocks(), open })(OPTIONS),
 		).rejects.toBe(broken);
-		expect(calls.map((c) => c.persistence)).toEqual(["opfs"]);
+		expect(calls.map((c) => c.persistence)).toEqual(["opfs", "memory"]);
 	});
 });
 

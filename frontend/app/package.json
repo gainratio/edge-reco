@@ -16,6 +16,7 @@
 		"test:artifacts": "PRODUCTION_ARTIFACT_DIR=dist node --test scripts/production-artifacts.test.mjs",
 		"test:e2e": "playwright test",
 		"test:e2e:c1": "node scripts/download-model.mjs && node scripts/stage-ort-wasm.mjs && playwright test -c playwright.c1.config.ts",
+		"test:e2e:webkit": "pnpm run build:pages && playwright test -c playwright.webkit.config.ts",
 		"test:e2e:offline": "VITE_BUNDLE_BASE_URL=http://localhost:8921/catalog pnpm run build && playwright test -c playwright.offline.config.ts",
 		"typecheck": "tsc -b",
 		"gen-icons": "node scripts/gen-icons.mjs",
