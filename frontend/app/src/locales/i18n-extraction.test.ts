@@ -31,7 +31,7 @@ describe("storefront i18n extraction — byte-identical English", () => {
 
 	it("grid chrome resolves verbatim (incl. pluralized count)", () => {
 		expect(t("grid.kickerCatalog")).toBe("Catalog");
-		expect(t("grid.kickerSearch")).toBe("Search results");
+		expect(t("grid.titleSearch")).toBe("Search results");
 		expect(t("grid.titleBrowse")).toBe("Browse");
 		expect(t("grid.empty")).toBe(
 			"Nothing here yet. Try another search or category.",

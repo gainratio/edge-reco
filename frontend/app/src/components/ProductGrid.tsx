@@ -6,7 +6,8 @@ const SKELETON_KEYS = ["s0", "s1", "s2", "s3", "s4", "s5", "s6", "s7"];
 
 interface ProductGridProps {
 	products: Product[];
-	kicker: string;
+	/** Small label above the title; the search view omits it (the title says it). */
+	kicker?: string;
 	title: string;
 	loading: boolean;
 	onPick: (product: Product) => void;
@@ -42,7 +43,9 @@ export function ProductGrid({
 		<section className="grid-section" aria-label={title}>
 			<div className="section-head">
 				<div>
-					<div className="section-head__kicker">{kicker}</div>
+					{kicker !== undefined && (
+						<div className="section-head__kicker">{kicker}</div>
+					)}
 					{/* The grid title is the page h1: browse/search render exactly one
 					    ProductGrid and no other h1 (the PDP view unmounts the grid). */}
 					<h1 className="section-head__title">{title}</h1>

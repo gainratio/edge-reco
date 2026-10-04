@@ -310,6 +310,29 @@ describe("Storefront category + search", () => {
 		// Entering search pulled the freshly-surfaced results into view.
 		expect(window.scrollTo).toHaveBeenCalled();
 	});
+
+	it("shows the query once: in the search box, never echoed by a visible heading", async () => {
+		render(<Storefront />);
+		await screen.findByText("Grid Gadget");
+		vi.useFakeTimers();
+		fireEvent.change(screen.getByLabelText("Search products"), {
+			target: { value: "lamp" },
+		});
+		await act(() => vi.advanceTimersByTimeAsync(300));
+		expect(screen.getByText("Lamp Deluxe")).toBeInTheDocument();
+
+		// The page h1 is a plain results label, not a second copy of the query.
+		const h1 = screen.getByRole("heading", { level: 1 });
+		expect(h1).toHaveTextContent("Search results");
+		expect(h1.textContent ?? "").not.toMatch(/lamp/i);
+		// ...and "Search results" is not stacked as both kicker and title.
+		expect(screen.getAllByText("Search results")).toHaveLength(1);
+		// The "Results for …" announcement stays for screen readers only: it is a
+		// polite live region, visually hidden so sighted users see the query once.
+		const cue = screen.getByText("Results for “lamp”");
+		expect(cue).toHaveAttribute("role", "status");
+		expect(cue).toHaveClass("visually-hidden");
+	});
 });
 
 describe("Storefront stale-search race (latest-wins)", () => {
