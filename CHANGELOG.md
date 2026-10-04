@@ -18,11 +18,19 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 ### Changed
 - **SQLite is the only store for app data.** The taste log (timestamp, event type,
   product id; newest 500) moved from the OPFS file `taste/events.jsonl` into a
-  `taste_events` table in the on-device catalogue database. Returning visitors are
-  migrated copy-then-retire: the file is copied into SQLite with an `app_migrations`
-  marker in one transaction, then deleted. The old `nimbus_session_id` and
-  `nimbus_uplink_queue` localStorage keys are removed on boot and their contents
-  dropped. "Reset taste" clears the table and any legacy leftovers.
+  `taste_events` table in the shopper's own SQLite database (`edgereco-user`), kept
+  apart from the disposable catalogue database so a catalogue rebuild can never touch
+  it. Returning visitors are migrated copy-then-retire: events are copied in, skipping
+  any already present, then the file is deleted (owner tab only). A rerun after a
+  crash, or a rollback to an older build and forward again, never duplicates or loses
+  events. The old `nimbus_session_id` and `nimbus_uplink_queue` localStorage keys are
+  removed on boot and their contents dropped. "Reset taste" clears the table and any
+  legacy leftovers, then checks the table is empty; anything left is an error the
+  shopper sees, never a silent success. A Reset in a second tab is routed to the tab
+  that owns the database over a BroadcastChannel.
+- The optional FastAPI server is stateless: the in-memory session store, the
+  `X-Session-Id` header, `apply_interaction`, `dump_jsonl` and `InteractionEvent` are
+  deleted.
 - Co-occurrence is still bundle data built at publish time; nothing recomputes it from
   shopper activity.
 

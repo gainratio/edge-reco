@@ -471,5 +471,5 @@ self-hosted model (`transformers-cache`), and the on-device taste log are left a
 
 - **Cold start**: the first sync downloads the full bundle (~10 MB for the demo catalog). Subsequent syncs only fetch chunks that changed.
 - **Offline**: once synced, both tiers are fully offline-capable. The SPA keeps working with `origin` + `edge` down; the FastAPI runtime keeps serving from cache.
-- **Shopper data**: none leaves the device. The SPA keeps the shopper's activity in a `taste_events` table in the on-device SQLite database and never sends it anywhere; there is no event route, collector or retrain-from-events job to deploy. Popularity and the `cooccurrence.json` "also bought" map are set at publish time and shipped in the signed bundle.
+- **Shopper data**: none leaves the device. The SPA keeps the shopper's activity in a `taste_events` table in its own on-device SQLite database (`edgereco-user`) and never sends it anywhere; there is no event route, collector or retrain-from-events job to deploy. Popularity and the `cooccurrence.json` "also bought" map are set at publish time and shipped in the signed bundle.
 - **Docker build context**: the demo_server `Dockerfile` builds with `backend/` as the context; uv resolves edge-proc/edgeproc-core from the release tags pinned in `uv.lock`, so no sibling checkout is sent to Docker. See its top comment.

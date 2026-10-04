@@ -174,7 +174,7 @@ ValidationError: Input should be greater than or equal to 0
 ## Where the shopper's data lives
 
 No user data leaves the device. The shopper's clicks, views, favorites and cart adds are
-stored only in a `taste_events` table in the SQLite database inside their own browser
+stored only in a `taste_events` table in the shopper's own SQLite database (`edgereco-user`) inside their browser
 (timestamp, event type, product id; the newest 500). Nothing is sent to or stored on any
 server or cloud, and there is no command that collects it. **Reset taste** or clearing
 the site's data wipes it. Export/import is not built yet.

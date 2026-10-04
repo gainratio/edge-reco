@@ -33,7 +33,7 @@ boundary; no integrity error falls back to unverified data.
 | Data | Default hosted demo | Storage / retention | Network egress |
 |---|---|---|---|
 | Search text | Processed in the embedder/search Workers | Memory for the active operation; not persisted by EdgeReco | None after bundle/model sync |
-| Click, view, favorite, cart | Folded into the in-tab session profile | `taste_events` table in the on-device SQLite database (`edgereco-catalogue`, OPFS pool): product ID, event type, timestamp. No user ID, no session ID, no PII. Rolling window of the newest 500 events, replayed locally on boot to rebuild the profile. When OPFS is refused or another tab holds the database, SQLite runs in memory and the log resets on reload; a status pill says so. Erased by "Reset taste" or by clearing site data | None. The app has no code that sends it anywhere |
+| Click, view, favorite, cart | Folded into the in-tab session profile | `taste_events` table in the shopper's own on-device SQLite database (`edgereco-user`, its own OPFS pool, never rebuilt by a catalogue refresh): product ID, event type, timestamp. No user ID, no session ID, no PII. Rolling window of the newest 500 events, replayed locally on boot to rebuild the profile. When OPFS is refused or another tab holds the database, SQLite runs in memory and the log resets on reload; a status pill says so. Erased by "Reset taste" or by clearing site data | None. The app has no code that sends it anywhere |
 | Catalog, embeddings, model, WASM, public key | Public release artifacts | OPFS, service-worker/transformers caches, HTTP cache | Same-origin sync/download only |
 | Product images | Generated SVG product cards (a Lucide icon for the product's shelf on a pastel backdrop), self-hosted with the app under `/images/<product-id>.svg` (720 files, about 0.8 MB); the signed catalog's `image_url` is root-relative and no third-party image is loaded | Browser HTTP cache only; not precached by the service worker. The same cards are also signed into the bundle as `images/<id>.svg`, and a build guard (`frontend/app/scripts/check-product-images.mjs`) fails the build if any product's card is missing | Same-origin image requests only (`img-src 'self' data:`) |
 | Self-hosted API-server search (optional, not in the demo) | Query text and parameters only; the server is stateless, keeps no session or profile, and ignores any session header | None; each request is ranked against an empty profile and nothing is kept after the response | Client-to-API request; normal access logs may contain the URL query and must be governed by the operator |
@@ -47,11 +47,15 @@ sessionStorage "launched" flag.
 There are no prompts, LLM providers, user embeddings, account records, backups, or
 personal-data exports in this repository. Export/import of the shopper's data is not
 built yet. Clearing site data removes all of it. "Reset taste" clears the SQLite taste
-table and the live profile without touching the cached catalog/model.
+table and the live profile without touching the cached catalog/model, then checks the
+table is empty; rows left behind are an error on screen, never a silent success. A
+Reset in a tab that does not own the database is sent to the owner tab, which wipes,
+verifies and replies; no reply is an error too.
 
 Returning visitors from older builds are migrated on boot. The old OPFS file
-`taste/events.jsonl` is copied into SQLite with an `app_migrations` marker in the same
-transaction, then deleted (only when the database is durable). The old localStorage
+`taste/events.jsonl` is copied into SQLite, skipping any event already present, then
+deleted (only by the tab that owns the durable database). A crash mid-way or a rollback
+to an older build and forward again copies only what is new. The old localStorage
 keys `nimbus_session_id` and `nimbus_uplink_queue` are removed and their contents
 dropped, never sent. Production never sent events: no deploy ever set an events URL.
 

@@ -191,7 +191,8 @@ flowchart LR
   embed["Embedder worker — embedderWorker.ts<br>transformers.js, all-MiniLM-L6-v2"]
   sqlw["SQL worker — @gainratio/browser/sql<br>SQLite: FTS5 bm25 + sqlite-vector,<br>RRF in one query"]
   opfs[("OPFS bundle cache<br>content-addressed chunks")]
-  catdb[("OPFS catalogue pool<br>edgereco-catalogue SQLite DB<br>catalogue + taste_events")]
+  catdb[("OPFS catalogue pool<br>edgereco-catalogue SQLite DB<br>catalogue (rebuilt every boot)")]
+  userdb[("OPFS user pool<br>edgereco-user SQLite DB<br>taste_events (shopper data)")]
   profile["Session profile<br>in memory, rebuilt from taste_events"]
 
   app --> engine
@@ -201,6 +202,7 @@ flowchart LR
   sync -->|"atomic promote on success"| opfs
   opfs -->|"verified products + vectors"| sqlw
   sqlw <--> catdb
+  sqlw <--> userdb
   engine <--> profile
   profile -->|"append click / view / favorite / cart"| sqlw
 
@@ -209,14 +211,14 @@ flowchart LR
   classDef store fill:#f8f0e8,stroke:#c2925a,color:#171717;
   class app,engine ui;
   class sync,embed,sqlw work;
-  class opfs,catdb,profile store;
+  class opfs,catdb,userdb,profile store;
 ```
 
 - **Sync substrate (`@gainratio/browser`)** — standalone Worker that fetches `/latest`, verifies ed25519 against a SPA-pinned public key, diffs the manifest against the OPFS cache, fetches missing chunks, re-checks every chunk's sha256, and atomically promotes the new version.
 - **Embedder** — `Xenova/all-MiniLM-L6-v2` via transformers.js. Parity-tested against the Python encoder at cosine ≥ 0.99.
 - **SQL Worker** — `@gainratio/browser/sql` runs SQLite (FTS5 + sqlite-vector) in its own Worker. `catalogueSql.ts` is the only file that talks to it; `catalogueDb.ts` holds the SQL. Keyword ranking is FTS5's `bm25()`, similarity is sqlite-vector's exact cosine scan, and RRF (`k=60`) is one SQL query.
 - **Engine** — same pipeline shape as the backend (keyword + vector, RRF, session rerank), in TypeScript over that database. It does **not** reproduce Python's ranking exactly. Python scores keywords with `rank_bm25` (`BM25Okapi`: k1=1.5, b=0.75, negative IDF floored to 0.25 × the mean IDF, one bag of words split on whitespace). FTS5 hard-codes k1=1.2 and b=0.75, floors IDF at 1e-6, normalizes length per column, and tokenizes with `unicode61` (splits on punctuation, folds diacritics). Neither knob is reachable without a custom C auxiliary function compiled into the SQLite build. The measured contract, enforced by `hybridParity.test.ts`: the same top-1 result and at least 80% of the same top-10 for every fixture query, with the one query that orders differently named in the test.
-- **Storage** — OPFS for the bundle cache (plus the library's IndexedDB anti-rollback floor) and a second OPFS pool for the catalogue database (`edgereco-catalogue`, catalogue tables rebuilt from the verified bundle on every boot; the in-memory fallback is used when OPFS is refused or another tab owns the database). The shopper's taste log is the `taste_events` table in that same database (timestamp, event type, product id; newest 500; `tasteStore.ts`). SQLite is the only store for app data, and nothing in it leaves the device. When the database is in memory the storefront says the tab can't save activity and that it resets on reload. The session profile is in memory, rebuilt from the taste log on boot.
+- **Storage** — OPFS for the bundle cache (plus the library's IndexedDB anti-rollback floor) and a second OPFS pool for the catalogue database (`edgereco-catalogue`, catalogue tables rebuilt from the verified bundle on every boot; the in-memory fallback is used when OPFS is refused or another tab owns the database). The shopper's taste log is the `taste_events` table in a third OPFS pool, the user database (`edgereco-user`; timestamp, event type, product id; newest 500; `tasteStore.ts`). It is never rebuilt or deleted by a catalogue refresh, and it is the database a future export/import covers. SQLite is the only store for app data, and nothing in it leaves the device. When the database is in memory the storefront says the tab can't save activity and that it resets on reload. The session profile is in memory, rebuilt from the taste log on boot.
 - **Worker boundary** — sync runs in a Worker so the UI thread is never blocked on a multi-MB bundle fetch.
 
 The SPA consumes the private `@edgereco/browser` workspace package and the standalone `@gainratio/browser` npm dependency (caret range, exact version in the lockfile). No shared source or sibling checkout is required.
