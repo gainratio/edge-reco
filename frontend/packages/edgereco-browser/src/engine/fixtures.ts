@@ -10,7 +10,7 @@
 import { readFileSync } from "node:fs";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
-import type { IndexManifest, VersionPointer } from "@gainratio/browser";
+import type { IndexManifest, VersionPointer } from "../gainratio";
 
 const HERE = dirname(fileURLToPath(import.meta.url));
 const DECODER = new TextDecoder();

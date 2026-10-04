@@ -1,6 +1,7 @@
 /// <reference types="node" />
 // Inject, don't entangle: edge-reco reaches SQLite only through
-// @gainratio/browser/sql, and only from ONE seam file (engine/catalogueSql.ts).
+// @gainratio/browser/sql, imported only by the package seam (gainratio.ts) and
+// used only by ONE module (engine/catalogueSql.ts).
 // Nothing may load the sqlite3 build by file path. The single exception is the
 // test-only in-process Worker (engine/__fixtures__/nodeSqlWorker.ts), because
 // the library ships no Node entry for its SQL Worker; it may also import the
@@ -12,13 +13,17 @@ import { describe, expect, it } from "vitest";
 
 const PACKAGE = process.cwd();
 const APP_SRC = join(PACKAGE, "../../app/src");
-const SEAM = "src/engine/catalogueSql.ts";
+const SEAM = "src/gainratio.ts";
+const SQL_USER = "src/engine/catalogueSql.ts";
 const NODE_FIXTURE = "src/engine/__fixtures__/nodeSqlWorker.ts";
 const SELF = "src/sqlBoundary.test.ts";
 
 /** A quoted string that loads the SQLite build or reaches into a package dist. */
 const RAW_SQLITE =
 	/["'`][^"'`\n]*(?:sqlite3\.(?:mjs|wasm|js)|@sqlite\.org\/|node_modules\/@gainratio\/)[^"'`\n]*["'`]/u;
+/** Opening or deleting a SQL database: the SQL surface catalogueSql.ts owns. */
+const SQL_ENTRY =
+	/\b(?:openSqlDatabase|removeOpfsPool|sqliteVectorPoolName)\b/u;
 /** An import of the library's SQL / SQLite / vector-SQLite subpaths. */
 const SQL_SUBPATH =
 	/["']@gainratio\/browser\/(?:sql|sqlite|vector\/sqlite)(?:\/[^"']*)?["']/u;
@@ -42,6 +47,14 @@ function violations(file: string, text: string): string[] {
 	if (file !== SEAM && file !== NODE_FIXTURE && SQL_SUBPATH.test(text)) {
 		found.push(`${file}: imports @gainratio/browser SQL outside ${SEAM}`);
 	}
+	const exempt = [SEAM, SQL_USER, NODE_FIXTURE];
+	if (
+		!exempt.includes(file) &&
+		!/\.test\.ts$/u.test(file) &&
+		SQL_ENTRY.test(text)
+	) {
+		found.push(`${file}: opens SQL outside ${SQL_USER}`);
+	}
 	return found;
 }
 
@@ -58,7 +71,18 @@ describe("SQLite boundary", () => {
 				"src/engine/searchEngine.ts",
 				'import { openSqlDatabase } from "@gainratio/browser/sql";',
 			),
-		).toHaveLength(1);
+		).toHaveLength(2);
+		expect(
+			violations(
+				"src/engine/searchEngine.ts",
+				'import { openSqlDatabase } from "../gainratio";',
+			),
+		).toEqual([
+			"src/engine/searchEngine.ts: opens SQL outside src/engine/catalogueSql.ts",
+		]);
+		expect(
+			violations(SQL_USER, 'import { openSqlDatabase } from "../gainratio";'),
+		).toEqual([]);
 		expect(
 			violations(SEAM, 'import { x } from "@gainratio/browser/sql";'),
 		).toEqual([]);

@@ -13,7 +13,7 @@ import {
 	DEFAULT_EMBED_TIMEOUT_MS,
 	WorkerCrashError,
 	WorkerTimeoutError,
-} from "@gainratio/browser";
+} from "../gainratio";
 import type { Embedder } from "./embedder";
 import type { EmbedRequest, EmbedResponse } from "./embedderWorker";
 

@@ -25,7 +25,6 @@
  * dev-facing coded console breadcrumb) is new.
  */
 
-import type { EngineErrorCode } from "@gainratio/browser";
 import {
 	type Catalog,
 	defineErrors,
@@ -33,6 +32,7 @@ import {
 	errorTextOf,
 	starterPack,
 } from "@gainratio/errors";
+import type { EngineErrorCode } from "../gainratio";
 
 /** The canonical codes a sync failure can classify into. */
 type BundleCode =
