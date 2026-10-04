@@ -404,6 +404,22 @@ describe("durable taste: replay on boot, reset, replayed count", () => {
 		__setRuntimeForTests(freshDeps());
 	});
 
+	it("boots when the user database cannot open, and then Reset fails visibly", async () => {
+		const warn = vi.spyOn(console, "warn").mockImplementation(() => undefined);
+		__setRuntimeForTests({
+			...freshDeps(),
+			openTasteStore: () => Promise.reject(new Error("opfs exploded")),
+		});
+		await bootstrap();
+		expect(tasteDurable()).toBe(false);
+		await expect(resetSession()).rejects.toThrow("could not be opened");
+		expect(warn).toHaveBeenCalledWith(
+			"[edge-reco] user database unavailable",
+			expect.any(Error),
+		);
+		warn.mockRestore();
+	});
+
 	it("keeps the taste log in the user SQLite database, not in browser storage", async () => {
 		await bootstrap();
 		await clickThreeSameCategory();

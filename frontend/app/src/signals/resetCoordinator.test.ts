@@ -5,8 +5,9 @@
 
 import type { TasteStore } from "@edgereco/browser";
 import { sharedUserDb } from "@edgereco/browser/testing/sharedUserDb";
-import { describe, expect, it } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 import {
+	broadcastBus,
 	OwnerUnreachableError,
 	type ResetBus,
 	ResetCoordinator,
@@ -149,5 +150,51 @@ describe("ResetCoordinator", () => {
 		await expect(
 			coordinator(join(), await tab("secondary"), 50).reset(),
 		).rejects.toBeInstanceOf(OwnerUnreachableError);
+	});
+});
+
+describe("broadcastBus", () => {
+	afterEach(() => vi.unstubAllGlobals());
+
+	it("is null where BroadcastChannel does not exist", () => {
+		vi.stubGlobal("BroadcastChannel", undefined);
+		expect(broadcastBus()).toBeNull();
+	});
+
+	it("delivers between two real channels until unsubscribed", async () => {
+		const a = broadcastBus();
+		const b = broadcastBus();
+		const seen: ResetMessage[] = [];
+		const stop = b?.subscribe((m) => seen.push(m));
+		a?.post({ kind: "reset-done" });
+		await vi.waitFor(() => expect(seen).toEqual([{ kind: "reset-done" }]));
+		stop?.();
+		a?.post({ kind: "reset-done" });
+		await new Promise((r) => setTimeout(r, 20));
+		expect(seen).toHaveLength(1);
+	});
+});
+
+describe("a secondary that cannot drop its own copy", () => {
+	it("warns instead of throwing into the message handler", async () => {
+		const warn = vi.spyOn(console, "warn").mockImplementation(() => undefined);
+		const network = busNetwork();
+		const owner = await tab("owner");
+		const secondary = await tab("secondary");
+		const failing: TasteStore = {
+			...secondary.store,
+			ownership: "secondary",
+			clear: () => Promise.reject(new Error("locked")),
+		};
+		coordinator(network(), owner);
+		new ResetCoordinator(network(), failing, () => Promise.resolve());
+		await coordinator(network(), owner).reset();
+		await vi.waitFor(() =>
+			expect(warn).toHaveBeenCalledWith(
+				"[edge-reco] could not drop this tab's copy",
+				expect.any(Error),
+			),
+		);
+		warn.mockRestore();
 	});
 });

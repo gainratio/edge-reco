@@ -143,7 +143,11 @@ test("Reset taste in a SECOND tab wipes the owner tab's durable activity", async
 	await expect(second.locator(".banner--error")).toHaveCount(0);
 
 	// The durable copy is gone: the owner tab reloads cold.
+	// It must reopen the DURABLE copy, or "0" would only prove a memory copy.
 	await owner.reload();
 	await expectStorefront(owner);
+	await expect(owner.locator(".storage-badge")).toContainText(
+		"saved only in this browser",
+	);
 	await expect(owner.locator(FOR_YOU_BADGE)).toHaveText("0");
 });

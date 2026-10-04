@@ -4,7 +4,7 @@
 // the real pinned SQLite build (in-process Worker). User data never shares a
 // file with the disposable catalogue database.
 
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 import { CatalogueDb } from "./catalogueDb";
 import {
 	type CatalogueSql,
@@ -56,7 +56,11 @@ describe("the user database is its own database", () => {
 	});
 
 	it("openTasteStore opens the user database, and a catalogue rebuild never touches it", async () => {
+		vi.mocked(openUserSql).mockClear();
+		vi.mocked(openCatalogueSql).mockClear();
 		const store = await openTasteStore();
+		expect(openUserSql).toHaveBeenCalledTimes(1);
+		expect(openCatalogueSql).not.toHaveBeenCalled();
 		await store.append(rec("P1"));
 		const catalogue = await CatalogueDb.open(await openCatalogueSql(), 2);
 		await catalogue.replace({ products: [], vectors: new Float32Array() });
@@ -213,6 +217,36 @@ describe("SqlTasteStore.importLegacy (copy step of copy-then-retire)", () => {
 	it("an empty legacy file imports nothing", async () => {
 		const { store } = await freshStore();
 		await store.importLegacy([]);
+		expect(await store.count()).toBe(0);
+	});
+});
+
+describe("SqlTasteStore reads defensively", () => {
+	/** A connection whose reads return exactly `rows`. */
+	function cannedSql(
+		rows: ReadonlyArray<Record<string, unknown>>,
+	): CatalogueSql {
+		return {
+			storage: { persistence: "memory", reason: "opfs-unavailable" },
+			exec: () => Promise.resolve(undefined),
+			query: () => Promise.resolve(rows as never),
+			transaction: () => Promise.resolve(undefined),
+			close: () => Promise.resolve(),
+		};
+	}
+
+	it("drops a row whose event type it does not know", async () => {
+		const store = await SqlTasteStore.open(
+			cannedSql([
+				{ ts: "t1", type: "bogus", product_id: "X" },
+				{ ts: "t2", type: "cart", product_id: "Y" },
+			]),
+		);
+		expect(await store.list()).toEqual([rec("Y", "cart", "t2")]);
+	});
+
+	it("counts an empty result as zero", async () => {
+		const store = await SqlTasteStore.open(cannedSql([]));
 		expect(await store.count()).toBe(0);
 	});
 });
