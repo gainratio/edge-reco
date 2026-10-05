@@ -31,6 +31,7 @@ import { expect, test } from "@playwright/test";
  */
 
 const PRODUCT_CARD = "main article.card button.card__overlay";
+const RAIL_CARD = "section.rail--row .rail__track-list img";
 const EXFIL_MARKER = "__exfil__";
 const EXFIL_PATH = `/${EXFIL_MARKER}?q=what-the-user-searched-for`;
 
@@ -52,19 +53,61 @@ async function launch(page: import("@playwright/test").Page): Promise<void> {
 }
 
 /**
- * The app's own live Web Worker. After boot the sync Worker is released, so the
- * embedder Worker — where every query embedding is computed — is the pipeline
- * context still running when the user is looking at the tile.
+ * The app's embedder Worker — where every query embedding is computed, and the
+ * pipeline context still running when the user is looking at the tile. Picked
+ * by its script name, never "any worker": the SQLite Worker is also alive, and
+ * attacking it by accident would test a different context.
  */
-async function liveAppWorker(page: import("@playwright/test").Page) {
+const EMBEDDER_WORKER = /\/embedderWorker[-.][^/]*\.js(?:$|\?)/u;
+
+async function embedderWorker(page: import("@playwright/test").Page) {
 	await expect
-		.poll(() => page.workers().length, {
-			message: "the app must keep a live Worker after boot",
-			timeout: 30_000,
-		})
-		.toBeGreaterThan(0);
-	const workers = page.workers();
-	return workers.find((w) => /worker/iu.test(w.url())) ?? workers[0];
+		.poll(
+			() => page.workers().filter((w) => EMBEDDER_WORKER.test(w.url())).length,
+			{
+				message: `exactly one embedder Worker must be live (saw ${page
+					.workers()
+					.map((w) => w.url())
+					.join(", ")})`,
+				timeout: 30_000,
+			},
+		)
+		.toBe(1);
+	const worker = page.workers().find((w) => EMBEDDER_WORKER.test(w.url()));
+	if (worker === undefined) {
+		throw new Error("embedder Worker vanished between poll and pick");
+	}
+	return worker;
+}
+
+/**
+ * Deterministic quiet point for the window's timeline. A visible first card is
+ * not "settled": rails populate asynchronously and their images are
+ * `loading="lazy"`, so a late layout shift used to pull new images into view
+ * AFTER the baseline (the old `networkidle` wait raced that). Wait for the
+ * rails to render, force every image to load now, and wait until each one is
+ * complete. After this point no window-side image request is still pending.
+ */
+async function settleWindowTraffic(
+	page: import("@playwright/test").Page,
+): Promise<void> {
+	await expect(page.locator(RAIL_CARD).first()).toBeVisible({
+		timeout: 60_000,
+	});
+	await expect
+		.poll(
+			() =>
+				page.evaluate(() => {
+					const images = Array.from(document.images);
+					for (const image of images) image.loading = "eager";
+					return images.every((image) => image.complete);
+				}),
+			{
+				message: "every storefront image must finish loading",
+				timeout: 60_000,
+			},
+		)
+		.toBe(true);
 }
 
 /** Every resource URL in a context's OWN performance timeline. */
@@ -79,16 +122,12 @@ test("a network call issued INSIDE the app's Web Worker is counted by the tile",
 
 	const tile = backendCallsTile(page);
 	await expect(tile).toHaveText("0");
-	// A visible first card does not mean the asynchronously populated rails have
-	// finished loading their same-origin images. Let that harmless window traffic
-	// settle before taking the attribution baseline for the Worker-only probe.
-	await page.waitForLoadState("networkidle");
+	await settleWindowTraffic(page);
 	const before = await page.evaluate(RESOURCE_NAMES);
 
 	// The attack: real fetch, real Worker global scope, real network stack.
-	const worker = await liveAppWorker(page);
-	expect(worker, "the app must expose a live Worker to attack").toBeDefined();
-	const leaked = await worker?.evaluate(async (path: string) => {
+	const worker = await embedderWorker(page);
+	const leaked = await worker.evaluate(async (path: string) => {
 		const response = await fetch(path, { cache: "no-store" }).catch(() => null);
 		return response !== null;
 	}, EXFIL_PATH);
@@ -111,7 +150,7 @@ test("a network call issued INSIDE the app's Web Worker is counted by the tile",
 		"the window must remain blind to the Worker's request",
 	).toBe(false);
 	expect(
-		await worker?.evaluate(
+		await worker.evaluate(
 			(marker: string) =>
 				performance
 					.getEntriesByType("resource")

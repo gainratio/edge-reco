@@ -67,8 +67,14 @@ export function deleteDatabaseBounded(
 
 /** Production default: delete the library's floor database from this tab. */
 export function deleteBundleFloorDatabase(): Promise<void> {
+	// Only deleteDatabase is exposed: this module deletes the library's floor
+	// and never writes IndexedDB (app/src/storageBoundary.test.ts).
+	const factory: IdbDeleteFactory | undefined =
+		typeof indexedDB === "undefined"
+			? undefined
+			: { deleteDatabase: (name) => indexedDB.deleteDatabase(name) };
 	return deleteDatabaseBounded(
-		typeof indexedDB === "undefined" ? undefined : indexedDB,
+		factory,
 		BUNDLE_FLOOR_DATABASE,
 		FLOOR_DELETE_TIMEOUT_MS,
 	);

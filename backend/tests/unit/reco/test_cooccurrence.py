@@ -1,7 +1,7 @@
 """Unit tests for the deterministic co-occurrence computation (``reco.cooccurrence``).
 
 ``build_cooccurrence`` folds a set of sessions (each a list of ``(product_id, event_type)``
-pairs) into a sparse top-N neighbour map per product, weighting pairs by the retrain
+pairs) into a sparse top-N neighbour map per product, weighting pairs by
 ``ENGAGEMENT_WEIGHTS`` and normalising with cosine over per-product engagement vectors.
 The output is deterministic, symmetric, self-excluded, and top-N capped.
 """

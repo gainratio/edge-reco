@@ -116,7 +116,7 @@ def build_app() -> FastAPI:
     fastapi_app.add_middleware(
         CORSMiddleware,
         allow_origins=cors_origins(),
-        allow_methods=["*"],
+        allow_methods=["GET"],
         allow_headers=["*"],
     )
     fastapi_app.include_router(_browse_router(container.catalog))

@@ -5,7 +5,45 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ## [Unreleased]
 
+### Removed
+- **No user data leaves the device.** The browser telemetry uplink is gone: no
+  `VITE_EVENTS_URL`, no batching or beacon, no "synced to cloud" badge. The backend
+  `/events` and `/events/export` routes, the demo collector, the `flywheel` compose
+  profile, `edgereco retrain`, `edgereco audit`, `republish.py`, the backend
+  `telemetry/` package, and the `demo-flywheel` / `demo-retrain` poe and make targets
+  are deleted. Production never sent events: no deploy ever set an events URL.
+- The pseudonymous browser session ID (`nimbus_session_id`) is gone. Nothing used it
+  once the uplink was removed.
+
+### Changed
+- **SQLite is the only store for app data.** The taste log (timestamp, event type,
+  product id; newest 500) moved from the OPFS file `taste/events.jsonl` into a
+  `taste_events` table in the shopper's own SQLite database (`edgereco-user`), kept
+  apart from the disposable catalogue database so a catalogue rebuild can never touch
+  it. Returning visitors are migrated copy-then-retire: events are copied in, skipping
+  any already present, then the file is deleted (owner tab only). A rerun after a
+  crash, or a rollback to an older build and forward again, never duplicates or loses
+  events. The old `nimbus_session_id` and `nimbus_uplink_queue` localStorage keys are
+  removed on boot and their contents dropped. "Reset taste" clears the table and any
+  legacy leftovers, then checks the table is empty; anything left is an error the
+  shopper sees, never a silent success. A Reset in a second tab is routed to the tab
+  that owns the database over a BroadcastChannel.
+- The optional FastAPI server is stateless: the in-memory session store, the
+  `X-Session-Id` header, `apply_interaction`, `dump_jsonl` and `InteractionEvent` are
+  deleted.
+- Co-occurrence is still bundle data built at publish time; nothing recomputes it from
+  shopper activity.
+
 ### Added
+- **Storage and network guards.** `frontend/app/src/storageBoundary.test.ts` fails if
+  app code uses localStorage, sessionStorage or IndexedDB outside a short allow-list.
+  `frontend/app/scripts/network-allowlist.test.mjs` (in `test:artifacts`) fails if the
+  built app names a host outside its allow-list, opens a beacon, WebSocket or
+  EventSource, or loosens CSP `connect-src` / `img-src` from `'self'`. Backend
+  `tests/unit/api/test_no_event_sink.py` fails if a `POST /events` route returns.
+- **Storage status pill.** The storefront says whether activity is saved in this
+  browser or, when OPFS is refused or another tab holds the database, that this tab
+  can't save it and it resets on reload.
 - **Deploys roll themselves back when the live site is broken.** `dagger call deploy`
   now records the production deployment that is live before the upload, runs the live
   Playwright smoke after it (`@release` identity checks + `@fresh` storefront journey,

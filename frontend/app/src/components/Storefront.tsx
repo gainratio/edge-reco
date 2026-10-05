@@ -13,6 +13,7 @@ import {
 	search,
 	similar,
 	strategies,
+	tasteDurable,
 } from "../api/client";
 import type { EventType, Product, SearchResult, Strategy } from "../api/types";
 import { startMetricsObservers } from "../metrics/observe";
@@ -31,7 +32,7 @@ import {
 	homeRails,
 	trendingInCategoryLabel,
 } from "./railSelection";
-import { SyncBadge } from "./SyncBadge";
+import { StorageBadge } from "./StorageBadge";
 import { Toast } from "./Toast";
 
 const RAIL_LIMIT = 10;
@@ -310,7 +311,6 @@ export function Storefront() {
 		const stop = startMetricsObservers({
 			readyAt: performance.now(),
 			edgeOrigin: new URL(resolveBundleBaseUrl()).origin,
-			eventsUrl: import.meta.env.VITE_EVENTS_URL,
 			appOrigin: window.location.origin,
 		});
 		void catalogInfo().then(({ count }) => record({ productCount: count }));
@@ -447,7 +447,7 @@ export function Storefront() {
 	const onDwell = useCallback(
 		(product: Product) => {
 			// Ambient impression: silent, uncounted, and failures never surface —
-			// a missed view must not interrupt browsing (same spirit as the uplink).
+			// a missed view must not interrupt browsing.
 			void emitInteraction("view", product)
 				.then((outcome) => (outcome.emitted ? refreshRails() : undefined))
 				.catch(() => undefined);
@@ -578,7 +578,7 @@ export function Storefront() {
 				)}
 			</main>
 
-			<SyncBadge />
+			<StorageBadge durable={tasteDurable()} />
 
 			<Toast message={toast} />
 		</>

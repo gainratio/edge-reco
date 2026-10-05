@@ -44,7 +44,11 @@ products and `vector/embeddings.f32` matrix into ONE SQLite database
 (`catalogueDb.ts`). The database comes from `@gainratio/browser/sql`, which runs
 SQLite + FTS5 + sqlite-vector in its own Worker and persists it in OPFS;
 `catalogueSql.ts` is the only file that imports it. On boot it also deletes
-the old vector pool earlier builds left in OPFS. Keyword search is SQLite FTS5's
+the old vector pool earlier builds left in OPFS. The shopper's taste log is a
+`taste_events` table in a SEPARATE database, `edgereco-user` (`tasteStore.ts`:
+timestamp, event type, product id; newest 500). The catalogue database is
+disposable and rebuilt every boot; the user database is never rebuilt or deleted
+by a catalogue refresh. It never leaves the device. Keyword search is SQLite FTS5's
 built-in `bm25()`, similarity is sqlite-vector's exact cosine scan, and the RRF
 fusion (`k=60`) is one SQL query that returns both ranks and raw scores. No
 hand-written BM25 or fusion code remains in the browser. The Python runtime uses

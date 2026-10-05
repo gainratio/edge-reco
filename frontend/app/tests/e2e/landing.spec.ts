@@ -12,7 +12,7 @@ import { expect, test } from "@playwright/test";
  *      tile reads a real measured value, and the "backend calls" tile stays 0 —
  *      the honest headline of the backend-free demo (product images are baked
  *      into the signed bundle and served same-origin, so browsing hits no
- *      application backend and the uplink stays off).
+ *      application backend, and no user data is ever sent anywhere).
  *
  * REAL vs STUBBED — identical to storefront.spec.ts: only the embedder TRANSPORT
  * is stubbed (the deterministic 384-d hook below) so the run doesn't wait on the
@@ -161,7 +161,7 @@ test("live metrics strip: search drives a real latency; backend calls stay 0", a
 	await expect(latency).toHaveText(/ms/, { timeout: 15_000 });
 
 	// --- The honest headline: backend calls stay 0 after browsing + searching ---
-	// Images are same-origin static assets and the uplink is off, so 0 is the
+	// Images are same-origin static assets and nothing is ever uploaded, so 0 is the
 	// true expected value (no per-query backend ranking call).
 	const backendCalls = tileValue("backend calls");
 	await expect(backendCalls).toHaveText("0");

@@ -1,10 +1,9 @@
 """Generate the committed synthetic demo session log for seed co-occurrence.
 
-LABELED DEMO DATA — NOT real purchases. The static hosted demo runs no retrain, so
+LABELED DEMO DATA — NOT real purchases. No shopper data ever leaves the browser, so
 ``examples/source/demo_sessions.jsonl`` ships a plausible set of co-purchase baskets
 over the committed 720-product catalog. ``cooccurrence.py`` runs *real* co-occurrence
-math on these, so "Customers also bought" rails are populated on edge-reco.com; a real
-retrain regenerates the matrix from genuine events.
+math on these, so "Customers also bought" rails are populated on edge-reco.com.
 
 Baskets are **shelf-coherent**: each session draws 2-4 products from one shelf
 (category + first subcategory, e.g. Health & Household > Wellness & Relaxation),

@@ -38,3 +38,16 @@ def test_search_empty_query_returns_empty(client: TestClient) -> None:
     assert body["results"] == []
     assert body["query"] == ""
     assert body["total"] == 0
+
+
+def test_search_ignores_a_session_header(client: TestClient) -> None:
+    """Ranking is stateless: a client-sent ``X-Session-Id`` changes nothing."""
+    url = "/search?q=wireless%20bluetooth%20headphones"
+    plain = client.get(url).json()
+    assert client.get(url, headers={"X-Session-Id": "s-1"}).json() == plain
+
+
+def test_service_container_holds_no_session_store(client: TestClient) -> None:
+    """The server keeps no per-visitor state between requests."""
+    container = client.app.state.container  # type: ignore[attr-defined]
+    assert not hasattr(container, "sessions")

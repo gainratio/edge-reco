@@ -49,17 +49,44 @@ export interface OpenCatalogueSqlDeps {
  * owns the pool it opens in memory instead: loadVectorIndex rebuilds the whole
  * verified catalogue on every boot, so memory loses nothing.
  */
-export async function openCatalogueSql(
+export function openCatalogueSql(
 	deps: OpenCatalogueSqlDeps = {},
 ): Promise<CatalogueSql> {
+	return openNamedSql(CATALOGUE_DATABASE, "catalogue", deps);
+}
+
+/** OPFS first, memory when refused or owned elsewhere; logs where it landed. */
+async function openNamedSql(
+	name: string,
+	label: string,
+	deps: OpenCatalogueSqlDeps,
+): Promise<CatalogueSql> {
 	const sql = await openSqlDatabase(
-		{ name: CATALOGUE_DATABASE, persistence: "opfs", fallback: "memory" },
-		deps.workerFactory === undefined
-			? {}
-			: { workerFactory: deps.workerFactory },
+		{ name, persistence: "opfs", fallback: "memory" },
+		deps,
 	);
-	console.info("[edge-reco] catalogue database storage", sql.storage);
+	console.info(`[edge-reco] ${label} database storage`, sql.storage);
 	return sql;
+}
+
+/**
+ * The shopper's own database: taste history and any future preferences. It is
+ * SEPARATE from the catalogue on purpose. The catalogue database is disposable
+ * (rebuilt from the signed bundle every boot); this one is user data, so it is
+ * never rebuilt, never deleted on a catalogue refresh, and it is the one a
+ * future export/import covers.
+ */
+export const USER_DATABASE = "edgereco-user";
+
+/**
+ * Open the user database in OPFS. When OPFS is refused it runs in memory
+ * ("opfs-unavailable"); when another tab owns the pool it runs in memory
+ * ("pool-in-use") and the owner tab holds the durable copy.
+ */
+export function openUserSql(
+	deps: OpenCatalogueSqlDeps = {},
+): Promise<CatalogueSql> {
+	return openNamedSql(USER_DATABASE, "user", deps);
 }
 
 export type LegacyPoolResult = OpfsPoolRemoval | "failed";
@@ -81,10 +108,7 @@ export async function retireLegacyVectorPool(
 	const label = `[edge-reco] legacy vector pool ${LEGACY_VECTOR_INDEX}`;
 	try {
 		const pool = await sqliteVectorPoolName(LEGACY_VECTOR_INDEX);
-		const result = await removeOpfsPool(
-			pool,
-			deps.root === undefined ? {} : { root: deps.root },
-		);
+		const result = await removeOpfsPool(pool, deps);
 		(deps.log ?? console.info)(`${label}: ${result}`);
 		return result;
 	} catch (error) {

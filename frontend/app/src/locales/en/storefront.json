@@ -58,11 +58,9 @@
 			"repetitionPenalty": "Repetition penalty"
 		}
 	},
-	"syncBadge": {
-		"local": "Running fully on-device · no uplink",
-		"armed": "Flywheel uplink armed · interactions sync to cloud",
-		"synced_one": "{{count}} interaction synced to cloud",
-		"synced_other": "{{count}} interactions synced to cloud"
+	"storageBadge": {
+		"durable": "Running fully on-device · your activity is saved only in this browser",
+		"memory": "Running fully on-device · this tab can’t save your activity, so it resets on reload"
 	},
 	"install": {
 		"cta": "Install app"

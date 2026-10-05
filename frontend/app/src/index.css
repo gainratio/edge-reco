@@ -1404,8 +1404,8 @@ input {
 	font-size: 14px;
 }
 
-/* Flywheel uplink status pill — unobtrusive, sits above the footer. */
-.sync-badge {
+/* Where-your-data-lives status pill — unobtrusive, sits above the footer. */
+.storage-badge {
 	display: flex;
 	align-items: center;
 	gap: 8px;
@@ -1420,16 +1420,16 @@ input {
 	width: fit-content;
 }
 
-.sync-badge__dot {
+.storage-badge__dot {
 	width: 7px;
 	height: 7px;
 	border-radius: 50%;
-	background: var(--signal);
+	background: var(--muted);
 }
 
-/* On-device (uplink disabled): a calmer, dimmer dot. */
-.sync-badge--local .sync-badge__dot {
-	background: var(--muted);
+/* In-memory database (this tab cannot save): the attention-tone dot. */
+.storage-badge--memory .storage-badge__dot {
+	background: var(--signal);
 }
 
 /* =========================================================================
@@ -1601,7 +1601,7 @@ input {
 
 /* Landing — intro shown before the engine boots (gated behind Launch). Reuses the
    full-viewport centered shell idiom from .boot and the header's frosted-paper
-   aesthetic; metric tiles echo the .clicks-badge / .sync-badge vocabulary. */
+   aesthetic; metric tiles echo the .clicks-badge / .storage-badge vocabulary. */
 .landing {
 	min-height: 100dvh;
 	display: grid;

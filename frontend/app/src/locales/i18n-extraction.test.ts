@@ -9,16 +9,12 @@ import i18n from "../i18n";
 const t = i18n.getFixedT("en", "storefront");
 
 describe("storefront i18n extraction — byte-identical English", () => {
-	it("SyncBadge chrome resolves verbatim", () => {
-		expect(t("syncBadge.local")).toBe("Running fully on-device · no uplink");
-		expect(t("syncBadge.armed")).toBe(
-			"Flywheel uplink armed · interactions sync to cloud",
+	it("StorageBadge chrome resolves verbatim", () => {
+		expect(t("storageBadge.durable")).toBe(
+			"Running fully on-device · your activity is saved only in this browser",
 		);
-		expect(t("syncBadge.synced", { count: 1 })).toBe(
-			"1 interaction synced to cloud",
-		);
-		expect(t("syncBadge.synced", { count: 4 })).toBe(
-			"4 interactions synced to cloud",
+		expect(t("storageBadge.memory")).toBe(
+			"Running fully on-device · this tab can’t save your activity, so it resets on reload",
 		);
 	});
 

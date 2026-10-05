@@ -10,12 +10,9 @@ so today's scores stay identical.
 
 from __future__ import annotations
 
-from typing import TYPE_CHECKING, Literal
+from typing import Literal
 
 from pydantic import BaseModel, Field
-
-if TYPE_CHECKING:
-    from edgereco.catalog.models import EventType
 
 #: Closed set of candidate-selection policies a strategy may pick (``reco.pool``).
 #: ``affinity_first`` is today's warm/cold logic; ``co_occurrence`` is the Phase-3
@@ -49,7 +46,7 @@ class ScoringWeights(BaseModel):
 
 
 class GradedSignal(BaseModel):
-    """Affinity bumps a single interaction applies (``reco.signals``).
+    """Affinity bumps a single interaction applies (the browser tier's ``applyInteraction``).
 
     Each bump is range-constrained ``>= 0`` so a tampered/negative affinity weight
     in a signed config fails validation fail-closed.
@@ -67,16 +64,6 @@ class InteractionWeights(BaseModel):
     view: GradedSignal
     favorite: GradedSignal
     cart: GradedSignal
-
-    def for_event(self, event_type: EventType) -> GradedSignal:
-        """The affinity bumps one event type applies (TS mirror: ``weights[eventType]``)."""
-        signals: dict[EventType, GradedSignal] = {
-            "click": self.click,
-            "view": self.view,
-            "favorite": self.favorite,
-            "cart": self.cart,
-        }
-        return signals[event_type]
 
 
 class Strategy(BaseModel):

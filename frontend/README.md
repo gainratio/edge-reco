@@ -105,8 +105,12 @@ The dev SPA reads `VITE_BUNDLE_BASE_URL` (default `http://localhost:8081`, the e
    The committed demo catalog still carries the legacy receipt shape, so this section
    currently reads "Verification unavailable" until a v1 proof is republished.
 
-Taste signals are stored only in this browser and survive reloads; use **Reset taste** to
-clear them.
+Taste signals are stored only in this browser, in a `taste_events` table in the shopper's own
+on-device SQLite database (`edgereco-user`, separate from the disposable catalogue), and
+survive reloads. Nothing is sent to any server. Use **Reset taste** to clear them; it
+verifies the table is empty and shows an error otherwise. A Reset in a second tab is
+sent to the tab that owns the database. If the browser refuses OPFS or another tab holds
+the database, the log lives in memory for this tab only and the storefront says so.
 
 **Tests** (units + the browser e2e that proves the backend-free loop and captures the
 screenshot):

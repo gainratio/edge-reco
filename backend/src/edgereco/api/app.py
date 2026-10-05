@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from fastapi import FastAPI
 
-from edgereco.api.routes import catalog, events, health, recommend, search
+from edgereco.api.routes import catalog, health, recommend, search
 
 
 def create_app(container: object | None = None) -> FastAPI:
@@ -16,7 +16,6 @@ def create_app(container: object | None = None) -> FastAPI:
     app.include_router(health.router)
     app.include_router(search.router)
     app.include_router(recommend.router)
-    app.include_router(events.router)
     app.include_router(catalog.router)
 
     return app

@@ -48,21 +48,15 @@ describe("Landing", () => {
 			"Offline",
 			"Instant",
 			"Cheap to run",
-			"Always learning",
+			"Learns on the device",
 		]) {
 			expect(screen.getByText(k)).toBeInTheDocument();
 		}
-		// the flywheel is a first-class value prop, framed honestly
-		expect(
-			screen.getByText(/Switch on an optional loop — off by default/),
-		).toBeInTheDocument();
-		// the Private card is reframed: shopper activity stays on-device by default,
-		// the optional learning loop is off until switched on
-		expect(
-			screen.getByText(
-				/The optional learning loop is off until you switch it on/,
-			),
-		).toBeInTheDocument();
+		// No user data leaves the device: there is no learning loop to switch on.
+		expect(screen.getByText(/never sent to a server/)).toBeInTheDocument();
+		expect(document.body.textContent).not.toMatch(
+			/optional loop|switch it on/i,
+		);
 		// Derived from the constant, never hardcoded. This line used to pin "~2.2 MB"
 		// while the bundle on disk was 1.5 MB, so a green suite kept a wrong figure
 		// alive in front of users. Split of duties: landing-figures.test.ts asserts

@@ -4,14 +4,13 @@
 //   search()   -> engine.search(query)        (embed in-tab -> BM25⊕vector -> RRF -> rerank)
 //   recommend()-> engine.recommend()          (popularity pool reranked by the live profile)
 //   browse()   -> engine.browse()             (catalog listing over products.jsonl)
-//   sendEvent()-> fold the click into the in-tab SessionProfile (NO network),
-//                 and ALSO hand it to the flywheel uplink (off the inference
-//                 path; disabled unless VITE_EVENTS_URL is set)
+//   sendEvent()-> fold the click into the in-tab SessionProfile and append it
+//                 to the taste log in the on-device SQLite database. NO network:
+//                 no user data ever leaves the device.
 //
 // The whole point of the demo lives in sendEvent: a click updates the in-browser
 // profile, so the very next recommend() re-ranks toward your taste — entirely
-// in-tab, no round trip. (The uplink is a separate, optional, fire-and-forget
-// beacon — it never gates the rail re-rank.) The SearchResponse/RecommendResponse/BrowseResponse
+// in-tab, no round trip. The SearchResponse/RecommendResponse/BrowseResponse
 // shapes are byte-identical to the old HTTP contract, so the components that
 // consume this module did not change.
 //
@@ -28,20 +27,24 @@ import {
 	emptyProfile,
 	type InteractionWeights,
 	type OnStage,
+	openTasteStore,
 	type RankingProofEvidence,
 	type RuntimeConfig,
 	type RuntimeDeps,
 	type SearchEngine,
 	type SessionProfile,
+	type TasteStore,
 } from "@edgereco/browser";
 import { record } from "../metrics/store";
+import { retireLegacyLocalStorage } from "../signals/legacyStorage";
 import {
 	appendTasteEvent,
+	bindTasteStore,
 	clearTasteLog,
+	migrateLegacyTaste,
 	readTasteEvents,
-	type TasteEvent,
+	tasteDurable as tasteLogDurable,
 } from "../signals/tasteLog";
-import { enqueueUplink } from "../telemetry/uplink";
 import { resolveBundleBaseUrl } from "./bundleUrl";
 import type {
 	BrowseResponse,
@@ -129,6 +132,8 @@ export interface DataClient {
 	clearCatalogCache(): Promise<void>;
 	/** Clear the live profile AND the durable taste log (the Reset-taste path). */
 	resetSession(): Promise<void>;
+	/** True when the taste log survives a reload (SQLite database in OPFS). */
+	tasteDurable(): boolean;
 	/**
 	 * How many explicit signals (click | favorite | cart) the last bootstrap
 	 * replayed from the durable log — the honest starting value for the
@@ -157,12 +162,33 @@ export interface DataClient {
  * the production app uses `defaultRuntimeDeps()` (real Workers) with an
  * optional embedder override from `window.__edgeprocDemoTestHooks`.
  */
-export function createDataClient(deps: Partial<RuntimeDeps> = {}): DataClient {
+/** Runtime deps plus the user-database opener (tests inject a shared one). */
+export interface ClientDeps extends Partial<RuntimeDeps> {
+	readonly openTasteStore?: () => Promise<TasteStore>;
+}
+
+/**
+ * Open the shopper's user database once per client. A failure degrades to
+ * session-only taste (appends/reads no-op) and makes Reset fail visibly.
+ */
+async function openUserStore(
+	open: () => Promise<TasteStore>,
+): Promise<TasteStore | null> {
+	try {
+		return await open();
+	} catch (error) {
+		console.warn("[edge-reco] user database unavailable", error);
+		return null;
+	}
+}
+
+export function createDataClient(deps: ClientDeps = {}): DataClient {
 	const runtime = new EngineRuntime(resolveDeps(deps));
+	let userStore: Promise<TasteStore | null> | null = null;
 	let profile: SessionProfile = emptyProfile();
 	let productById: ReadonlyMap<string, Product> = new Map();
 	// The SIGNED BUNDLE's per-event-type affinity bumps, captured at bootstrap.
-	// The fold must use these (mirror of the backend /events fold) — the typed
+	// The fold must use these (mirror of the Python session fold) — the typed
 	// defaults apply only before bootstrap, when no product resolves anyway.
 	let interactionWeights: InteractionWeights | undefined;
 	// Explicit signals restored from the durable log by the last bootstrap.
@@ -187,6 +213,17 @@ export function createDataClient(deps: Partial<RuntimeDeps> = {}): DataClient {
 			});
 			productById = new Map(engine.catalog().map((p) => [p.id, p]));
 			interactionWeights = engine.interactionWeights();
+			// The taste log lives in the shopper's own SQLite database, separate
+			// from the disposable catalogue. Bind it, copy in anything an older
+			// build left outside SQLite, and drop the old localStorage keys
+			// (session id, uplink queue) — no longer used.
+			userStore ??= openUserStore(deps.openTasteStore ?? openTasteStore);
+			const store = await userStore;
+			bindTasteStore(store);
+			if (store !== null) {
+				await migrateLegacyTaste(store);
+			}
+			retireLegacyLocalStorage();
 			// Deterministic replay: rebuild the taste profile from the durable
 			// log through the SAME fold used live (buildProfile ≡ repeated
 			// applyInteraction), with the SAME bundle weights. Unknown product
@@ -202,8 +239,7 @@ export function createDataClient(deps: Partial<RuntimeDeps> = {}): DataClient {
 				interactionWeights,
 			);
 			replayedSignals = logged.filter(
-				(event: TasteEvent) =>
-					event.type !== "view" && productById.has(event.productId),
+				(event) => event.type !== "view" && productById.has(event.productId),
 			).length;
 		},
 		clearCatalogCache(): Promise<void> {
@@ -216,6 +252,9 @@ export function createDataClient(deps: Partial<RuntimeDeps> = {}): DataClient {
 		},
 		replayedSignalCount(): number {
 			return replayedSignals;
+		},
+		tasteDurable(): boolean {
+			return tasteLogDurable();
 		},
 		search(q: string, opts?: SearchOptions): Promise<SearchResponse> {
 			return requireEngine().search(q, {
@@ -288,16 +327,12 @@ export function createDataClient(deps: Partial<RuntimeDeps> = {}): DataClient {
 					evt.event_type,
 					interactionWeights,
 				);
-				// Land the event in the durable in-browser log so a reload can
+				// Land the event in the on-device SQLite taste log so a reload can
 				// replay it (appendTasteEvent never throws — a storage failure
-				// degrades to today's session-only behavior). Awaited so the
-				// event is durable before the UI acknowledges the interaction.
+				// degrades to session-only behavior). Awaited so the event is
+				// stored before the UI acknowledges the interaction.
 				await appendTasteEvent(evt.event_type, evt.product_id);
 			}
-			// Off the inference path: a click ALSO feeds the flywheel uplink —
-			// captured locally and later batched to the mimicked cloud. No-op when
-			// the uplink is disabled (VITE_EVENTS_URL unset). Never blocks/throws.
-			enqueueUplink(evt);
 		},
 		catalogInfo(): Promise<{ readonly count: number }> {
 			return Promise.resolve({ count: requireEngine().ntotal });
@@ -326,7 +361,7 @@ function warnIfExpired(stage: BootStage): void {
  * The demo test hook is honored only for `makeEmbedder`; everything else uses
  * the real Worker-backed defaults from `@edgereco/browser`.
  */
-function resolveDeps(deps: Partial<RuntimeDeps>): RuntimeDeps {
+function resolveDeps(deps: ClientDeps): RuntimeDeps {
 	const base = defaultRuntimeDeps();
 	const hookEmbedder =
 		typeof window !== "undefined"
@@ -335,11 +370,13 @@ function resolveDeps(deps: Partial<RuntimeDeps>): RuntimeDeps {
 	const loadPublisherKey = deps.loadPublisherKey ?? base.loadPublisherKey;
 	const deleteFloorDatabase =
 		deps.deleteFloorDatabase ?? base.deleteFloorDatabase;
+	const makeCatalogue = deps.makeCatalogue ?? base.makeCatalogue;
 	return {
 		spawnEngine: deps.spawnEngine ?? base.spawnEngine,
 		makeEmbedder: deps.makeEmbedder ?? hookEmbedder ?? base.makeEmbedder,
 		...(loadPublisherKey !== undefined ? { loadPublisherKey } : {}),
 		...(deleteFloorDatabase !== undefined ? { deleteFloorDatabase } : {}),
+		...(makeCatalogue !== undefined ? { makeCatalogue } : {}),
 	};
 }
 
@@ -353,7 +390,7 @@ let active: DataClient = createDataClient();
  * browser. Not used by the app, which always uses the default Worker-backed
  * client.
  */
-export function __setRuntimeForTests(deps: RuntimeDeps): void {
+export function __setRuntimeForTests(deps: RuntimeDeps & ClientDeps): void {
 	active = createDataClient(deps);
 }
 
@@ -371,6 +408,9 @@ export function resetSession(): Promise<void> {
 }
 export function replayedSignalCount(): number {
 	return active.replayedSignalCount();
+}
+export function tasteDurable(): boolean {
+	return active.tasteDurable();
 }
 export async function search(
 	q: string,

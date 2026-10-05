@@ -46,6 +46,7 @@ vi.mock("../api/client", () => ({
 	rankingProofEvidence: mocks.rankingProofEvidence,
 	resetSession: mocks.resetSession,
 	replayedSignalCount: mocks.replayedSignalCount,
+	tasteDurable: () => true,
 }));
 vi.mock("../signals/emit", () => ({
 	emitInteraction: mocks.emitInteraction,
@@ -147,6 +148,10 @@ describe("Storefront mount", () => {
 		).toBeInTheDocument();
 		expect(screen.getByText("Rail Widget")).toBeInTheDocument();
 		expect(mocks.browse).toHaveBeenCalledWith({ limit: 24 });
+		// Says where the shopper's activity lives: only in this browser.
+		expect(
+			screen.getByText(/your activity is saved only in this browser/),
+		).toBeInTheDocument();
 	});
 
 	it("puts the grid h1 before the rail h2s in DOM order (heading outline)", async () => {

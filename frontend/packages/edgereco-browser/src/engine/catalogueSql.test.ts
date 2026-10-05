@@ -58,6 +58,16 @@ describe("retireLegacyVectorPool", () => {
 		);
 	});
 
+	it("logs to console.info when no logger is given", async () => {
+		const info = vi.spyOn(console, "info").mockImplementation(() => undefined);
+		const root = fakeRoot(new Set());
+
+		expect(await seam.retireLegacyVectorPool({ root })).toBe("absent");
+		expect(info).toHaveBeenCalledWith(
+			"[edge-reco] legacy vector pool edgereco-catalog: absent",
+		);
+	});
+
 	it("never fails boot when OPFS itself is missing; it logs the failure", async () => {
 		const warn = vi.spyOn(console, "warn").mockImplementation(() => undefined);
 		const root = fakeRoot(new Set(), "SecurityError");
@@ -87,6 +97,33 @@ describe("openCatalogueSql", () => {
 			);
 		} finally {
 			await sql.close();
+		}
+	});
+});
+
+describe("openUserSql", () => {
+	it("opens the shopper's own database, a separate connection from the catalogue", async () => {
+		const info = vi.spyOn(console, "info").mockImplementation(() => undefined);
+		const user = await seam.openUserSql({
+			workerFactory: nodeSqlWorkerFactory,
+		});
+		const catalogue = await seam.openCatalogueSql({
+			workerFactory: nodeSqlWorkerFactory,
+		});
+		try {
+			await user.exec("CREATE TABLE only_user(x)");
+			expect(
+				await catalogue.query(
+					"SELECT name FROM sqlite_master WHERE name = 'only_user'",
+				),
+			).toEqual([]);
+			expect(info).toHaveBeenCalledWith(
+				"[edge-reco] user database storage",
+				user.storage,
+			);
+		} finally {
+			await user.close();
+			await catalogue.close();
 		}
 	});
 });

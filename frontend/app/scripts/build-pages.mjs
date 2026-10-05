@@ -9,8 +9,8 @@
 //   2. copy the committed signed catalog bundle (backend/examples/catalog)
 //      same-origin into dist/bundle — no CORS, no second origin to run.
 //
-// VITE_EVENTS_URL is deliberately left alone (unset → uplink disabled → the
-// hosted demo makes zero backend calls). Defaults are env-overridable: a fork
+// The app has no telemetry or event uplink: no user data leaves the device.
+// Defaults are env-overridable: a fork
 // hosting under a GitHub Pages project subpath sets VITE_BASE=/<repo>/.
 //
 // Run: `pnpm -F frontend run build:pages` (locally, or as the Cloudflare Pages

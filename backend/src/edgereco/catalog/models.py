@@ -5,7 +5,7 @@ from __future__ import annotations
 from typing import Literal
 
 from assay import ScoreResult
-from pydantic import BaseModel, ConfigDict, Field
+from pydantic import BaseModel
 
 
 class Product(BaseModel):
@@ -66,16 +66,3 @@ class SearchResult(BaseModel):
 
 
 type EventType = Literal["click", "view", "favorite", "cart"]
-
-
-class InteractionEvent(BaseModel):
-    """A user interaction event."""
-
-    # Reject unknown fields at the wire boundary: the beacon sends exactly
-    # event_type/product_id/timestamp (+ optional metadata); anything else is malformed.
-    model_config = ConfigDict(extra="forbid")
-
-    event_type: EventType
-    product_id: str
-    timestamp: str
-    metadata: dict[str, str] = Field(default_factory=dict)

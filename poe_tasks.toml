@@ -3,43 +3,12 @@
 # `cd backend && uv run poe demo`; keep the two in sync. The demo is backend-free
 # (Docker edge + Vite SPA), so it needs no Python project behind it.
 #
-# All three tasks are thin wrappers over the single orchestrator
+# The task is a thin wrapper over the single orchestrator
 # frontend/app/scripts/demo.mjs — the one place the demo logic lives. It allocates
-# RANDOM FREE PORTS per run (edge, SPA, collector) and wires them through compose,
+# RANDOM FREE PORTS per run (edge, SPA) and wires them through compose,
 # Vite, CORS, and the preflight, so the demo never collides with a stale container
 # or a sibling project.
 [tasks.demo]
 help = "Turnkey backend-free demo — edge + Vite SPA on free ports, opens your browser."
 cwd = "frontend"            # resolved relative to this file's dir (the repo root)
 shell = "node app/scripts/demo.mjs"
-
-# Same demo, PLUS the flywheel uplink: interaction events are captured in-tab and
-# periodically flushed to a mimicked-cloud collector (the FastAPI /events). Inference
-# stays 100% local — the uplink is an optional, off-path beacon. Brings up an extra
-# container, so it's a separate task and NOT the backend-free headline `demo`.
-[tasks.demo-flywheel]
-help = "Demo + flywheel uplink — events flush to a mimicked cloud collector (free port)."
-cwd = "frontend"
-shell = "node app/scripts/demo.mjs --flywheel"
-
-# The CLOUD half of the flywheel: after clicking around under `demo-flywheel`, run
-# this to recompute popularity from the collected events and republish a freshly
-# signed bundle into the runtime origin. The edge revalidates `latest` within 30s,
-# so a browser refresh re-ranks the rail toward what you clicked. The collector's
-# randomly-chosen port is read from the demo-ports.env the flywheel run wrote. Kept
-# in sync with backend/pyproject.toml's [tool.poe.tasks.demo-retrain].
-[tasks.demo-retrain]
-help = "Flywheel retrain — recompute popularity from collected events, republish the signed bundle."
-cwd = "backend"
-shell = """
-set -e
-ORIGIN=../frontend/.demo-origin
-[ -d "$ORIGIN/manifest" ] || { echo 'No runtime origin yet — run `poe demo-flywheel` first, click around, then retrain.'; exit 1; }
-[ -f examples/keys/private.key ] || { echo 'Missing examples/keys/private.key (gitignored). Retrain re-signs the bundle, so the maintainer signing key is required.'; exit 1; }
-# The flywheel run records its randomly-chosen collector port here; fall back to 8000.
-COLLECTOR_PORT=8000
-[ -f "$ORIGIN/demo-ports.env" ] && . "$ORIGIN/demo-ports.env"
-echo ">> retrain -> syncing the current bundle, folding in collected engagement, republishing… (collector :$COLLECTOR_PORT)"
-uv run edgereco retrain "$ORIGIN" "$ORIGIN" examples/keys/private.key examples/keys/public.key --events-url "http://localhost:${COLLECTOR_PORT}/events/export" --alpha 0.5 --cache-dir .retrain-cache
-echo '>> done. Refresh the SPA tab — the rail re-ranks toward what you clicked.'
-"""

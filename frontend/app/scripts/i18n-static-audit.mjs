@@ -29,7 +29,7 @@ export const COMPONENTS_DIR = join(HERE, "..", "src", "components");
 // verify-i18n.mjs; ProductImage renders decorative category echoes (data, shown
 // verbatim like category names), and Toast renders a caller-supplied message.
 export const AUDITED = [
-	"SyncBadge.tsx",
+	"StorageBadge.tsx",
 	"Storefront.tsx",
 	"ProductGrid.tsx",
 	"ProductCard.tsx",

@@ -29,8 +29,12 @@ test("pagesEnv respects caller overrides (forks deploy under their repo name)", 
 	assert.equal(env.VITE_BUNDLE_BASE_URL, "https://cdn.example.com/cat");
 });
 
-test("pagesEnv never injects VITE_EVENTS_URL (the hosted demo has no uplink)", () => {
-	assert.equal(pagesEnv({}).VITE_EVENTS_URL, undefined);
+test("pagesEnv injects no events or telemetry URL (no user data leaves the device)", () => {
+	const keys = Object.keys(pagesEnv({}));
+	assert.deepEqual(
+		keys.filter((key) => /EVENT|TELEMETRY|ANALYTICS|UPLINK/i.test(key)),
+		[],
+	);
 });
 
 test("CATALOG_DIR points at the committed signed bundle (latest pointer present)", () => {

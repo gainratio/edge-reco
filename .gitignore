@@ -48,11 +48,6 @@ private.key
 staging/
 origin/
 *.bundle/
-# Flywheel retrain: the runtime origin the demo edge serves (seeded from the
-# committed examples/catalog/ at demo start, then republished into) + the retrain
-# job's sync/staging scratch. Both disposable — the committed seed stays pristine.
-.demo-origin/
-.retrain-cache/
 .superpowers/
 # Internal launch/publish notes — local scratch, never shipped in the public repo.
 .publish-drafts/

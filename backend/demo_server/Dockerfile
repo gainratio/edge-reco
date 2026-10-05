@@ -1,4 +1,4 @@
-# Optional flywheel collector. Build with backend/ as the context; never expose
+# Optional demo API server (search / recommend / products). Build with backend/ as the context; never expose
 # the parent OSS workspace (or sibling repositories) to the Docker daemon.
 
 FROM python:3.13-slim
@@ -34,7 +34,7 @@ ENV DEMO_HOST=0.0.0.0 \
     DEMO_PORT=8000 \
     DEMO_CORS_ORIGINS=http://localhost:5174
 
-# The collector builds a query encoder at boot. edge-proc >=0.4.0 never downloads
+# The API server builds a query encoder at boot. edge-proc >=0.4.0 never downloads
 # the model implicitly, so this demo server opts in to its one-time fetch. That fetch
 # is NOT pinned to a model commit; see
 # docs/DEPLOY.md#the-server-images-and-the-embedding-model for why and for running

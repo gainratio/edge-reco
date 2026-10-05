@@ -50,7 +50,7 @@
 		"ariaLabel": "Why",
 		"private": {
 			"title": "Private",
-			"body": "By default, what your shoppers do stays on their own device. The optional learning loop is off until you switch it on."
+			"body": "What your shoppers do stays on their own device: it is kept only in their browser’s own database and never sent to a server."
 		},
 		"offline": {
 			"title": "Offline",
@@ -65,8 +65,8 @@
 			"body": "No per-search cloud bill. You hand out one small file, and each shopper's device does the work."
 		},
 		"learning": {
-			"title": "Always learning",
-			"body": "Switch on an optional loop — off by default — and your store learns from anonymous, grouped activity to send everyone sharper picks. The shopping itself still runs entirely on each device."
+			"title": "Learns on the device",
+			"body": "Every click re-ranks the shopper’s picks right in their browser. Their taste is remembered across visits on that device, and a Reset button wipes it."
 		}
 	},
 	"how": {

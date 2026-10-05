@@ -1,14 +1,17 @@
-"""Search endpoint: hybrid BM25 + FAISS + RRF, optional session rerank."""
+"""Search endpoint: hybrid BM25 + FAISS + RRF, then a stateless rerank.
+
+The server keeps no per-visitor session; the rerank runs against an empty profile.
+"""
 
 from __future__ import annotations
 
 from typing import Annotated, NamedTuple
 
-from fastapi import APIRouter, Depends, Query
+from fastapi import APIRouter, Query
 
-from edgereco.api.deps import Container, ServiceContainer, get_session_id
+from edgereco.api.deps import Container, ServiceContainer
 from edgereco.api.models import SearchResponse
-from edgereco.catalog.models import SearchResult
+from edgereco.catalog.models import SearchResult, SessionProfile
 from edgereco.reco.reranker import RetrievalEvidence, rerank_search, retrieval_evidence
 from edgereco.search.hybrid import reciprocal_rank_fusion
 
@@ -48,16 +51,14 @@ def search(
     q: Annotated[str, Query()] = "",
     limit: Annotated[int, Query(ge=1, le=100)] = 10,
     category: Annotated[str | None, Query()] = None,
-    session_id: Annotated[str, Depends(get_session_id)] = "",
 ) -> SearchResponse:
     if not q.strip():
         return SearchResponse(results=[], query="", total=0)
 
     fused = _fused_results(container, q, k=max(limit * 3, 30))
 
-    profile = container.sessions.get(session_id)
     ranked = rerank_search(
-        fused.results, profile, fused.evidence, container.ranking_config.scoring_weights
+        fused.results, SessionProfile(), fused.evidence, container.ranking_config.scoring_weights
     )
     # `total` counts what SURVIVED the absolute floor, not what fusion produced.
     # Reporting the fused count would tell a caller "192 matches" alongside a page

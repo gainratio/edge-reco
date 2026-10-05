@@ -46,11 +46,12 @@ In-scope reports include: any way to get unsigned, mis-signed, tampered, or stal
 data accepted by either tier; key-pinning bypasses; or a path that turns a verification
 failure into a silent fallback instead of a hard fail.
 
-## Non-production components
+## Shopper data
 
-The demo **`/events` collector** (`backend/src/edgereco/api/routes/events.py`) is a
-*reference* component for the personalization flywheel demo — not a hardened
-internet-facing service. It is request-bounded and supports an optional fail-closed shared
-token (`EDGERECO_EVENTS_TOKEN`); set that token (and put it behind your own auth/rate
-limiting) before exposing it beyond localhost. The flywheel uplink itself is optional,
-off the inference path, and disabled unless `VITE_EVENTS_URL` is set.
+No user data leaves the device. The shopper's activity (clicks, views, favorites, cart
+adds) is stored only in an on-device SQLite database in their own browser. There is no
+event endpoint, collector, or uplink, so nothing is sent to or stored on any server or
+cloud. Two guard tests keep it that way: `frontend/app/src/storageBoundary.test.ts`
+(app data stays in SQLite) and `frontend/app/scripts/network-allowlist.test.mjs` (the
+built app can only talk to its own origin). A report that shows shopper data leaving the
+browser is in scope.

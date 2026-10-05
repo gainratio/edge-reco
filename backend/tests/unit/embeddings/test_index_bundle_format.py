@@ -8,8 +8,8 @@ deleting the pair. Both are right for a mutable local index and wrong for a bund
 - the browser tier reads ``vector/state.json`` (``faiss_ids``) and
   ``vector/embeddings.f32``, so a bundle without them fails closed on every device;
 - random generation names make the signed bundle non-reproducible;
-- a load that rewrites the materialized ``vector/`` would let a retrain (which copies
-  the synced ``vector/`` verbatim) republish a bundle the browser cannot read.
+- a load that rewrites the materialized ``vector/`` would corrupt the synced copy a
+  consumer reads, leaving a layout the browser cannot read.
 
 So ``VectorIndex`` writes the flat, deterministic layout itself and loads it without
 touching the directory. These tests pin that, including byte-for-byte against the

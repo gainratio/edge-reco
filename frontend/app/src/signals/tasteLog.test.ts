@@ -1,33 +1,41 @@
-// The durable taste log seam — append/replay/compact/corrupt-tolerance.
+// The taste-log seam over the shopper's own SQLite database (edgereco-user).
 //
-// These tests drive the seam over an injected in-memory backend (jsdom has no
-// OPFS); the REAL OPFS path is proven by the Playwright reload-persistence
-// e2e (tests/e2e/persistent-taste.spec.ts). The property under guard: a torn
-// or corrupt tail line must NEVER poison boot — bad records are skipped and
-// the next write self-heals the file (the aml-filter OPFS-poisoning incident
-// is the cautionary tale).
+// The store is the REAL SqlTasteStore on the pinned SQLite build (in-process
+// Worker). The legacy OPFS file is an in-memory stand-in (jsdom has no OPFS);
+// the real browser path is proven by tests/e2e/persistent-taste.spec.ts.
 
-import { afterEach, beforeEach, describe, expect, it } from "vitest";
+import type { TasteStore } from "@edgereco/browser";
 import {
-	__setTasteLogBackendForTests,
+	type SharedStorage,
+	sharedUserDb,
+} from "@edgereco/browser/testing/sharedUserDb";
+import { afterEach, beforeEach, describe, expect, it } from "vitest";
+import type { LegacyTasteFile } from "./legacyStorage";
+import {
 	appendTasteEvent,
+	bindTasteStore,
 	clearTasteLog,
-	MAX_TASTE_EVENTS,
+	migrateLegacyTaste,
 	readTasteEvents,
-	type TasteLogBackend,
+	TasteStoreUnavailableError,
+	tasteDurable,
 } from "./tasteLog";
 
-/** An in-memory stand-in for the OPFS file: one string, atomically replaced. */
-function memoryBackend(initial: string | null = null): TasteLogBackend & {
+async function sqlStore(
+	durable: boolean | SharedStorage = true,
+): Promise<TasteStore> {
+	const storage =
+		typeof durable === "string" ? durable : durable ? "owner" : "volatile";
+	return (await sharedUserDb(storage)).open();
+}
+
+/** The old OPFS file, in memory, with a removal counter. */
+function legacyFile(initial: string | null): LegacyTasteFile & {
 	contents: () => string | null;
 } {
-	let text: string | null = initial;
+	let text = initial;
 	return {
 		read: () => Promise.resolve(text),
-		write: (next: string) => {
-			text = next;
-			return Promise.resolve();
-		},
 		remove: () => {
 			text = null;
 			return Promise.resolve();
@@ -36,13 +44,14 @@ function memoryBackend(initial: string | null = null): TasteLogBackend & {
 	};
 }
 
-/** A backend whose every operation fails (quota / permission / detached). */
-function brokenBackend(): TasteLogBackend {
-	return {
-		read: () => Promise.reject(new Error("storage broken")),
-		write: () => Promise.reject(new Error("storage broken")),
-		remove: () => Promise.reject(new Error("storage broken")),
-	};
+function line(productId: string, type = "click"): string {
+	return JSON.stringify({
+		v: 1,
+		ts: "2026-07-21T00:00:00.000Z",
+		type,
+		productId,
+		sessionId: "s-1",
+	});
 }
 
 beforeEach(() => {
@@ -50,143 +59,156 @@ beforeEach(() => {
 });
 
 afterEach(() => {
-	__setTasteLogBackendForTests(undefined);
+	bindTasteStore(null);
 });
 
-describe("taste log append/replay", () => {
-	it("round-trips an appended event as a v1 envelope with the session id", async () => {
-		const backend = memoryBackend();
-		__setTasteLogBackendForTests(backend);
-
+describe("taste log over SQLite", () => {
+	it("round-trips appended events without any session id", async () => {
+		bindTasteStore(await sqlStore());
 		await appendTasteEvent("click", "B0TEST01");
-
-		const events = await readTasteEvents();
-		expect(events).toHaveLength(1);
-		const event = events[0];
-		expect(event?.v).toBe(1);
+		const [event] = await readTasteEvents();
 		expect(event?.type).toBe("click");
 		expect(event?.productId).toBe("B0TEST01");
 		expect(typeof event?.ts).toBe("string");
-		// The random per-browser session id — the only identifier, no PII.
-		expect(event?.sessionId).not.toBe("");
-		expect(event?.sessionId).toBe(localStorage.getItem("nimbus_session_id"));
-	});
-
-	it("preserves append order across event types", async () => {
-		__setTasteLogBackendForTests(memoryBackend());
-		await appendTasteEvent("click", "P1");
-		await appendTasteEvent("favorite", "P2");
-		await appendTasteEvent("view", "P3");
-		const events = await readTasteEvents();
-		expect(events.map((e) => `${e.type}:${e.productId}`)).toEqual([
-			"click:P1",
-			"favorite:P2",
-			"view:P3",
+		expect(Object.keys(event ?? {}).sort()).toEqual([
+			"productId",
+			"ts",
+			"type",
 		]);
 	});
 
-	it(`compacts to the last ${MAX_TASTE_EVENTS} events (rolling window)`, async () => {
-		const backend = memoryBackend();
-		__setTasteLogBackendForTests(backend);
-		for (let i = 0; i < MAX_TASTE_EVENTS + 5; i += 1) {
-			await appendTasteEvent("click", `P${i}`);
-		}
-		const events = await readTasteEvents();
-		expect(events).toHaveLength(MAX_TASTE_EVENTS);
-		// The OLDEST five fell off; the newest survives.
-		expect(events[0]?.productId).toBe("P5");
-		expect(events.at(-1)?.productId).toBe(`P${MAX_TASTE_EVENTS + 4}`);
-		// The durable file itself is capped too, not just the in-memory view.
-		expect(backend.contents()?.trim().split("\n")).toHaveLength(
-			MAX_TASTE_EVENTS,
-		);
-	});
-});
-
-describe("taste log corruption tolerance (torn writes must not poison boot)", () => {
-	const good = (id: string): string =>
-		JSON.stringify({
-			v: 1,
-			ts: "2026-07-21T00:00:00.000Z",
-			type: "click",
-			productId: id,
-			sessionId: "s-1",
-		});
-
-	it("skips a torn (half-written) tail line and keeps the valid prefix", async () => {
-		__setTasteLogBackendForTests(
-			memoryBackend(`${good("P1")}\n${good("P2")}\n{"v":1,"ts":"2026-0`),
-		);
-		const events = await readTasteEvents();
-		expect(events.map((e) => e.productId)).toEqual(["P1", "P2"]);
+	it("writes nothing to localStorage", async () => {
+		bindTasteStore(await sqlStore());
+		await appendTasteEvent("click", "P1");
+		expect(localStorage.length).toBe(0);
 	});
 
-	it("skips structurally invalid envelopes (wrong version, unknown type, missing id)", async () => {
-		const wrongVersion = JSON.stringify({
-			v: 2,
-			ts: "t",
-			type: "click",
-			productId: "PX",
-			sessionId: "s",
-		});
-		const unknownType = JSON.stringify({
-			v: 1,
-			ts: "t",
-			type: "purchase",
-			productId: "PY",
-			sessionId: "s",
-		});
-		const missingId = JSON.stringify({
-			v: 1,
-			ts: "t",
-			type: "click",
-			sessionId: "s",
-		});
-		__setTasteLogBackendForTests(
-			memoryBackend(
-				[good("P1"), wrongVersion, unknownType, missingId, good("P2")].join(
-					"\n",
-				),
-			),
-		);
-		const events = await readTasteEvents();
-		expect(events.map((e) => e.productId)).toEqual(["P1", "P2"]);
-	});
-
-	it("self-heals: the next append rewrites the file with only valid records", async () => {
-		const backend = memoryBackend(`${good("P1")}\nnot json at all`);
-		__setTasteLogBackendForTests(backend);
-		await appendTasteEvent("cart", "P2");
-		const stored = backend.contents()?.trim().split("\n") ?? [];
-		expect(stored).toHaveLength(2);
-		expect(stored.every((line) => JSON.parse(line).v === 1)).toBe(true);
-	});
-
-	it("a completely unreadable log degrades to empty (session-only), never throws", async () => {
-		__setTasteLogBackendForTests(brokenBackend());
-		await expect(readTasteEvents()).resolves.toEqual([]);
-		await expect(appendTasteEvent("click", "P1")).resolves.toBeUndefined();
-		await expect(clearTasteLog()).resolves.toBeUndefined();
-	});
-});
-
-describe("taste log reset + no-storage degrade", () => {
-	it("clearTasteLog empties the log durably", async () => {
-		const backend = memoryBackend();
-		__setTasteLogBackendForTests(backend);
+	it("clearTasteLog empties the table", async () => {
+		bindTasteStore(await sqlStore(), null, () => null);
 		await appendTasteEvent("click", "P1");
 		await clearTasteLog();
 		expect(await readTasteEvents()).toEqual([]);
-		expect(backend.contents()).toBeNull();
-		// And the wipe survives a fresh read (nothing cached back).
-		await appendTasteEvent("click", "P2");
-		expect((await readTasteEvents()).map((e) => e.productId)).toEqual(["P2"]);
 	});
 
-	it("no storage backend at all (jsdom default): every op no-ops safely", async () => {
-		__setTasteLogBackendForTests(null);
+	it("reports durability from the bound store", async () => {
+		bindTasteStore(await sqlStore(true));
+		expect(tasteDurable()).toBe(true);
+		bindTasteStore(await sqlStore(false));
+		expect(tasteDurable()).toBe(false);
+		bindTasteStore(null);
+		expect(tasteDurable()).toBe(false);
+	});
+
+	it("with no store bound, appends and reads no-op but reset fails visibly", async () => {
 		await expect(appendTasteEvent("click", "P1")).resolves.toBeUndefined();
 		await expect(readTasteEvents()).resolves.toEqual([]);
-		await expect(clearTasteLog()).resolves.toBeUndefined();
+		await expect(clearTasteLog()).rejects.toBeInstanceOf(
+			TasteStoreUnavailableError,
+		);
+	});
+
+	it("reset fails visibly when rows survive (never a silent success)", async () => {
+		const real = await sqlStore();
+		await real.append({ ts: "t", type: "click", productId: "P1" });
+		const stuck: TasteStore = {
+			durable: true,
+			ownership: "owner",
+			append: (r) => real.append(r),
+			list: () => real.list(),
+			count: () => real.count(),
+			clear: () => Promise.reject(new Error("1 row left")),
+			importLegacy: (r) => real.importLegacy(r),
+		};
+		bindTasteStore(stuck, null, () => null);
+		await expect(clearTasteLog()).rejects.toThrow(/1 row left/);
+	});
+
+	it("reset fails visibly when the legacy file cannot be removed", async () => {
+		bindTasteStore(await sqlStore(), null, () => ({
+			read: () => Promise.resolve(null),
+			remove: () => Promise.reject(new Error("opfs locked")),
+		}));
+		await expect(clearTasteLog()).rejects.toThrow(/opfs locked/);
+	});
+
+	it("reset in a secondary tab with no owner reachable fails visibly", async () => {
+		bindTasteStore(await sqlStore("secondary"), null, () => null);
+		await expect(clearTasteLog()).rejects.toThrow(/another tab/);
+	});
+
+	it("reset removes the legacy file and the old localStorage keys", async () => {
+		const file = legacyFile(`${line("P1")}\n`);
+		localStorage.setItem("nimbus_session_id", "x");
+		bindTasteStore(await sqlStore(), null, () => file);
+		await clearTasteLog();
+		expect(file.contents()).toBeNull();
+		expect(localStorage.getItem("nimbus_session_id")).toBeNull();
+	});
+
+	it("a failing store degrades appends and reads to session-only", async () => {
+		const broken: TasteStore = {
+			durable: true,
+			ownership: "owner",
+			append: () => Promise.reject(new Error("disk")),
+			list: () => Promise.reject(new Error("disk")),
+			count: () => Promise.reject(new Error("disk")),
+			clear: () => Promise.reject(new Error("disk")),
+			importLegacy: () => Promise.reject(new Error("disk")),
+		};
+		bindTasteStore(broken, null, () => null);
+		await expect(appendTasteEvent("click", "P1")).resolves.toBeUndefined();
+		await expect(readTasteEvents()).resolves.toEqual([]);
+		await expect(clearTasteLog()).rejects.toThrow(/disk/);
+	});
+});
+
+describe("legacy OPFS taste file: copy-then-retire", () => {
+	it("copies valid events into SQLite, then retires the file", async () => {
+		const store = await sqlStore(true);
+		const file = legacyFile(`${line("P1")}\n${line("P2", "cart")}\n{"v":1,"ts`);
+		expect(await migrateLegacyTaste(store, file)).toBe("copied-and-retired");
+		bindTasteStore(store);
+		expect((await readTasteEvents()).map((e) => e.productId)).toEqual([
+			"P1",
+			"P2",
+		]);
+		expect(file.contents()).toBeNull();
+	});
+
+	it("is crash-resumable: a rerun after the copy never duplicates, and still retires", async () => {
+		const store = await sqlStore(true);
+		const text = `${line("P1")}\n`;
+		// The copy committed but the tab died before the file was removed.
+		await store.importLegacy([
+			{ ts: "2026-07-21T00:00:00.000Z", type: "click", productId: "P1" },
+		]);
+		expect(await store.count()).toBe(1);
+		const file = legacyFile(text);
+		await migrateLegacyTaste(store, file);
+		bindTasteStore(store);
+		expect(await readTasteEvents()).toHaveLength(1);
+		expect(file.contents()).toBeNull();
+	});
+
+	it("keeps the file when this tab does not own the database", async () => {
+		const store = await sqlStore("secondary");
+		const file = legacyFile(`${line("P1")}\n`);
+		expect(await migrateLegacyTaste(store, file)).toBe("copied");
+		expect(file.contents()).not.toBeNull();
+	});
+
+	it("does nothing when there is no legacy file", async () => {
+		const store = await sqlStore(true);
+		expect(await migrateLegacyTaste(store, legacyFile(null))).toBe("none");
+		expect(await migrateLegacyTaste(store, null)).toBe("none");
+	});
+
+	it("never fails boot when the legacy file cannot be read", async () => {
+		const store = await sqlStore(true);
+		const broken: LegacyTasteFile = {
+			read: () => Promise.reject(new Error("opfs")),
+			remove: () => Promise.reject(new Error("opfs")),
+		};
+		expect(await migrateLegacyTaste(store, broken)).toBe("failed");
 	});
 });

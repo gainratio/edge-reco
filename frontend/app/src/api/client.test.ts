@@ -13,6 +13,10 @@ import {
 } from "@edgereco/browser";
 import { catalogFetch } from "@edgereco/browser/testing/fixtures";
 import {
+	type SharedUserDb,
+	sharedUserDb,
+} from "@edgereco/browser/testing/sharedUserDb";
+import {
 	type IndexManifest,
 	MemoryCacheStore,
 	materializeFile,
@@ -21,11 +25,7 @@ import {
 } from "@gainratio/browser";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { getSnapshot } from "../metrics/store";
-import {
-	__setTasteLogBackendForTests,
-	readTasteEvents,
-	type TasteLogBackend,
-} from "../signals/tasteLog";
+import { readTasteEvents } from "../signals/tasteLog";
 import {
 	__setRuntimeForTests,
 	bootstrap,
@@ -42,6 +42,7 @@ import {
 	sendEvent,
 	similar,
 	strategies,
+	tasteDurable,
 } from "./client";
 import type { Product } from "./types";
 
@@ -370,25 +371,13 @@ describe("bundle-supplied interaction weights drive the in-tab fold", () => {
 	});
 });
 
-/** In-memory taste-log backend: the durable-storage stand-in for these tests. */
-function memoryTasteBackend(): TasteLogBackend {
-	let text: string | null = null;
-	return {
-		read: () => Promise.resolve(text),
-		write: (next: string) => {
-			text = next;
-			return Promise.resolve();
-		},
-		remove: () => {
-			text = null;
-			return Promise.resolve();
-		},
-	};
-}
+// One SQLite database shared across "reloads", like a tab reopening OPFS.
+let shared: SharedUserDb;
 
 const freshDeps = () => ({
 	spawnEngine: () => fakeEnginePort(),
 	makeEmbedder: () => stubEmbedder,
+	openTasteStore: shared.open,
 });
 
 /** Click 3 same-category products (the standard warm-up used across this file). */
@@ -409,14 +398,78 @@ async function clickThreeSameCategory(): Promise<Product[]> {
 }
 
 describe("durable taste: replay on boot, reset, replayed count", () => {
-	beforeEach(() => {
+	beforeEach(async () => {
 		localStorage.clear();
-		__setTasteLogBackendForTests(memoryTasteBackend());
+		shared = await sharedUserDb();
 		__setRuntimeForTests(freshDeps());
 	});
 
-	afterEach(() => {
-		__setTasteLogBackendForTests(undefined);
+	it("boots when the user database cannot open, and then Reset fails visibly", async () => {
+		const warn = vi.spyOn(console, "warn").mockImplementation(() => undefined);
+		__setRuntimeForTests({
+			...freshDeps(),
+			openTasteStore: () => Promise.reject(new Error("opfs exploded")),
+		});
+		await bootstrap();
+		expect(tasteDurable()).toBe(false);
+		await expect(resetSession()).rejects.toThrow("could not be opened");
+		expect(warn).toHaveBeenCalledWith(
+			"[edge-reco] user database unavailable",
+			expect.any(Error),
+		);
+		warn.mockRestore();
+	});
+
+	it("keeps the taste log in the user SQLite database, not in browser storage", async () => {
+		await bootstrap();
+		await clickThreeSameCategory();
+		const [row] = await shared.sql.query(
+			"SELECT count(*) AS n FROM taste_events",
+		);
+		expect(Number(row?.n)).toBe(3);
+		expect(localStorage.length).toBe(0);
+	});
+
+	it("bootstrap retires the old localStorage session id and uplink queue", async () => {
+		localStorage.setItem("nimbus_session_id", "returning-visitor");
+		localStorage.setItem(
+			"nimbus_uplink_queue",
+			JSON.stringify([{ event_type: "click", product_id: "P1" }]),
+		);
+		await bootstrap();
+		expect(localStorage.getItem("nimbus_session_id")).toBeNull();
+		expect(localStorage.getItem("nimbus_uplink_queue")).toBeNull();
+	});
+
+	it("resetSession also clears the old localStorage keys", async () => {
+		await bootstrap();
+		localStorage.setItem("nimbus_session_id", "late-old-tab");
+		await resetSession();
+		expect(localStorage.getItem("nimbus_session_id")).toBeNull();
+	});
+
+	it("reports whether the taste log survives a reload", async () => {
+		await bootstrap();
+		expect(tasteDurable()).toBe(true);
+		shared = await sharedUserDb("volatile");
+		__setRuntimeForTests(freshDeps());
+		await bootstrap();
+		expect(tasteDurable()).toBe(false);
+	});
+
+	it("a click makes no network request (no uplink exists)", async () => {
+		await bootstrap();
+		const fetchSpy = vi.spyOn(globalThis, "fetch");
+		const beacon = vi.fn(() => true);
+		vi.stubGlobal("navigator", { ...navigator, sendBeacon: beacon });
+		try {
+			await clickThreeSameCategory();
+			expect(fetchSpy).not.toHaveBeenCalled();
+			expect(beacon).not.toHaveBeenCalled();
+		} finally {
+			fetchSpy.mockRestore();
+			vi.unstubAllGlobals();
+		}
 	});
 
 	it("replays the persisted log through the SAME fold on a fresh boot", async () => {

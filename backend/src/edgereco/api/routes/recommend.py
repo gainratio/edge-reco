@@ -1,4 +1,8 @@
-"""Recommend endpoint: strategy-aware, session-aware rerank over the full catalog.
+"""Recommend endpoint: stateless, strategy-aware rerank over the full catalog.
+
+The server keeps no per-visitor session: personalization lives in the browser,
+which holds the taste profile on-device. Here every request ranks against an
+empty profile, so the same query always returns the same list.
 
 ``strategy`` defaults to ``for_you`` (today's behavior); ``seed`` is the product the
 ``vector_similarity`` strategies recommend around. An unknown strategy or a vector
@@ -9,9 +13,9 @@ from __future__ import annotations
 
 from typing import Annotated
 
-from fastapi import APIRouter, Depends, HTTPException, Query
+from fastapi import APIRouter, HTTPException, Query
 
-from edgereco.api.deps import Container, get_session_id
+from edgereco.api.deps import Container
 from edgereco.api.models import RecommendResponse
 from edgereco.catalog.models import Product, SearchResult, SessionProfile
 from edgereco.reco.cooccurrence import CooccurrenceMatrix
@@ -28,13 +32,11 @@ def recommend(
     limit: Annotated[int, Query(ge=1, le=100)] = 10,
     strategy: Annotated[str, Query()] = "for_you",
     seed: Annotated[str | None, Query()] = None,
-    session_id: Annotated[str, Depends(get_session_id)] = "",
 ) -> RecommendResponse:
-    profile = container.sessions.get(session_id)
     ranked = _run(
         catalog=container.catalog,
         by_id=container.by_id,
-        profile=profile,
+        profile=SessionProfile(),
         config=container.ranking_config,
         vector=container.vector,
         cooccurrence=container.cooccurrence,
@@ -42,7 +44,7 @@ def recommend(
         seed=seed,
         limit=limit,
     )
-    return RecommendResponse(results=ranked, session_clicks=profile.click_count)
+    return RecommendResponse(results=ranked)
 
 
 def _run(

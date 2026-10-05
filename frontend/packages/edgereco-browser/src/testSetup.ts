@@ -16,6 +16,9 @@ vi.mock("./engine/catalogueSql", async (importOriginal) => {
 		openCatalogueSql: vi.fn(() =>
 			actual.openCatalogueSql({ workerFactory: nodeSqlWorkerFactory }),
 		),
+		openUserSql: vi.fn(() =>
+			actual.openUserSql({ workerFactory: nodeSqlWorkerFactory }),
+		),
 		retireLegacyVectorPool: vi.fn(async () => "absent"),
 	};
 });

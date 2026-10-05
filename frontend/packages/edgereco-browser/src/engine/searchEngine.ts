@@ -120,7 +120,7 @@ export interface SearchEngine {
 	 * The per-event-type affinity bumps from the synced config. The app's
 	 * sendEvent fold (and its boot-time replay) MUST use these — not the typed
 	 * defaults — so a republished bundle retunes the in-tab fold exactly like
-	 * the backend /events fold. Falls back to the typed defaults only for a
+	 * the Python session fold. Falls back to the typed defaults only for a
 	 * bundle that predates ranking_config.json (parseRankingConfig handles that).
 	 */
 	interactionWeights(): InteractionWeights;
