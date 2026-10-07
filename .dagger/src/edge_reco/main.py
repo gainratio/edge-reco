@@ -34,9 +34,11 @@ REPOSITORY: Final = TARGET.repository
 UV_VERSION: Final = "0.11.32"
 PNPM_VERSION: Final = "11.5.0"
 CHECK_SHA: Final = "0000000000000000000000000000000000000000"
-CENTRAL_MODULE_SHA: Final = "4d48302e30d3a54ec71364d43aada5c0d4b1f9bf"
+CENTRAL_MODULE_SHA: Final = "a88866232e679b6353d2b75bceb01969be739f67"
 DEPLOY_ROOT: Final = "dist"
 PAGES_DOMAINS: Final = ("www.edge-reco.com",)
+#: The Pages project's Git source owner. Pinned so a Git-linked project stays bound after the gainratio transfer.
+PAGES_GIT_SOURCE_OWNER: Final = "hseshadr"
 SHA_LENGTH: Final = 40
 PREVIEW_ARGS: Final = tuple(shell_split("pnpm -C app exec vite preview --host --port 4173 --strictPort"))
 ASSAY_INSTALL: Final = tuple(
@@ -414,6 +416,7 @@ class EdgeReco:
             request.target.repository, request.target.project, request.target.branch,
             request.target.domain, DEPLOY_ROOT, list(PAGES_DOMAINS), request.consumer_identity,
             request.producing_identity, [DEPLOY_ROOT],
+            git_source_owner=PAGES_GIT_SOURCE_OWNER,
         )
     # fmt: on
 

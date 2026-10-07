@@ -23,7 +23,7 @@ import edge_reco.main as main_module
 from edge_reco.live_release import LiveSmokeError
 from edge_reco.main import EdgeReco, parse_release_evidence
 
-FOUNDATION_SHA = "4d48302e30d3a54ec71364d43aada5c0d4b1f9bf"
+FOUNDATION_SHA = "a88866232e679b6353d2b75bceb01969be739f67"
 REPOSITORY = "hseshadr/edge-reco"
 TRANSFERRED_REPOSITORY = "gainratio/edge-reco"
 #: Look-alikes of the two owners that must never pass the exact allow-list.
@@ -46,7 +46,7 @@ RECORDING_ACCOUNT = (RECORDING_CLOUDFLARE_TOKEN, RECORDING_CLOUDFLARE_ACCOUNT, "
 PRETRANSPORT_SOURCE = """\
 from dagger import dag, function, object_type
 
-SHA = "4d48302e30d3a54ec71364d43aada5c0d4b1f9bf"
+SHA = "a88866232e679b6353d2b75bceb01969be739f67"
 COMMIT = "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
 REPOSITORY = "hseshadr/edge-reco"
 
@@ -175,8 +175,9 @@ class RecordingProvider:
         self.events.append("preflight")
         return "preflight"
 
-    def deploy(self, *arguments: object) -> dagger.CloudflarePagesDeploymentEvidence:
+    def deploy(self, *arguments: object, **options: object) -> dagger.CloudflarePagesDeploymentEvidence:
         self._require_exact_arguments(arguments)
+        self._require_git_source_owner(options)
         self.events.append("deploy")
         return self._record("created-evidence", self.created_id, self.created_url)
 
@@ -214,6 +215,10 @@ class RecordingProvider:
     @staticmethod
     def _require_exact_arguments(arguments: tuple[object, ...]) -> None:
         assert arguments == _recording_provider_arguments()
+
+    @staticmethod
+    def _require_git_source_owner(options: dict[str, object]) -> None:
+        assert options == {"git_source_owner": "hseshadr"}
 
 
 class CacheNeverCall:
@@ -301,8 +306,9 @@ class MaterializingProvider(RecordingProvider):
         super().__init__(events)
         self.materialized_evidence: dict[str, IdBackedDeployment] = {}
 
-    def deploy(self, *arguments: object) -> dagger.CloudflarePagesDeploymentEvidence:
+    def deploy(self, *arguments: object, **options: object) -> dagger.CloudflarePagesDeploymentEvidence:
         self._require_exact_arguments(arguments)
+        self._require_git_source_owner(options)
         return self._construct("deploy")
 
     def verify(self, *arguments: object) -> dagger.CloudflarePagesDeploymentEvidence:
@@ -394,8 +400,9 @@ class RecordingDirectory:
 class FailingProviderTransaction(RecordingProvider):
     """Provider fake that proves a shared transaction failure blocks live proof."""
 
-    def deploy(self, *arguments: object) -> dagger.CloudflarePagesDeploymentEvidence:
+    def deploy(self, *arguments: object, **options: object) -> dagger.CloudflarePagesDeploymentEvidence:
         self._require_exact_arguments(arguments)
+        self._require_git_source_owner(options)
         self.events.append("deploy")
         raise ValueError("provider transaction failed")
 
@@ -403,8 +410,9 @@ class FailingProviderTransaction(RecordingProvider):
 class TamperRejectingProvider(RecordingProvider):
     """Model the central envelope verifier rejecting changed artifact bytes."""
 
-    def deploy(self, *arguments: object) -> dagger.CloudflarePagesDeploymentEvidence:
+    def deploy(self, *arguments: object, **options: object) -> dagger.CloudflarePagesDeploymentEvidence:
         self._require_exact_arguments(arguments)
+        self._require_git_source_owner(options)
         self.events.extend(("deploy", "provider-envelope-reject"))
         raise ValueError("envelope checksum mismatch")
 
@@ -548,7 +556,7 @@ class GraphDeployment:
 
 
 class GraphCloudflarePages:
-    def deploy(self, *_arguments: object) -> dagger.CloudflarePagesDeploymentEvidence:
+    def deploy(self, *_arguments: object, **_options: object) -> dagger.CloudflarePagesDeploymentEvidence:
         return cast(dagger.CloudflarePagesDeploymentEvidence, GraphDeployment())
 
     def previous_production_deployment(self, *_arguments: object) -> dagger.CloudflarePagesProductionDeployment:
@@ -1050,6 +1058,15 @@ def test_should_refuse_sarif_upload_for_an_unlisted_repository(monkeypatch: pyte
     with pytest.raises(ValueError, match="validated production values"):
         asyncio.run(edge_reco.codeql_upload(token, "a" * 40, repository="attacker/edge-reco"))
     assert root.foundation_client.calls == []
+
+
+def test_should_pin_the_pages_git_source_owner_to_hseshadr() -> None:
+    # Given
+    source = inspect.getsource(EdgeReco._provider_deploy)
+
+    # Then: the Git-linked Pages project stays bound to hseshadr across the gainratio transfer
+    assert main_module.PAGES_GIT_SOURCE_OWNER == "hseshadr"
+    assert "git_source_owner=PAGES_GIT_SOURCE_OWNER" in source
 
 
 class TransferredRecordingProvider(RecordingProvider):
