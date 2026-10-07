@@ -61,21 +61,22 @@ def test_should_require_the_triggering_protected_run_identity() -> None:
     deploy = _async_method("deploy")
     parameters = [argument.arg for argument in deploy.args.args]
 
-    assert parameters[-3:] == ["commit_sha", "workflow_run_id", "run_attempt"]
+    assert parameters[-4:] == ["commit_sha", "workflow_run_id", "run_attempt", "repository"]
 
 
 def test_should_bind_the_triggering_checkout_before_building_product_bytes() -> None:
     deploy = _top_level_calls("deploy")
     delivery = _top_level_calls("_deploy_context")
-    assert deploy == [["_release_context"], ["_deploy_context"]]
+    # The run's repository is validated against the allow-list before anything is bound.
+    assert deploy == [["production"], ["_release_context"], ["_deploy_context"]]
     assert delivery[0] == ["_provider_request", "_build_source"]
 
 
 def test_should_leave_green_run_validation_to_the_attempt_bound_provider() -> None:
     source = _source()
     assert "dag.foundation().green_main(" not in source
-    assert "_verified_source(self.source, commit_sha)" in source
-    assert "ReleaseContext(bound, commit_sha, workflow_run_id, run_attempt)" in source
+    assert "_verified_source(self.source, commit_sha, target)" in source
+    assert "ReleaseContext(bound, commit_sha, workflow_run_id, run_attempt, target)" in source
     assert "actions/workflows/dagger.yml/runs?head_sha={commit}" not in source
     assert 'select(.conclusion=="success")' not in source
 

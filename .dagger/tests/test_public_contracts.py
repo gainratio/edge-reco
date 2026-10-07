@@ -24,6 +24,16 @@ from edge_reco.live_release import LiveSmokeError
 from edge_reco.main import EdgeReco, parse_release_evidence
 
 FOUNDATION_SHA = "4d48302e30d3a54ec71364d43aada5c0d4b1f9bf"
+REPOSITORY = "hseshadr/edge-reco"
+TRANSFERRED_REPOSITORY = "gainratio/edge-reco"
+#: Look-alikes of the two owners that must never pass the exact allow-list.
+REFUSED_REPOSITORIES = (
+    "attacker/edge-reco",
+    "gainratio/other-repo",
+    "hseshadr/edge-reco-evil",
+    "gainratio-evil/edge-reco",
+    "",
+)
 VALID_DEPLOYMENT_ID = "f621dc42-3cf9-4217-b4fb-0392c1d39020"
 VALID_DEPLOYMENT_URL = "https://f621dc42.edge-reco.pages.dev"
 PREVIOUS_DEPLOYMENT_ID = "0b915c11-176b-493e-b9fb-969a1304cdec"
@@ -58,7 +68,7 @@ class Pretransport:
 """
 
 
-def _recording_provider_arguments() -> tuple[object, ...]:
+def _recording_provider_arguments(repository: str = REPOSITORY) -> tuple[object, ...]:
     return (
         RECORDING_ENVELOPE,
         RECORDING_GITHUB_TOKEN,
@@ -66,13 +76,13 @@ def _recording_provider_arguments() -> tuple[object, ...]:
         RECORDING_CLOUDFLARE_ACCOUNT,
         "123456",
         2,
-        "hseshadr/edge-reco",
+        repository,
         "edge-reco",
         "main",
         "edge-reco.com",
         "dist",
         ["www.edge-reco.com"],
-        "hseshadr/edge-reco@" + "a" * 40,
+        repository + "@" + "a" * 40,
         FOUNDATION_SHA + ":123456",
         ["dist"],
     )
@@ -836,20 +846,233 @@ def test_should_bind_edge_reco_repository_pages_and_domain() -> None:
     assert main_module.PAGES_DOMAINS == ("www.edge-reco.com",)
 
 
-def test_should_reject_mismatched_delivery_target_tuple() -> None:
+@pytest.mark.parametrize(
+    "values",
+    (
+        ("hseshadr/another-repository", "edge-reco", "main", "edge-reco.com"),
+        ("gainratio/edge-reco", "another-project", "main", "edge-reco.com"),
+        ("hseshadr/edge-reco", "edge-reco", "release", "edge-reco.com"),
+        ("hseshadr/edge-reco", "edge-reco", "main", "evil.example"),
+    ),
+)
+def test_should_reject_mismatched_delivery_target_tuple(values: tuple[str, str, str, str]) -> None:
     # Given
     from edge_reco.targets import EdgeRecoTarget
 
     # When / Then
     with pytest.raises(ValueError, match="validated production values"):
-        EdgeRecoTarget("hseshadr/another-repository", "edge-reco", "main", "edge-reco.com")
+        EdgeRecoTarget(*values)
 
 
-def test_should_reject_unvalidated_repository_override() -> None:
+@pytest.mark.parametrize("repository", REFUSED_REPOSITORIES)
+def test_should_reject_unvalidated_repository_override(monkeypatch: pytest.MonkeyPatch, repository: str) -> None:
+    # Inverted contract (was: deploy takes no repository at all). The run now passes its own
+    # identity so the guard survives the gainratio transfer; anything off the two-item list
+    # is refused before the shared guard, the build, or the provider sees it.
     # Given
-    deploy = inspect.signature(EdgeReco.deploy)
+    events: list[str] = []
+    edge_reco = _recording_edge_reco(monkeypatch, events, RecordingProvider(events))
+
+    # When / Then
+    with pytest.raises(ValueError, match="validated production values"):
+        asyncio.run(_deploy_with_fake_secrets(edge_reco, repository))
+    assert events == []
+
+
+def test_should_default_every_repository_entrypoint_to_todays_owner() -> None:
+    # Given
+    entrypoints = (EdgeReco.ci, EdgeReco.deploy, EdgeReco.codeql_upload, EdgeReco.workflow_security, EdgeReco.security)
+
+    # When
+    defaults = {inspect.signature(entry).parameters["repository"].default for entry in entrypoints}
+
     # Then
-    assert "repository" not in deploy.parameters
+    assert defaults == {"hseshadr/edge-reco"}
+    assert inspect.signature(EdgeReco.secret_scan).parameters["repository"].default == "hseshadr/edge-reco"
+
+
+def test_should_allow_exactly_the_hseshadr_and_gainratio_repositories() -> None:
+    # Given
+    from edge_reco import targets
+
+    # Then
+    assert targets.ALLOWED_REPOSITORIES == ("hseshadr/edge-reco", "gainratio/edge-reco")
+    assert targets.EdgeRecoTarget.production().repository == "hseshadr/edge-reco"
+
+
+@pytest.mark.parametrize("repository", (REPOSITORY, TRANSFERRED_REPOSITORY))
+def test_should_accept_both_owners_of_the_edge_reco_repository(repository: str) -> None:
+    # Given
+    from edge_reco.targets import EdgeRecoTarget
+
+    # When
+    target = EdgeRecoTarget.production(repository)
+
+    # Then
+    assert (target.repository, target.project, target.branch, target.domain) == (
+        repository,
+        "edge-reco",
+        "main",
+        "edge-reco.com",
+    )
+
+
+@pytest.mark.parametrize("repository", REFUSED_REPOSITORIES)
+def test_should_refuse_every_repository_outside_the_exact_allow_list(repository: str) -> None:
+    # Given
+    from edge_reco.targets import EdgeRecoTarget
+
+    # When / Then
+    with pytest.raises(ValueError, match="validated production values"):
+        EdgeRecoTarget.production(repository)
+
+
+def test_should_bind_the_runs_transferred_repository_in_ci(monkeypatch: pytest.MonkeyPatch) -> None:
+    # Given
+    events: list[str] = []
+    root = RecordingDag(events, RecordingProvider(events))
+    edge_reco = EdgeReco.__new__(EdgeReco)
+    edge_reco.source = cast(dagger.Directory, "caller-source")
+    monkeypatch.setattr(main_module, "dag", root)
+    monkeypatch.setattr(edge_reco, "_product_checks", lambda _source: ())
+
+    # When
+    asyncio.run(edge_reco.ci("a" * 40, TRANSFERRED_REPOSITORY))
+
+    # Then
+    assert [call[2] for call in root.foundation_client.calls] == [TRANSFERRED_REPOSITORY] * 2
+
+
+@pytest.mark.parametrize("repository", REFUSED_REPOSITORIES)
+def test_should_refuse_ci_for_an_unlisted_repository_before_the_guard(
+    monkeypatch: pytest.MonkeyPatch, repository: str
+) -> None:
+    # Given
+    events: list[str] = []
+    root = RecordingDag(events, RecordingProvider(events))
+    edge_reco = EdgeReco.__new__(EdgeReco)
+    edge_reco.source = cast(dagger.Directory, "caller-source")
+    monkeypatch.setattr(main_module, "dag", root)
+
+    # When / Then
+    with pytest.raises(ValueError, match="validated production values"):
+        asyncio.run(edge_reco.ci("a" * 40, repository))
+    assert root.foundation_client.calls == []
+
+
+class RepositoryRecordingFoundation(GraphFoundation):
+    def __init__(self, guarded: list[object]) -> None:
+        self.guarded = guarded
+
+    def guard(self, *_arguments: object, **options: object) -> dagger.Container:
+        self.guarded.append(options.get("repository"))
+        return cast(dagger.Container, GraphContainer())
+
+
+class RepositoryRecordingDag(GraphDag):
+    def __init__(self) -> None:
+        self.urls: list[str] = []
+        self.guarded: list[object] = []
+
+    def git(self, repository: str) -> GraphGitRepository:
+        self.urls.append(repository)
+        return GraphGitRepository()
+
+    def foundation(self) -> GraphFoundation:
+        return RepositoryRecordingFoundation(self.guarded)
+
+
+@pytest.mark.parametrize("entrypoint", ("workflow_security", "secret_scan", "security"))
+def test_should_guard_the_runs_transferred_repository_history(monkeypatch: pytest.MonkeyPatch, entrypoint: str) -> None:
+    # Given
+    root = RepositoryRecordingDag()
+    edge_reco = EdgeReco.__new__(EdgeReco)
+    edge_reco.source = cast(dagger.Directory, GraphDirectory())
+    monkeypatch.setattr(main_module, "dag", root)
+
+    # When
+    asyncio.run(getattr(edge_reco, entrypoint)(TRANSFERRED_REPOSITORY))
+
+    # Then
+    assert root.urls == ["https://github.com/gainratio/edge-reco.git"] * 2
+    assert root.guarded == [TRANSFERRED_REPOSITORY]
+
+
+@pytest.mark.parametrize("entrypoint", ("workflow_security", "secret_scan", "security"))
+def test_should_refuse_history_guard_for_an_unlisted_repository(
+    monkeypatch: pytest.MonkeyPatch, entrypoint: str
+) -> None:
+    # Given
+    root = RepositoryRecordingDag()
+    edge_reco = EdgeReco.__new__(EdgeReco)
+    monkeypatch.setattr(main_module, "dag", root)
+
+    # When / Then
+    with pytest.raises(ValueError, match="validated production values"):
+        asyncio.run(getattr(edge_reco, entrypoint)("attacker/edge-reco"))
+    assert root.urls == [] and root.guarded == []
+
+
+def test_should_upload_sarif_for_the_runs_transferred_repository(monkeypatch: pytest.MonkeyPatch) -> None:
+    # Given
+    events: list[str] = []
+    root = RecordingDag(events, RecordingProvider(events))
+    edge_reco = EdgeReco.__new__(EdgeReco)
+    edge_reco.source = cast(dagger.Directory, "caller-source")
+    uploads: list[str] = []
+
+    async def record(_source: object, request: main_module.SarifUploadRequest) -> str:
+        uploads.append(request.repository)
+        return "uploaded"
+
+    monkeypatch.setattr(main_module, "dag", root)
+    monkeypatch.setattr(edge_reco, "_upload_sarif", record)
+
+    # When
+    token = cast(dagger.Secret, RECORDING_GITHUB_TOKEN)
+    asyncio.run(edge_reco.codeql_upload(token, "a" * 40, repository=TRANSFERRED_REPOSITORY))
+
+    # Then
+    assert uploads == [TRANSFERRED_REPOSITORY]
+    assert [call[2] for call in root.foundation_client.calls] == [TRANSFERRED_REPOSITORY] * 2
+
+
+def test_should_refuse_sarif_upload_for_an_unlisted_repository(monkeypatch: pytest.MonkeyPatch) -> None:
+    # Given
+    events: list[str] = []
+    root = RecordingDag(events, RecordingProvider(events))
+    edge_reco = EdgeReco.__new__(EdgeReco)
+    edge_reco.source = cast(dagger.Directory, "caller-source")
+    monkeypatch.setattr(main_module, "dag", root)
+
+    # When / Then
+    token = cast(dagger.Secret, RECORDING_GITHUB_TOKEN)
+    with pytest.raises(ValueError, match="validated production values"):
+        asyncio.run(edge_reco.codeql_upload(token, "a" * 40, repository="attacker/edge-reco"))
+    assert root.foundation_client.calls == []
+
+
+class TransferredRecordingProvider(RecordingProvider):
+    @staticmethod
+    def _require_exact_arguments(arguments: tuple[object, ...]) -> None:
+        assert arguments == _recording_provider_arguments(TRANSFERRED_REPOSITORY)
+
+
+def test_should_deploy_the_runs_transferred_repository_identity(monkeypatch: pytest.MonkeyPatch) -> None:
+    # Given
+    events: list[str] = []
+    provider = TransferredRecordingProvider(events)
+    edge_reco = _recording_edge_reco(monkeypatch, events, provider)
+    root = RecordingDag(events, provider)
+    monkeypatch.setattr(main_module, "dag", root)
+
+    # When
+    result = asyncio.run(_deploy_with_fake_secrets(edge_reco, TRANSFERRED_REPOSITORY))
+
+    # Then
+    assert VALID_DEPLOYMENT_ID in result
+    assert "deploy" in events
+    assert [call[2] for call in root.foundation_client.calls] == [TRANSFERRED_REPOSITORY] * 2
 
 
 def test_should_delegate_both_repository_guard_entrypoints_to_foundation() -> None:
@@ -1008,6 +1231,29 @@ def test_should_extract_one_exact_attempt_from_serialized_green_main_evidence() 
 
     # Then
     assert attempt == ("a" * 40, "123456", 2)
+
+
+@pytest.mark.parametrize("repository", (REPOSITORY, TRANSFERRED_REPOSITORY))
+def test_should_accept_green_main_evidence_from_either_owner(repository: str) -> None:
+    # Given
+    evidence = json.dumps(
+        {"branch": "main", "commit_sha": "a" * 40, "repository": repository, "run_attempt": 2, "workflow_run_id": "1"}
+    )
+
+    # When / Then
+    assert parse_release_evidence(evidence) == ("a" * 40, "1", 2)
+
+
+@pytest.mark.parametrize("repository", REFUSED_REPOSITORIES)
+def test_should_refuse_green_main_evidence_from_an_unlisted_repository(repository: str) -> None:
+    # Given
+    evidence = json.dumps(
+        {"branch": "main", "commit_sha": "a" * 40, "repository": repository, "run_attempt": 2, "workflow_run_id": "1"}
+    )
+
+    # When / Then
+    with pytest.raises(ValueError, match="serialized green-main evidence"):
+        parse_release_evidence(evidence)
 
 
 @pytest.mark.parametrize(
@@ -1323,11 +1569,11 @@ def test_should_reject_a_tampered_envelope_before_generated_provider_transport(
     assert "live" not in events
 
 
-async def _deploy_with_fake_secrets(edge_reco: EdgeReco) -> str:
+async def _deploy_with_fake_secrets(edge_reco: EdgeReco, repository: str = REPOSITORY) -> str:
     token = cast(dagger.Secret, RECORDING_CLOUDFLARE_TOKEN)
     account = cast(dagger.Secret, RECORDING_CLOUDFLARE_ACCOUNT)
     github = cast(dagger.Secret, RECORDING_GITHUB_TOKEN)
-    deployment = cast(Awaitable[str], edge_reco.deploy(token, account, github, "a" * 40, "123456", 2))
+    deployment = cast(Awaitable[str], edge_reco.deploy(token, account, github, "a" * 40, "123456", 2, repository))
     return await deployment
 
 

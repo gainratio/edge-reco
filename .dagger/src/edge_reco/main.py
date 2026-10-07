@@ -20,7 +20,7 @@ from edge_reco.live_release import (
     SmokeRun,
     release_with_rollback,
 )
-from edge_reco.targets import EdgeRecoTarget
+from edge_reco.targets import ALLOWED_REPOSITORIES, EdgeRecoTarget
 
 PYTHON_IMAGE: Final = "python:3.13.14-slim@sha256:9662417aace5ae7b8e2609cce472b72a8958e134ba372808abe9cc1a0c0125e6"
 NODE_IMAGE: Final = "node:24.16.0-bookworm-slim@sha256:2c87ef9bd3c6a3bd4b472b4bec2ce9d16354b0c574f736c476489d09f560a203"
@@ -31,7 +31,6 @@ CODEQL_URL: Final = (
 CODEQL_CHECKSUM: Final = "sha256:0b152b004dec9fd57ccaf58d3fc410efa5be409e1b331cde280b0b8db7bc6dd6"
 TARGET: Final = EdgeRecoTarget.production()
 REPOSITORY: Final = TARGET.repository
-REPOSITORY_URL: Final = f"https://github.com/{REPOSITORY}.git"
 UV_VERSION: Final = "0.11.32"
 PNPM_VERSION: Final = "11.5.0"
 CHECK_SHA: Final = "0000000000000000000000000000000000000000"
@@ -72,12 +71,14 @@ class ReleaseContext:
     commit_sha: str
     workflow_run_id: str
     run_attempt: int
+    target: EdgeRecoTarget
 
 
 @dataclass(frozen=True)
 class ProviderRequest:
     """Closed provider inputs derived from the immutable release context."""
 
+    target: EdgeRecoTarget
     envelope: dagger.Directory
     consumer_identity: str
     producing_identity: str
@@ -147,7 +148,7 @@ def _valid_release_identity(commit_sha: object, repository: object, branch: obje
     return (
         isinstance(commit_sha, str)
         and _is_sha(commit_sha)
-        and repository == TARGET.repository
+        and repository in ALLOWED_REPOSITORIES
         and branch == TARGET.branch
     )
 
@@ -213,24 +214,26 @@ class EdgeReco:
 
     @function
     @check
-    async def ci(self, commit_sha: str) -> str:
+    async def ci(self, commit_sha: str, repository: str = REPOSITORY) -> str:
         """Run every product gate only after the exact caller source is guarded."""
-        source = await self._verified_source(self.source, commit_sha)
+        source = await self._verified_source(self.source, commit_sha, EdgeRecoTarget.production(repository))
         for product in self._product_checks(source):
             await product.sync()
         return "EdgeReco canonical Dagger gate passed"
 
     @function
-    async def workflow_security(self) -> dagger.Container:
+    async def workflow_security(self, repository: str = REPOSITORY) -> dagger.Container:
         """Delegate the repository guard to the exact-SHA Foundation module."""
-        source, commit_sha = await self._canonical_guard_source()
-        return self._shared_guard(source, commit_sha)
+        target = EdgeRecoTarget.production(repository)
+        source, commit_sha = await self._canonical_guard_source(target)
+        return self._shared_guard(source, commit_sha, target)
 
     @function
-    async def secret_scan(self) -> dagger.Container:
+    async def secret_scan(self, repository: str = REPOSITORY) -> dagger.Container:
         """Delegate snapshot and complete-history scanning to Foundation."""
-        source, commit_sha = await self._canonical_guard_source()
-        return self._shared_guard(source, commit_sha)
+        target = EdgeRecoTarget.production(repository)
+        source, commit_sha = await self._canonical_guard_source(target)
+        return self._shared_guard(source, commit_sha, target)
 
     @function
     def build(self, commit_sha: str) -> dagger.Directory:
@@ -256,18 +259,12 @@ class EdgeReco:
         return self._codeql_analysis(self.source).directory("/sarif")
 
     @function
-    async def security(self) -> str:
+    async def security(self, repository: str = REPOSITORY) -> str:
         """Run every credentialless scheduled security check through Dagger."""
-        source, commit_sha = await self._canonical_guard_source()
-        checks = cast(
-            tuple[dagger.Container, ...],
-            (
-                self._shared_guard(source, commit_sha),
-                self.backend_audit(),
-                self.frontend_audit(),
-                self.codeql(),
-            ),
-        )
+        target = EdgeRecoTarget.production(repository)
+        source, commit_sha = await self._canonical_guard_source(target)
+        guard = self._shared_guard(source, commit_sha, target)
+        checks = (guard, self.backend_audit(), self.frontend_audit(), self.codeql())
         for security_check in checks:
             await security_check.sync()
         return "security checks passed"
@@ -285,8 +282,9 @@ class EdgeReco:
         repository: str = REPOSITORY,
     ) -> str:
         """Upload Dagger-generated SARIF after GitHub default setup is retired."""
-        source = await self._verified_source(self.source, commit_sha)
-        request = SarifUploadRequest(github_token, commit_sha, ref, repository)
+        target = EdgeRecoTarget.production(repository)
+        source = await self._verified_source(self.source, commit_sha, target)
+        request = SarifUploadRequest(github_token, commit_sha, ref, target.repository)
         return await self._upload_sarif(source, request)
 
     async def _upload_sarif(self, source: dagger.Directory, request: SarifUploadRequest) -> str:
@@ -331,9 +329,11 @@ class EdgeReco:
         commit_sha: str,
         workflow_run_id: str,
         run_attempt: int,
+        repository: str = REPOSITORY,
     ) -> str:
         """Deploy one exact protected attempt and verify provider and live identity."""
-        context = await self._release_context(commit_sha, workflow_run_id, run_attempt)
+        target = EdgeRecoTarget.production(repository)
+        context = await self._release_context(commit_sha, workflow_run_id, run_attempt, target)
         credentials = ProviderCredentials(github_token, cloudflare_api_token, cloudflare_account_id)
         return await self._deploy_context(context, credentials)
 
@@ -363,38 +363,44 @@ class EdgeReco:
         checked = built.with_exec(["pnpm", "-F", "frontend", "run", "test:artifacts"])
         return checked.directory("/src/frontend/app/dist")
 
-    async def _release_context(self, commit_sha: str, workflow_run_id: str, run_attempt: int) -> ReleaseContext:
+    async def _release_context(
+        self, commit_sha: str, workflow_run_id: str, run_attempt: int, target: EdgeRecoTarget = TARGET
+    ) -> ReleaseContext:
         """Bind the triggering checkout and its exact protected attempt."""
         self._require_release_attempt(workflow_run_id, run_attempt)
-        bound = await self._verified_source(self.source, commit_sha)
-        return ReleaseContext(bound, commit_sha, workflow_run_id, run_attempt)
+        bound = await self._verified_source(self.source, commit_sha, target)
+        return ReleaseContext(bound, commit_sha, workflow_run_id, run_attempt, target)
 
-    async def _verified_source(self, source: dagger.Directory, commit_sha: str) -> dagger.Directory:
+    async def _verified_source(
+        self, source: dagger.Directory, commit_sha: str, target: EdgeRecoTarget
+    ) -> dagger.Directory:
         """Bind and guard one caller snapshot before any product evaluation."""
         self._require_sha(commit_sha)
         foundation = dag.foundation()
-        bound = foundation.source(source, REPOSITORY, commit_sha)
-        await foundation.guard(bound, REPOSITORY, commit_sha).sync()
+        bound = foundation.source(source, target.repository, commit_sha)
+        await foundation.guard(bound, target.repository, commit_sha).sync()
         return bound
 
-    async def _canonical_guard_source(self) -> tuple[dagger.Directory, str]:
+    async def _canonical_guard_source(self, target: EdgeRecoTarget) -> tuple[dagger.Directory, str]:
         """Fetch public EdgeReco bytes that can be bound to complete Git history."""
-        commit_sha = await dag.git(REPOSITORY_URL).branch(TARGET.branch).commit()
+        url = f"https://github.com/{target.repository}.git"
+        commit_sha = await dag.git(url).branch(target.branch).commit()
         self._require_sha(commit_sha)
-        source = dag.git(REPOSITORY_URL).commit(commit_sha).tree(depth=0)
+        source = dag.git(url).commit(commit_sha).tree(depth=0)
         return source, commit_sha
 
-    def _shared_guard(self, source: dagger.Directory, commit_sha: str) -> dagger.Container:
+    def _shared_guard(self, source: dagger.Directory, commit_sha: str, target: EdgeRecoTarget) -> dagger.Container:
         """Build the generated exact-SHA Foundation repository guard."""
-        return dag.foundation().guard(source=source, repository=REPOSITORY, commit_sha=commit_sha)
+        return dag.foundation().guard(source=source, repository=target.repository, commit_sha=commit_sha)
 
     def _provider_request(self, artifact: dagger.Directory, context: ReleaseContext) -> ProviderRequest:
         """Create the closed central envelope and provider identity inputs."""
-        consumer = f"{TARGET.repository}@{context.commit_sha}"
+        consumer = f"{context.target.repository}@{context.commit_sha}"
         producing = f"{CENTRAL_MODULE_SHA}:{context.workflow_run_id}"
         packaged = dag.directory().with_directory(DEPLOY_ROOT, artifact)
         envelope = dag.foundation().envelope(packaged, consumer, producing, [DEPLOY_ROOT])
-        return ProviderRequest(envelope, consumer, producing, context.workflow_run_id, context.run_attempt)
+        attempt = (context.workflow_run_id, context.run_attempt)
+        return ProviderRequest(context.target, envelope, consumer, producing, *attempt)
 
     # fmt: off
     def _provider_deploy(
@@ -405,8 +411,8 @@ class EdgeReco:
         return provider.deploy(
             request.envelope, credentials.github_token, credentials.api_token,
             credentials.account_id, request.workflow_run_id, request.run_attempt,
-            TARGET.repository, TARGET.project, TARGET.branch, TARGET.domain,
-            DEPLOY_ROOT, list(PAGES_DOMAINS), request.consumer_identity,
+            request.target.repository, request.target.project, request.target.branch,
+            request.target.domain, DEPLOY_ROOT, list(PAGES_DOMAINS), request.consumer_identity,
             request.producing_identity, [DEPLOY_ROOT],
         )
     # fmt: on

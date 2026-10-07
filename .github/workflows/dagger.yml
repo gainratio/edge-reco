@@ -21,7 +21,7 @@ jobs:
       - uses: dagger/dagger-for-github@27b130bf0f79a7f6fbbbe0fbca6760dc9bb40a77 # v8.4.1
         with:
           version: "0.21.8"
-          call: ci --commit-sha=${{ github.sha }}
+          call: ci --commit-sha=${{ github.sha }} --repository=${{ github.repository }}
   sarif:
     name: Dagger SARIF
     if: github.event_name == 'push' || github.event.pull_request.head.repo.full_name == github.repository
