@@ -23,7 +23,7 @@ import edge_reco.main as main_module
 from edge_reco.live_release import LiveSmokeError
 from edge_reco.main import EdgeReco, parse_release_evidence
 
-FOUNDATION_SHA = "2338511a17ed240121def1639a6c4f95c929ec2d"
+FOUNDATION_SHA = "4d48302e30d3a54ec71364d43aada5c0d4b1f9bf"
 VALID_DEPLOYMENT_ID = "f621dc42-3cf9-4217-b4fb-0392c1d39020"
 VALID_DEPLOYMENT_URL = "https://f621dc42.edge-reco.pages.dev"
 PREVIOUS_DEPLOYMENT_ID = "0b915c11-176b-493e-b9fb-969a1304cdec"
@@ -36,7 +36,7 @@ RECORDING_ACCOUNT = (RECORDING_CLOUDFLARE_TOKEN, RECORDING_CLOUDFLARE_ACCOUNT, "
 PRETRANSPORT_SOURCE = """\
 from dagger import dag, function, object_type
 
-SHA = "2338511a17ed240121def1639a6c4f95c929ec2d"
+SHA = "4d48302e30d3a54ec71364d43aada5c0d4b1f9bf"
 COMMIT = "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
 REPOSITORY = "hseshadr/edge-reco"
 
