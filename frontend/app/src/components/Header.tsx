@@ -68,7 +68,7 @@ export function Header({
 
 				<a
 					className="header-gh"
-					href="https://github.com/hseshadr/edge-reco"
+					href="https://github.com/gainratio/edge-reco"
 					target="_blank"
 					rel="noreferrer"
 					title={t("openSourceTitle")}

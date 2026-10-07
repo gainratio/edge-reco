@@ -5,11 +5,14 @@ from __future__ import annotations
 from dataclasses import dataclass
 from typing import Final, Self
 
-#: Today's owner. Every entrypoint defaults to it, so callers that pass nothing are unchanged.
-DEFAULT_REPOSITORY: Final = "hseshadr/edge-reco"
-#: The exact repositories a run may claim: today's owner and the gainratio org after transfer.
-ALLOWED_REPOSITORIES: Final = ("hseshadr/edge-reco", "gainratio/edge-reco")
-_PRODUCTION_PAGES: Final = ("edge-reco", "main", "edge-reco.com")
+#: The exact repositories a run may claim: the canonical gainratio owner first, and the
+#: pre-transfer identity until the org move finishes. There is deliberately no default:
+#: every gate takes the run's own ``github.repository``.
+ALLOWED_REPOSITORIES: Final = ("gainratio/edge-reco", "hseshadr/edge-reco")
+PRODUCTION_PROJECT: Final = "edge-reco"
+PRODUCTION_BRANCH: Final = "main"
+PRODUCTION_DOMAIN: Final = "edge-reco.com"
+_PRODUCTION_PAGES: Final = (PRODUCTION_PROJECT, PRODUCTION_BRANCH, PRODUCTION_DOMAIN)
 
 
 @dataclass(frozen=True)
@@ -31,6 +34,6 @@ class EdgeRecoTarget:
             raise ValueError("EdgeReco delivery target must use the validated production values")
 
     @classmethod
-    def production(cls, repository: str = DEFAULT_REPOSITORY) -> Self:
+    def production(cls, repository: str) -> Self:
         """Return the immutable production delivery target for one allow-listed repository."""
         return cls(repository, *_PRODUCTION_PAGES)

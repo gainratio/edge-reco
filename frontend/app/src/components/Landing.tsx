@@ -83,7 +83,7 @@ export function Landing({ onLaunch }: LandingProps) {
 						</button>
 						<a
 							className="landing__btn landing__btn--ghost"
-							href="https://github.com/hseshadr/edge-reco"
+							href="https://github.com/gainratio/edge-reco"
 							target="_blank"
 							rel="noreferrer"
 						>

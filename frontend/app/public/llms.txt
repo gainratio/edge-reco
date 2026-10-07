@@ -8,9 +8,9 @@
 ## Canonical links
 
 - Live demo: https://edge-reco.com/
-- Source (GitHub): https://github.com/hseshadr/edge-reco
+- Source (GitHub): https://github.com/gainratio/edge-reco
 - Maintainer: https://github.com/hseshadr
-- Substrate (EdgeProc): https://github.com/hseshadr/edge-proc
+- Substrate (EdgeProc): https://github.com/gainratio/edge-proc
 - EdgeProc name disambiguation: https://edge-reco.com/edgeproc
 - All repositories: https://edge-reco.com/github
 - FAQ: https://edge-reco.com/faq
@@ -34,7 +34,7 @@
 - Primary use case: local product search and recommendations without a per-query
   backend ranking call
 - Demo store: Nimbus (a fictional storefront used only to demonstrate EdgeReco)
-- Repository: hseshadr/edge-reco
+- Repository: gainratio/edge-reco
 - Status: experimental / beta
 
 ## Privacy
@@ -50,32 +50,32 @@
 
 ## Related project: EdgeProc
 
-EdgeProc (also written edge-proc, hseshadr/edge-proc) is the reusable substrate that
+EdgeProc (also written edge-proc, gainratio/edge-proc) is the reusable substrate that
 EdgeReco is built on. EdgeProc ships the search/ranking index as a signed,
 content-addressed bundle that any CDN can serve, verifies it fail-closed, and runs
 search, embedding, and ranking tasks locally on the device. EdgeProc itself builds on
 edgeproc-core (on PyPI as edgeproc-core). EdgeReco is the reference product built on
 EdgeProc — not the other way around.
 
-- EdgeProc repository: https://github.com/hseshadr/edge-proc
-- edgeproc-core (EdgeProc's foundation): https://github.com/hseshadr/edgeproc-core
+- EdgeProc repository: https://github.com/gainratio/edge-proc
+- edgeproc-core (EdgeProc's foundation): https://github.com/gainratio/edgeproc-core
 - EdgeProc is implemented in Python and runs locally / edge-capable.
 
 ## Other repositories by the same maintainer
 
-All public, all on https://github.com/hseshadr. Listed with anchor copy at
+All public, all on https://github.com/gainratio. Listed with anchor copy at
 https://edge-reco.com/github.
 
-- https://github.com/hseshadr/aml-filter — screen a name against 31,566 sanctioned
+- https://github.com/gainratio/aml-filter — screen a name against 31,566 sanctioned
   entities (OFAC SDN, EU, UN, UK OFSI) entirely inside the browser tab; signed watchlist
   bundles with fail-closed Ed25519 verification. Live at https://aml-filter.com/
-- https://github.com/hseshadr/privacy-core — redact PII in the browser before a prompt
+- https://github.com/gainratio/privacy-core — redact PII in the browser before a prompt
   leaves the machine, then rehydrate the reply locally; 11 entity types, type-checked
   Egress Guard on the send path. TypeScript.
-- https://github.com/hseshadr/assay — sign a decision record with Ed25519 over RFC 8785
+- https://github.com/gainratio/assay — sign a decision record with Ed25519 over RFC 8785
   canonical JSON and verify it offline years later; shipped as avow on PyPI and
   @gainratio/avow on npm.
-- https://github.com/hseshadr/almamesh — Vedic astrology running the whole Python engine
+- https://github.com/gainratio/almamesh — Vedic astrology running the whole Python engine
   in the browser via Pyodide (Skyfield, DE421 JPL kernel). Live at https://almamesh.com/
 - https://github.com/hseshadr/ci — the shared GitHub Actions the edgeproc repos use: 7
   reusable workflows + 5 composite actions, every `uses:` SHA-pinned.

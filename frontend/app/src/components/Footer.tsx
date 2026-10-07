@@ -28,13 +28,13 @@ export function Footer() {
 			<nav className="nimbus-footer__links" aria-label={t("footer.navLabel")}>
 				<a
 					className="nimbus-footer__link"
-					href="https://github.com/hseshadr/edge-reco"
+					href="https://github.com/gainratio/edge-reco"
 				>
 					{t("footer.links.repo")}
 				</a>
 				<a
 					className="nimbus-footer__link"
-					href="https://github.com/hseshadr/edge-proc"
+					href="https://github.com/gainratio/edge-proc"
 				>
 					{t("footer.links.substrate")}
 				</a>
@@ -49,7 +49,7 @@ export function Footer() {
 				{t("footer.demoBefore")}{" "}
 				<a
 					className="nimbus-footer__link"
-					href="https://github.com/hseshadr/edge-reco"
+					href="https://github.com/gainratio/edge-reco"
 				>
 					edge-reco
 				</a>{" "}
@@ -68,7 +68,7 @@ export function Footer() {
 				<a className="nimbus-footer__link" href="https://almamesh.com/">
 					{t("footer.links.almamesh")}
 				</a>
-				<a className="nimbus-footer__link" href="https://github.com/hseshadr">
+				<a className="nimbus-footer__link" href="https://github.com/gainratio">
 					{t("footer.links.allRepos")}
 				</a>
 			</nav>

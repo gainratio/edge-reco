@@ -44,6 +44,23 @@ test("REJECTS a @gainratio package pulled from GitHub in any spec form", () => {
 	}
 });
 
+test("REJECTS our library from GitHub under either owner, whatever its name", () => {
+	for (const spec of [
+		"github:gainratio/edgeproc-browser#abc123",
+		"gainratio/edgeproc-browser#abc123",
+		"git+https://github.com/gainratio/edgeproc-browser.git#abc123",
+		"github:hseshadr/edgeproc-browser#abc123",
+	]) {
+		const found = entryViolations("edgeproc-browser", spec);
+		assert.equal(found.length, 1, `${spec} must be rejected`);
+		assert.match(found[0], /from GitHub/);
+	}
+	assert.deepEqual(
+		entryViolations("x", "github:gainratio-evil/edgeproc-browser"),
+		[],
+	);
+});
+
 test("REJECTS an npm alias onto the retired scope", () => {
 	assert.equal(
 		entryViolations("browser", "npm:@edgeproc/browser@0.5.0").length,

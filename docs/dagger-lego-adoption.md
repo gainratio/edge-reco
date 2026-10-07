@@ -18,7 +18,7 @@ portfolio has graduated.
 From a fresh clone with Dagger 0.21.8, Docker, `uv`, Node, and pnpm available:
 
 ```bash
-git clone https://github.com/hseshadr/edge-reco.git
+git clone https://github.com/gainratio/edge-reco.git
 cd edge-reco
 test "$(jq -r '.engineVersion' dagger.json)" = v0.21.8
 dagger develop
@@ -58,22 +58,22 @@ cached without creating a separate long-lived container per repository component
 
 The adoption was deliberately staged instead of deleting local code first:
 
-1. [EdgeReco canary PR #97](https://github.com/hseshadr/edge-reco/pull/97) merged as
+1. [EdgeReco canary PR #97](https://github.com/gainratio/edge-reco/pull/97) merged as
    `86c2c80d0ac5f7d46f58620f79a6d060463bacf2`. Its first deployment run
-   ([33181142497](https://github.com/hseshadr/edge-reco/actions/runs/33181142497))
+   ([33181142497](https://github.com/gainratio/edge-reco/actions/runs/33181142497))
    failed inside the original per-file artifact envelope before any Cloudflare mutation.
    Production remained on the prior build.
 2. The central bounded-envelope release merged as
    `daebff7ebf3e69a0361b90cd7b7a767c0e4b48e1`. It replaced thousands of per-file
    graph terminals with a bounded inventory/normalization step while preserving the
    authenticated manifest and exact verifier.
-3. [EdgeReco repin PR #98](https://github.com/hseshadr/edge-reco/pull/98) merged as
+3. [EdgeReco repin PR #98](https://github.com/gainratio/edge-reco/pull/98) merged as
    `14abbdf0dd74b64064903fee9521d65bc107d247`. A fresh cold local Dagger engine
    passed all nine checks; the release preflight also passed with pinned Wrangler
    4.103.0 and no credentials.
-4. The [exact-main gate](https://github.com/hseshadr/edge-reco/actions/runs/33189648062)
+4. The [exact-main gate](https://github.com/gainratio/edge-reco/actions/runs/33189648062)
    passed both Dagger and Dagger SARIF for that exact SHA. Only then did the guarded
-   [deployment and live-verification run](https://github.com/hseshadr/edge-reco/actions/runs/33190282778)
+   [deployment and live-verification run](https://github.com/gainratio/edge-reco/actions/runs/33190282778)
    execute; it completed successfully after provider preflight, mutation, convergence,
    and the local live browser proof.
 5. `https://edge-reco.com/build.json` then reported the same exact commit and bundle

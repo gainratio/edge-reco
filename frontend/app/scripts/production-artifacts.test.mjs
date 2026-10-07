@@ -35,6 +35,11 @@ const PUBLIC_REPOS = [
 	"almamesh",
 	"ci",
 ];
+/** gainratio is canonical; `ci` moves to the org last and is linked at hseshadr until then. */
+const ORG = "https://github.com/gainratio";
+const MAINTAINER = "https://github.com/hseshadr";
+const repoUrl = (repo) =>
+	repo === "ci" ? `${MAINTAINER}/${repo}` : `${ORG}/${repo}`;
 
 // The three live sites are separate domains with no inbound links between them.
 // Every page must reach the other two, or each stays an island.
@@ -226,11 +231,11 @@ test("/github links every public repository with real describing copy", async ()
 	const document = await htmlDocument("github.html");
 	const links = hrefs(document);
 	for (const repo of PUBLIC_REPOS) {
-		const url = `https://github.com/hseshadr/${repo}`;
+		const url = repoUrl(repo);
 		assert.ok(links.has(url), `/github is missing a link to ${repo}`);
 	}
 	assert.ok(
-		links.has("https://github.com/hseshadr"),
+		links.has(MAINTAINER),
 		"/github is missing the maintainer profile link",
 	);
 
@@ -238,7 +243,7 @@ test("/github links every public repository with real describing copy", async ()
 	// weighs. Every repo's list item must carry a sentence, not just a URL.
 	for (const repo of PUBLIC_REPOS) {
 		const anchor = [...document.querySelectorAll("ul.repos a")].find(
-			(a) => a.getAttribute("href") === `https://github.com/hseshadr/${repo}`,
+			(a) => a.getAttribute("href") === repoUrl(repo),
 		);
 		assert.ok(anchor, `${repo} is not listed in a repository list`);
 		const copy = anchor.closest("li").textContent.replace(/\s+/gu, " ").trim();
@@ -249,15 +254,15 @@ test("/github links every public repository with real describing copy", async ()
 	}
 });
 
-test("every crawlable page links out to the sibling sites and the profile", async () => {
+test("every crawlable page links out to the sibling sites and the org", async () => {
 	for (const { file } of ROUTES) {
 		const links = hrefs(await htmlDocument(file));
 		for (const site of SIBLING_SITES) {
 			assert.ok(links.has(site), `${file} does not link to ${site}`);
 		}
 		assert.ok(
-			links.has("https://github.com/hseshadr"),
-			`${file} does not link to the GitHub profile`,
+			links.has(ORG),
+			`${file} does not link to the gainratio GitHub org`,
 		);
 	}
 });
@@ -265,10 +270,7 @@ test("every crawlable page links out to the sibling sites and the profile", asyn
 test("llms.txt lists every repository and every live site", async () => {
 	const llms = await artifact("llms.txt");
 	for (const repo of PUBLIC_REPOS) {
-		assert.ok(
-			llms.includes(`https://github.com/hseshadr/${repo}`),
-			`llms.txt missing ${repo}`,
-		);
+		assert.ok(llms.includes(repoUrl(repo)), `llms.txt missing ${repo}`);
 	}
 	for (const site of SIBLING_SITES) {
 		assert.ok(llms.includes(site), `llms.txt missing ${site}`);
@@ -383,8 +385,8 @@ test("robots.txt and llms.txt keep AI crawlers and canonical sources accessible"
 		"https://edge-reco.com/",
 		"https://edge-reco.com/edgeproc",
 		"https://edge-reco.com/faq",
-		"https://github.com/hseshadr/edge-reco",
-		"https://github.com/hseshadr/edge-proc",
+		"https://github.com/gainratio/edge-reco",
+		"https://github.com/gainratio/edge-proc",
 	]) {
 		assert.ok(llms.includes(url), `llms.txt missing ${url}`);
 	}

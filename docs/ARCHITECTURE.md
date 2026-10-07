@@ -9,18 +9,18 @@ Three pieces, composed from a shared browser Lego:
 - **`frontend/packages/edgereco-browser/`** — `@edgereco/browser`. EdgeReco's transformers.js embedder, hybrid search, ranking, and session logic composed over that substrate.
 - **`frontend/app/`** — the Nimbus React storefront. Thin UI over `@edgereco/browser`; no app server in the request path.
 
-The cross-cutting substrate is **[edge-proc](https://github.com/hseshadr/edge-proc)** — a content-addressed, signed-bundle sync engine, plus the BM25 ⊕ vector → RRF retrieval primitives both tiers run. EdgeReco uses it to ship the prebuilt index from the build host to every edge / device, fail-closed on signature, and to do the local retrieval once the bundle is resident. **This is what makes on-device search possible** — EdgeReco is the product brain (scoring formula, session signals, reranker) layered on top.
+The cross-cutting substrate is **[edge-proc](https://github.com/gainratio/edge-proc)** — a content-addressed, signed-bundle sync engine, plus the BM25 ⊕ vector → RRF retrieval primitives both tiers run. EdgeReco uses it to ship the prebuilt index from the build host to every edge / device, fail-closed on signature, and to do the local retrieval once the bundle is resident. **This is what makes on-device search possible** — EdgeReco is the product brain (scoring formula, session signals, reranker) layered on top.
 
 The whole system is four repositories that compose as one stack:
 
 | Repo | Role |
 | --- | --- |
-| [**edge-reco**](https://github.com/hseshadr/edge-reco) (this repo) | the product brain — scoring formula, session signals, session-aware reranker, the Nimbus demo storefront. |
-| [**edge-proc**](https://github.com/hseshadr/edge-proc) | the reusable local-compute substrate — signed bundle sync, content-addressed OPFS/CAS cache, fail-closed Ed25519 + SHA-256 verification, BM25 ⊕ vector → RRF retrieval. |
+| [**edge-reco**](https://github.com/gainratio/edge-reco) (this repo) | the product brain — scoring formula, session signals, session-aware reranker, the Nimbus demo storefront. |
+| [**edge-proc**](https://github.com/gainratio/edge-proc) | the reusable local-compute substrate — signed bundle sync, content-addressed OPFS/CAS cache, fail-closed Ed25519 + SHA-256 verification, BM25 ⊕ vector → RRF retrieval. |
 | [**edgeproc-browser**](https://github.com/hseshadr/edgeproc-browser) | the reusable browser substrate — signed sync, OPFS/CAS, Worker transport, integrity, and swappable vector indexes. |
-| [**edgeproc-core**](https://github.com/hseshadr/edgeproc-core) | the vector-partitioning protocol edge-proc builds its local vector index on (formerly `shared-libs-python`). On PyPI as [`edgeproc-core`](https://pypi.org/project/edgeproc-core/). |
+| [**edgeproc-core**](https://github.com/gainratio/edgeproc-core) | the vector-partitioning protocol edge-proc builds its local vector index on (formerly `shared-libs-python`). On PyPI as [`edgeproc-core`](https://pypi.org/project/edgeproc-core/). |
 
-The backend installs `edge-proc` and `edgeproc-core` from PyPI (`uv.lock` pins the exact releases), and the frontend installs `@gainratio/browser` from npm (`^0.2.0`, locked in `pnpm-lock.yaml`) — see [`GETTING_STARTED.md`](GETTING_STARTED.md). You only clone edge-reco. [privacy-core](https://github.com/hseshadr/privacy-core), by the same author, is unrelated: it redacts personal data from AI prompts and is not part of this stack.
+The backend installs `edge-proc` and `edgeproc-core` from PyPI (`uv.lock` pins the exact releases), and the frontend installs `@gainratio/browser` from npm (`^0.2.0`, locked in `pnpm-lock.yaml`) — see [`GETTING_STARTED.md`](GETTING_STARTED.md). You only clone edge-reco. [privacy-core](https://github.com/gainratio/privacy-core), by the same author, is unrelated: it redacts personal data from AI prompts and is not part of this stack.
 
 ## System context
 
@@ -242,7 +242,7 @@ edge-proc is the **signed-bundle delivery substrate**. EdgeReco depends on it fo
 1. **Publish** — `edgereco bundle` is a thin wrapper over `edgeproc publish`. Chunks → manifest → signed pointer.
 2. **Sync** — both `ServiceContainer.from_synced` (Python) and `BrowserSync` (TypeScript) verify and pull bundles via the same content-addressed contract.
 
-edge-proc itself is a generic library; EdgeReco is one possible consumer. It in turn builds its local vector index on the vector-partitioning protocol in **[edgeproc-core](https://github.com/hseshadr/edgeproc-core)** — the bottom of the stack. See [edge-proc/docs/ARCHITECTURE.md](https://github.com/hseshadr/edge-proc/blob/main/docs/ARCHITECTURE.md).
+edge-proc itself is a generic library; EdgeReco is one possible consumer. It in turn builds its local vector index on the vector-partitioning protocol in **[edgeproc-core](https://github.com/gainratio/edgeproc-core)** — the bottom of the stack. See [edge-proc/docs/ARCHITECTURE.md](https://github.com/gainratio/edge-proc/blob/main/docs/ARCHITECTURE.md).
 
 ## Cross-tier parity
 
