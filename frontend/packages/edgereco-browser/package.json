@@ -20,7 +20,7 @@
 	"dependencies": {
 		"@gainratio/browser": "^0.2.0",
 		"@gainratio/assay": "0.5.0-dev.6",
-		"@gainratio/avow": "^0.5.2",
+		"@gainratio/avow": "^0.5.3",
 		"@huggingface/transformers": "^4.2.0"
 	},
 	"devDependencies": {
