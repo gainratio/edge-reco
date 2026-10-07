@@ -60,7 +60,7 @@ def test_should_bind_the_protected_dagger_job_to_the_exact_checkout_sha() -> Non
     }
     assert steps[1]["with"] == {
         "version": "0.21.8",
-        "call": "ci --commit-sha=${{ github.sha }}",
+        "call": "ci --commit-sha=${{ github.sha }} --repository=${{ github.repository }}",
     }
 
 
@@ -84,13 +84,17 @@ def test_should_consolidate_manual_and_weekly_security_into_the_protected_dagger
     assert not (_ROOT / ".github" / "workflows" / "security-audit.yml").exists()
 
 
-def test_should_call_deploy_without_repository_override() -> None:
+def test_should_call_deploy_with_the_runs_own_repository_identity() -> None:
+    # Inverted contract (was: the deploy call must carry no --repository at all). After the
+    # gainratio transfer the run's repository is gainratio/edge-reco, so the call passes the
+    # run's own identity; Dagger refuses anything outside its exact two-item allow-list.
     # Given / When
     workflow = _load_workflow("deploy.yml")
-    call = workflow["jobs"]["deploy"]["steps"][1]["with"]["call"]
+    step = workflow["jobs"]["deploy"]["steps"][1]
 
     # Then
-    assert "--repository=" not in call
+    assert '--repository="$REPOSITORY"' in step["with"]["call"]
+    assert step["env"]["REPOSITORY"] == "${{ github.repository }}"
 
 
 #: Expression roots whose values an event author, dispatcher, or fork controls.
@@ -103,7 +107,8 @@ _ENV_ONLY_INPUTS = frozenset({"module"})
 _DEPLOY_CALL = (
     "deploy --cloudflare-api-token=env:CLOUDFLARE_API_TOKEN "
     "--cloudflare-account-id=env:CLOUDFLARE_ACCOUNT_ID --github-token=env:GITHUB_TOKEN "
-    '--commit-sha="$HEAD_SHA" --workflow-run-id="$RUN_ID" --run-attempt="$RUN_ATTEMPT"'
+    '--commit-sha="$HEAD_SHA" --workflow-run-id="$RUN_ID" --run-attempt="$RUN_ATTEMPT" '
+    '--repository="$REPOSITORY"'
 )
 
 #: Values a hostile event could carry; each must reach Dagger as one inert argument.
@@ -193,6 +198,7 @@ def test_should_pass_workflow_run_identity_to_deploy_only_through_env() -> None:
         "HEAD_SHA": "${{ github.event.workflow_run.head_sha }}",
         "RUN_ID": "${{ github.event.workflow_run.id }}",
         "RUN_ATTEMPT": "${{ github.event.workflow_run.run_attempt }}",
+        "REPOSITORY": "${{ github.repository }}",
     }
 
 
@@ -202,16 +208,17 @@ def test_should_hand_any_event_value_to_dagger_as_one_inert_argument(
 ) -> None:
     # Given the real deploy call, expanded by bash with hostile event values
     call = str(cast(Step, _deploy_step()["with"])["call"])
-    env = {"HEAD_SHA": value, "RUN_ID": value, "RUN_ATTEMPT": value}
+    env = {"HEAD_SHA": value, "RUN_ID": value, "RUN_ATTEMPT": value, "REPOSITORY": value}
 
     # When bash expands it
     argv = _expand_like_the_action(call, env, tmp_path)
 
     # Then each value is one literal argument and bash ran nothing
-    assert argv[-3:] == [
+    assert argv[-4:] == [
         f"--commit-sha={value}",
         f"--workflow-run-id={value}",
         f"--run-attempt={value}",
+        f"--repository={value}",
     ]
-    assert len(argv) == 7
+    assert len(argv) == 8
     assert not (tmp_path / "pwned").exists()
