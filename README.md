@@ -4,8 +4,8 @@ Search and product recommendations for small online stores, running in each shop
 
 **[Try the demo store at edge-reco.com](https://edge-reco.com)**. Nothing to install.
 
-[![CI](https://github.com/hseshadr/edge-reco/actions/workflows/dagger.yml/badge.svg)](https://github.com/hseshadr/edge-reco/actions/workflows/dagger.yml)
-[![License](https://img.shields.io/github/license/hseshadr/edge-reco)](LICENSE)
+[![CI](https://github.com/gainratio/edge-reco/actions/workflows/dagger.yml/badge.svg)](https://github.com/gainratio/edge-reco/actions/workflows/dagger.yml)
+[![License](https://img.shields.io/github/license/gainratio/edge-reco)](LICENSE)
 
 Most online stores rent their search box and their "you might also like" rows from a
 cloud service that charges per search. The bill grows with traffic, and you pay for
@@ -65,13 +65,13 @@ EdgeReco is built on three sibling projects by the same author:
 
 - [edgeproc-browser](https://github.com/hseshadr/edgeproc-browser) (`@gainratio/browser`)
   does the download, signature check and offline storage in the browser.
-- [edge-proc](https://github.com/hseshadr/edge-proc) does the same job for the optional
+- [edge-proc](https://github.com/gainratio/edge-proc) does the same job for the optional
   Python side: it publishes and syncs the signed catalog, and searches it on a server.
-- [edgeproc-core](https://github.com/hseshadr/edgeproc-core) is a small Python library
+- [edgeproc-core](https://github.com/gainratio/edgeproc-core) is a small Python library
   edge-proc uses to organise its search index.
 
 EdgeReco adds the store-specific part: the ranking formula, the shopper's session
-signals and the demo store. [privacy-core](https://github.com/hseshadr/privacy-core) is
+signals and the demo store. [privacy-core](https://github.com/gainratio/privacy-core) is
 a separate, unrelated project (it hides personal data in AI prompts).
 
 ## What it does not do
@@ -104,7 +104,7 @@ You need Node 24.16 (see [`frontend/.nvmrc`](frontend/.nvmrc)) and pnpm, which
 `corepack` provides.
 
 ```bash
-git clone https://github.com/hseshadr/edge-reco
+git clone https://github.com/gainratio/edge-reco
 cd edge-reco/frontend
 corepack enable
 pnpm install

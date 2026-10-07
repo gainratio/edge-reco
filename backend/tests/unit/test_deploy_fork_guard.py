@@ -34,9 +34,10 @@ import pytest
 _ROOT = Path(__file__).resolve().parents[3]
 _DEPLOY = _ROOT / ".github" / "workflows" / "deploy.yml"
 _GUARDED_JOB = "deploy"
-_THIS_REPO = "hseshadr/edge-reco"
-#: Today's owner and the gainratio org after transfer: the guard must hold for both.
-_THIS_REPOS = (_THIS_REPO, "gainratio/edge-reco")
+_THIS_REPO = "gainratio/edge-reco"
+#: The canonical owner and the pre-transfer identity (kept until the org move finishes):
+#: the guard reads ``github.repository``, so it must hold for both.
+_THIS_REPOS = (_THIS_REPO, "hseshadr/edge-reco")
 _FORK_REPO = "attacker/edge-reco"
 
 # The gate this one replaced, verbatim. Kept so the hostile-payload case can show
@@ -253,8 +254,8 @@ def test_pre_transfer_push_replayed_into_the_transferred_repo_is_rejected() -> N
     """After the transfer, a run whose head claims the old owner is not this repository."""
     context = Context(
         event_name="workflow_run",
-        repository="gainratio/edge-reco",
-        workflow_run=WorkflowRun("push", "success", "main", _THIS_REPO),
+        repository=_THIS_REPO,
+        workflow_run=WorkflowRun("push", "success", "main", "hseshadr/edge-reco"),
     )
     assert evaluate(GUARD, context) is False
 

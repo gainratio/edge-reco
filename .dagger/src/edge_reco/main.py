@@ -20,7 +20,13 @@ from edge_reco.live_release import (
     SmokeRun,
     release_with_rollback,
 )
-from edge_reco.targets import ALLOWED_REPOSITORIES, EdgeRecoTarget
+from edge_reco.targets import (
+    ALLOWED_REPOSITORIES,
+    PRODUCTION_BRANCH,
+    PRODUCTION_DOMAIN,
+    PRODUCTION_PROJECT,
+    EdgeRecoTarget,
+)
 
 PYTHON_IMAGE: Final = "python:3.13.14-slim@sha256:9662417aace5ae7b8e2609cce472b72a8958e134ba372808abe9cc1a0c0125e6"
 NODE_IMAGE: Final = "node:24.16.0-bookworm-slim@sha256:2c87ef9bd3c6a3bd4b472b4bec2ce9d16354b0c574f736c476489d09f560a203"
@@ -29,8 +35,6 @@ CODEQL_URL: Final = (
     "https://github.com/github/codeql-action/releases/download/codeql-bundle-v2.26.2/codeql-bundle-linux64.tar.zst"
 )
 CODEQL_CHECKSUM: Final = "sha256:0b152b004dec9fd57ccaf58d3fc410efa5be409e1b331cde280b0b8db7bc6dd6"
-TARGET: Final = EdgeRecoTarget.production()
-REPOSITORY: Final = TARGET.repository
 UV_VERSION: Final = "0.11.32"
 PNPM_VERSION: Final = "11.5.0"
 CHECK_SHA: Final = "0000000000000000000000000000000000000000"
@@ -151,7 +155,7 @@ def _valid_release_identity(commit_sha: object, repository: object, branch: obje
         isinstance(commit_sha, str)
         and _is_sha(commit_sha)
         and repository in ALLOWED_REPOSITORIES
-        and branch == TARGET.branch
+        and branch == PRODUCTION_BRANCH
     )
 
 
@@ -216,7 +220,7 @@ class EdgeReco:
 
     @function
     @check
-    async def ci(self, commit_sha: str, repository: str = REPOSITORY) -> str:
+    async def ci(self, commit_sha: str, repository: str) -> str:
         """Run every product gate only after the exact caller source is guarded."""
         source = await self._verified_source(self.source, commit_sha, EdgeRecoTarget.production(repository))
         for product in self._product_checks(source):
@@ -224,14 +228,14 @@ class EdgeReco:
         return "EdgeReco canonical Dagger gate passed"
 
     @function
-    async def workflow_security(self, repository: str = REPOSITORY) -> dagger.Container:
+    async def workflow_security(self, repository: str) -> dagger.Container:
         """Delegate the repository guard to the exact-SHA Foundation module."""
         target = EdgeRecoTarget.production(repository)
         source, commit_sha = await self._canonical_guard_source(target)
         return self._shared_guard(source, commit_sha, target)
 
     @function
-    async def secret_scan(self, repository: str = REPOSITORY) -> dagger.Container:
+    async def secret_scan(self, repository: str) -> dagger.Container:
         """Delegate snapshot and complete-history scanning to Foundation."""
         target = EdgeRecoTarget.production(repository)
         source, commit_sha = await self._canonical_guard_source(target)
@@ -261,7 +265,7 @@ class EdgeReco:
         return self._codeql_analysis(self.source).directory("/sarif")
 
     @function
-    async def security(self, repository: str = REPOSITORY) -> str:
+    async def security(self, repository: str) -> str:
         """Run every credentialless scheduled security check through Dagger."""
         target = EdgeRecoTarget.production(repository)
         source, commit_sha = await self._canonical_guard_source(target)
@@ -280,8 +284,8 @@ class EdgeReco:
         self,
         github_token: dagger.Secret,
         commit_sha: str,
+        repository: str,
         ref: str = "refs/heads/main",
-        repository: str = REPOSITORY,
     ) -> str:
         """Upload Dagger-generated SARIF after GitHub default setup is retired."""
         target = EdgeRecoTarget.production(repository)
@@ -309,7 +313,7 @@ class EdgeReco:
         """Verify public identity, canonical routing, and zero-egress browser behavior."""
         run = await self._smoke(self.source, commit_sha, RELEASE_SMOKE)
         if not run.passed:
-            raise LiveSmokeError(f"Live verification failed against https://{TARGET.domain}\n{run.output}")
+            raise LiveSmokeError(f"Live verification failed against https://{PRODUCTION_DOMAIN}\n{run.output}")
         return run.output
 
     @function(cache="never")  # type: ignore[call-overload,untyped-decorator]  # SDK stub gap
@@ -317,7 +321,7 @@ class EdgeReco:
         """Scheduled fresh-visitor smoke against production; never cached, needs no credentials."""
         run = await self._smoke(self.source, CHECK_SHA, RECOVERY_SMOKE)
         verdict = "passed" if run.passed else "failed"
-        message = f"Live probe {verdict} (fresh) against https://{TARGET.domain}\n{run.output}"
+        message = f"Live probe {verdict} (fresh) against https://{PRODUCTION_DOMAIN}\n{run.output}"
         if not run.passed:
             raise LiveSmokeError(message)
         return message
@@ -331,7 +335,7 @@ class EdgeReco:
         commit_sha: str,
         workflow_run_id: str,
         run_attempt: int,
-        repository: str = REPOSITORY,
+        repository: str,
     ) -> str:
         """Deploy one exact protected attempt and verify provider and live identity."""
         target = EdgeRecoTarget.production(repository)
@@ -366,7 +370,7 @@ class EdgeReco:
         return checked.directory("/src/frontend/app/dist")
 
     async def _release_context(
-        self, commit_sha: str, workflow_run_id: str, run_attempt: int, target: EdgeRecoTarget = TARGET
+        self, commit_sha: str, workflow_run_id: str, run_attempt: int, target: EdgeRecoTarget
     ) -> ReleaseContext:
         """Bind the triggering checkout and its exact protected attempt."""
         self._require_release_attempt(workflow_run_id, run_attempt)
@@ -440,7 +444,7 @@ class EdgeReco:
 
     def _live_container(self, source: dagger.Directory, commit: str, grep: str) -> dagger.Container:
         self._require_sha(commit)
-        verified = self._frontend(source, commit).with_env_variable("LIVE_BASE_URL", f"https://{TARGET.domain}")
+        verified = self._frontend(source, commit).with_env_variable("LIVE_BASE_URL", f"https://{PRODUCTION_DOMAIN}")
         # A fresh nonce per run: a cached green must never stand in for a live site that broke since.
         verified = verified.with_env_variable("LIVE_SMOKE_RUN", uuid4().hex)
         return verified.with_exec(
@@ -586,7 +590,7 @@ class PagesRelease:
     async def previous_production(self) -> Deployment:
         """Read-only: the deployment production serves now, recorded as the rollback target."""
         account = (self.credentials.api_token, self.credentials.account_id)
-        lazy = dag.cloudflare_pages().previous_production_deployment(*account, TARGET.project)
+        lazy = dag.cloudflare_pages().previous_production_deployment(*account, PRODUCTION_PROJECT)
         # cache="never": each field read off the lazy call is its own API query. Load it once by ID.
         object_id = dagger.CloudflarePagesProductionDeploymentID(await lazy.id())
         current = dag.load_cloudflare_pages_production_deployment_from_id(object_id)
@@ -604,7 +608,7 @@ class PagesRelease:
     async def rollback_to(self, deployment_id: str) -> RollbackEvidence:
         """Roll production back through the shared module and return its evidence."""
         account = (self.credentials.api_token, self.credentials.account_id)
-        lazy = dag.cloudflare_pages().rollback(*account, TARGET.project, deployment_id=deployment_id)
+        lazy = dag.cloudflare_pages().rollback(*account, PRODUCTION_PROJECT, deployment_id=deployment_id)
         # cache="never": each field read off the lazy call runs another rollback. Run it once by ID.
         object_id = dagger.CloudflarePagesProductionRollbackEvidenceID(await lazy.id())
         evidence = dag.load_cloudflare_pages_production_rollback_evidence_from_id(object_id)

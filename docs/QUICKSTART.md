@@ -12,12 +12,12 @@ Goal: clone the repo, gate both subprojects, then run the headline demo (Nimbus,
 ## Clone and go
 
 Clone **just this repo** — that's all you need. The Python backend pulls
-[`edge-proc`](https://github.com/hseshadr/edge-proc) (`>=0.5.0`) and
-[`edgeproc-core`](https://github.com/hseshadr/edgeproc-core) (`>=0.4.3`) from PyPI, and
+[`edge-proc`](https://github.com/gainratio/edge-proc) (`>=0.5.0`) and
+[`edgeproc-core`](https://github.com/gainratio/edgeproc-core) (`>=0.4.3`) from PyPI, and
 `uv.lock` pins the exact releases, so `uv sync` resolves everything automatically:
 
 ```bash
-git clone https://github.com/hseshadr/edge-reco
+git clone https://github.com/gainratio/edge-reco
 cd edge-reco/backend && uv sync     # edge-proc + edgeproc-core from PyPI
 ```
 
