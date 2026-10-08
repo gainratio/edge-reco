@@ -654,7 +654,7 @@ def _require_dagger_success(result: subprocess.CompletedProcess[str]) -> None:
 def _install_real_provider_dependencies(binary: str, module: Path) -> None:
     dependencies = (("foundation", "portfolio-foundation"), ("cloudflare-pages", "cloudflare-pages"))
     for name, source in dependencies:
-        dependency = f"github.com/hseshadr/ci/modules/{source}@{FOUNDATION_SHA}"
+        dependency = f"github.com/gainratio/ci/modules/{source}@{FOUNDATION_SHA}"
         _require_dagger_success(_run_real_dagger(binary, module, "install", dependency, "--name", name))
 
 
@@ -1211,7 +1211,7 @@ def test_should_pin_foundation_to_literal_central_sha() -> None:
 
     # Then
     assert config["engineVersion"] == "v0.21.8"
-    assert source == f"github.com/hseshadr/ci/modules/portfolio-foundation@{FOUNDATION_SHA}"
+    assert source == f"github.com/gainratio/ci/modules/portfolio-foundation@{FOUNDATION_SHA}"
     assert pin == FOUNDATION_SHA
     assert re.fullmatch(r"[0-9a-f]{40}", pin)
 
@@ -1226,7 +1226,7 @@ def test_should_pin_cloudflare_pages_to_literal_central_sha() -> None:
     pin = dependency["pin"]
 
     # Then
-    assert source == f"github.com/hseshadr/ci/modules/cloudflare-pages@{FOUNDATION_SHA}"
+    assert source == f"github.com/gainratio/ci/modules/cloudflare-pages@{FOUNDATION_SHA}"
     assert pin == FOUNDATION_SHA
     assert re.fullmatch(r"[0-9a-f]{40}", pin)
 

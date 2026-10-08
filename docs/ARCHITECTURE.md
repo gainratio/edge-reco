@@ -481,7 +481,7 @@ dagger call release-preflight --commit-sha "$(git rev-parse HEAD)" # pinned Wran
 
 Dagger owns the repository's release graph. EdgeReco keeps its product build, audits,
 CodeQL, parity, browser journeys, signed bundle and model identity, and the live
-zero-egress proof. Exact-SHA modules in `hseshadr/ci` own the common repository checks,
+zero-egress proof. Exact-SHA modules in `gainratio/ci` own the common repository checks,
 artifact envelope, exact-green evidence and Cloudflare Pages delivery. GitHub workflows
 only check out the source, select the protected `production` environment for
 deployment, and call the pinned Dagger engine. See
