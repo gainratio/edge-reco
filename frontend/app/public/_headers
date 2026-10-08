@@ -15,7 +15,7 @@
   X-Content-Type-Options: nosniff
   Referrer-Policy: strict-origin-when-cross-origin
   X-Frame-Options: SAMEORIGIN
-  Content-Security-Policy: default-src 'self'; base-uri 'self'; object-src 'none'; frame-ancestors 'self'; form-action 'self'; script-src 'self' 'wasm-unsafe-eval' 'sha256-I0C3kwBGxYDGdgq9NQlnrEVp9waP7iDCM1fxwbeNlbU=' 'sha256-EIc29ZVmf0yOSJQH+ZtwuMohB2XZQkGij/wVK+HeJ5A=' 'sha256-DpJFpNME8gHvsmCXic4bQ+8P01zUijZjlsyyicHl+yg='; worker-src 'self' blob:; connect-src 'self'; img-src 'self' data:; style-src 'self' 'unsafe-inline'; font-src 'self'; manifest-src 'self'; upgrade-insecure-requests
+  Content-Security-Policy: default-src 'self'; base-uri 'self'; object-src 'none'; frame-ancestors 'self'; form-action 'self'; script-src 'self' 'wasm-unsafe-eval' 'sha256-I0C3kwBGxYDGdgq9NQlnrEVp9waP7iDCM1fxwbeNlbU=' 'sha256-EIc29ZVmf0yOSJQH+ZtwuMohB2XZQkGij/wVK+HeJ5A=' 'sha256-fygFrOlGeCRm/CKusJFl9UPkitMhZ82LdQZR25r6sCc='; worker-src 'self' blob:; connect-src 'self'; img-src 'self' data:; style-src 'self' 'unsafe-inline'; font-src 'self'; manifest-src 'self'; upgrade-insecure-requests
   Cross-Origin-Opener-Policy: same-origin
   Permissions-Policy: accelerometer=(), autoplay=(), camera=(), display-capture=(), geolocation=(), gyroscope=(), magnetometer=(), microphone=(), midi=(), payment=(), usb=()
 

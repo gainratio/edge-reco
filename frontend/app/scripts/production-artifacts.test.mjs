@@ -35,11 +35,10 @@ const PUBLIC_REPOS = [
 	"almamesh",
 	"ci",
 ];
-/** gainratio is canonical; `ci` moves to the org last and is linked at hseshadr until then. */
+/** gainratio is canonical for every public repo, `ci` included. */
 const ORG = "https://github.com/gainratio";
 const MAINTAINER = "https://github.com/hseshadr";
-const repoUrl = (repo) =>
-	repo === "ci" ? `${MAINTAINER}/${repo}` : `${ORG}/${repo}`;
+const repoUrl = (repo) => `${ORG}/${repo}`;
 
 // The three live sites are separate domains with no inbound links between them.
 // Every page must reach the other two, or each stays an island.

@@ -77,5 +77,5 @@ https://edge-reco.com/github.
   @gainratio/avow on npm.
 - https://github.com/gainratio/almamesh — Vedic astrology running the whole Python engine
   in the browser via Pyodide (Skyfield, DE421 JPL kernel). Live at https://almamesh.com/
-- https://github.com/hseshadr/ci — the shared GitHub Actions the edgeproc repos use: 7
+- https://github.com/gainratio/ci — the shared GitHub Actions the edgeproc repos use: 7
   reusable workflows + 5 composite actions, every `uses:` SHA-pinned.

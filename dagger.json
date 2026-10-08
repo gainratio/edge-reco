@@ -18,12 +18,12 @@
   "dependencies": [
     {
       "name": "cloudflare-pages",
-      "source": "github.com/hseshadr/ci/modules/cloudflare-pages@a88866232e679b6353d2b75bceb01969be739f67",
+      "source": "github.com/gainratio/ci/modules/cloudflare-pages@a88866232e679b6353d2b75bceb01969be739f67",
       "pin": "a88866232e679b6353d2b75bceb01969be739f67"
     },
     {
       "name": "foundation",
-      "source": "github.com/hseshadr/ci/modules/portfolio-foundation@a88866232e679b6353d2b75bceb01969be739f67",
+      "source": "github.com/gainratio/ci/modules/portfolio-foundation@a88866232e679b6353d2b75bceb01969be739f67",
       "pin": "a88866232e679b6353d2b75bceb01969be739f67"
     }
   ],
