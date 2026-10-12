@@ -84,9 +84,9 @@ export interface EnginePort {
 	): Promise<SyncResult>;
 	readFile(path: string): Promise<Uint8Array>;
 	/**
-	 * Clear the durable signed-bundle cache (OPFS chunks/manifests, the active
-	 * pointer and the IndexedDB rollback floor) under the same cross-tab lock as
-	 * sync/read. `EngineClient.clear()` satisfies this. Only ever driven by an
+	 * Clear the durable signed-bundle cache (the library's SQLite cache database
+	 * on OPFS: chunks, manifests, the active pointer and the rollback floor)
+	 * under the same cross-tab lock as sync/read. `EngineClient.clear()` satisfies this. Only ever driven by an
 	 * explicit user action — see {@link EngineRuntime.clearBundleCache}.
 	 */
 	clear?(): Promise<void>;
@@ -397,9 +397,10 @@ export class EngineRuntime {
 	}
 
 	/**
-	 * Wipe the synced signed-bundle cache — OPFS `chunk/`, `manifest/` and the
-	 * durable active pointer, plus the IndexedDB rollback floor — through the
-	 * upstream `EngineClient.clear()` on a dedicated, short-lived sync Worker.
+	 * Wipe the synced signed-bundle cache — chunks, manifests, the durable active
+	 * pointer and the rollback floor, all in the library's SQLite cache database
+	 * since @gainratio/browser 0.3.0 — through the upstream
+	 * `EngineClient.clear()` on a dedicated, short-lived sync Worker.
 	 * Nothing else is touched: not the service-worker caches, not the
 	 * self-hosted model cache, not the on-device taste log or vector database.
 	 *
@@ -417,9 +418,9 @@ export class EngineRuntime {
 	 * Order: (1) tear down any worker a failed boot left behind, so it releases
 	 * the Web Lock and its OPFS sync-access handles; (2) run the library clear
 	 * on a fresh sync worker, under the cache's Web Lock; (3) release that
-	 * worker; (4) delete the IndexedDB floor database, awaited and bounded
-	 * (`onblocked` waits; a timeout rejects), so the floor cannot silently
-	 * survive. Any failure rejects — a partial clear is never reported as done.
+	 * worker; (4) delete the 0.2.x IndexedDB floor database the library migrated
+	 * from, awaited and bounded (`onblocked` waits; a timeout rejects), so no
+	 * pre-migration copy of the floor survives the clear. Any failure rejects — a partial clear is never reported as done.
 	 */
 	public async clearBundleCache(): Promise<void> {
 		if (this.#enginePromise !== null) {

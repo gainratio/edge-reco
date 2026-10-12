@@ -28,7 +28,7 @@ describe("shared browser substrate dependency", () => {
 		// @edgeproc/assay and @edgeproc/avow are frozen at their last release
 		// (0.5.0-dev.3 / 0.5.1); new releases ship only as @gainratio/*.
 		expect(manifest.dependencies?.["@gainratio/assay"]).toBe("0.5.0-dev.6");
-		expect(manifest.dependencies?.["@gainratio/avow"]).toBe("^0.5.2");
+		expect(manifest.dependencies?.["@gainratio/avow"]).toBe("^0.5.3");
 		expect(manifest.dependencies?.["@edgeproc/assay"]).toBeUndefined();
 		expect(manifest.dependencies?.["@edgeproc/avow"]).toBeUndefined();
 	});

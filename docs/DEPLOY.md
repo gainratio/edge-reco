@@ -460,8 +460,9 @@ is actually served.
 
 If a shopper is stuck anyway, the boot screen offers **Clear cached catalog and retry**
 for an integrity refusal. It clears only the synced catalog and its rollback floor:
-the OPFS `chunk/`, `manifest/` and active-pointer files, plus the
-`edgeproc-browser-cache` IndexedDB database. It then syncs again at first-install
+the chunks, manifests, active pointer and floor in `@gainratio/browser`'s SQLite
+cache database on OPFS, plus the `edgeproc-browser-cache` IndexedDB database a 0.2.x
+install kept its floor in (migrated once since 0.3.0). It then syncs again at first-install
 trust. It never runs by itself. For a rollback refusal (the server offered an *older*
 catalog than the one the browser already has, which is what tampering looks like) it
 first shows a warning and asks for a second click. The service-worker caches, the

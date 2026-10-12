@@ -1,4 +1,3 @@
-import { readFileSync } from "node:fs";
 import { expect, type Page, test } from "@playwright/test";
 
 /**
@@ -7,18 +6,26 @@ import { expect, type Page, test } from "@playwright/test";
  * @gainratio/browser keeps the stored pointer as the anti-rollback floor even
  * when the current key can't verify it. So a republish with a LOWER `sequence`
  * (a lost/regenerated signing key) or a changed bundle_id/channel refuses on
- * every Retry. This lane proves, against the REAL sync Worker, REAL OPFS and
- * the REAL IndexedDB floor, that:
+ * every Retry. This lane proves, against the REAL sync Worker and REAL OPFS,
+ * that:
  *
  *   - a rollback refusal shows the tampering warning, Retry alone never
  *     clears, and the clear needs an inline second click ("Yes, clear and
  *     retry") before anything is touched;
  *   - a non-rollback integrity refusal (a changed bundle identity) offers a
  *     single-click clear;
- *   - after the clear, the catalog loads, BOTH floors hold the live pointer
- *     again, and nothing outside the edgeproc bundle cache was touched (a
+ *   - the refusal survives a reload until the user confirms the clear;
+ *   - after the clear, the catalog loads and loads again after a reload, and
+ *     nothing outside the edgeproc bundle cache was touched (a
  *     `transformers-cache` CacheStorage entry and an unrelated OPFS file
  *     survive), per the live-user storage covenant.
+ *
+ * Since @gainratio/browser 0.3.0 the floor lives in a library-owned SQLite
+ * database on OPFS, reachable only through the library's SQL Worker. This
+ * lane therefore proves the floor by what the shopper sees (a refusal that
+ * outlives Retry and a reload; a catalog that loads after the clear), not by
+ * reading the library's private storage. The library's own browser suite
+ * pins the floor row itself.
  *
  * Only the embedder is stubbed (as in storefront.spec.ts) so no ~25 MB model
  * download gates the run.
@@ -31,18 +38,9 @@ const CONFIRM = "Yes, clear and retry";
 const EMBEDDING_DIM = 384;
 
 /**
- * The committed bundle's live pointer sequence, read from
- * backend/examples/catalog/latest so a re-sign (every rebuild bumps it) can't
- * leave this lane asserting a stale floor.
+ * Where @gainratio/browser 0.2.x kept its IndexedDB rollback floor. The seed
+ * writes a 0.2.x-era returning shopper; 0.3+ migrates it into SQLite once.
  */
-const LIVE_SEQUENCE: number = JSON.parse(
-	readFileSync(
-		new URL("../../../../backend/examples/catalog/latest", import.meta.url),
-		"utf8",
-	),
-).sequence;
-
-/** The library's IndexedDB rollback floor (resolveIndexedDbLayout() default). */
 const FLOOR_DB = "edgeproc-browser-cache";
 const FLOOR_STORE = "content-addressed-cache";
 
@@ -83,9 +81,10 @@ test.beforeEach(async ({ page }) => {
 });
 
 /**
- * Seed a returning shopper's durable state: a structurally valid stored
- * pointer in BOTH floors (OPFS `active.a` + the IndexedDB floor), plus two
- * sentinels that the clear must NOT touch.
+ * Seed a returning shopper's durable state in the 0.2.x layout: a
+ * structurally valid stored pointer in OPFS `active.a` and the IndexedDB
+ * floor, which the library migrates into its SQLite floor on first sync, plus
+ * two sentinels that the clear must NOT touch.
  */
 async function seedReturningShopper(
 	page: Page,
@@ -143,62 +142,6 @@ async function seedReturningShopper(
 	);
 }
 
-/** The highest sequence across OPFS's durable pointer files (null if none). */
-async function opfsFloorSequence(page: Page): Promise<number | null> {
-	return page.evaluate(async () => {
-		const root = await navigator.storage.getDirectory();
-		let highest: number | null = null;
-		for (const name of ["active", "active.a", "active.b"]) {
-			try {
-				const file = await (await root.getFileHandle(name)).getFile();
-				const pointer = JSON.parse(await file.text()) as { sequence: number };
-				highest = Math.max(highest ?? -1, pointer.sequence);
-			} catch {
-				// missing or unreadable slot
-			}
-		}
-		return highest;
-	});
-}
-
-/** The sequence held by the IndexedDB floor (null if absent). */
-async function indexedDbFloorSequence(page: Page): Promise<number | null> {
-	return page.evaluate(
-		({ floorDb, floorStore }) =>
-			new Promise<number | null>((resolve, reject) => {
-				const open = indexedDB.open(floorDb);
-				open.onerror = () => reject(open.error);
-				open.onsuccess = () => {
-					const db = open.result;
-					if (!db.objectStoreNames.contains(floorStore)) {
-						db.close();
-						resolve(null);
-						return;
-					}
-					const get = db
-						.transaction(floorStore, "readonly")
-						.objectStore(floorStore)
-						.get("active");
-					get.onsuccess = () => {
-						db.close();
-						const value = get.result as Uint8Array | undefined;
-						resolve(
-							value === undefined
-								? null
-								: (
-										JSON.parse(new TextDecoder().decode(value)) as {
-											sequence: number;
-										}
-									).sequence,
-						);
-					};
-					get.onerror = () => reject(get.error);
-				};
-			}),
-		{ floorDb: FLOOR_DB, floorStore: FLOOR_STORE },
-	);
-}
-
 /** The storage-covenant sentinels, still present after the clear? */
 async function sentinelsSurvive(page: Page): Promise<boolean> {
 	return page.evaluate(async () => {
@@ -225,6 +168,15 @@ async function launch(page: Page): Promise<void> {
 	await page.getByRole("button", { name: LAUNCH }).click();
 }
 
+/**
+ * A returning visit: reload the page. A returning shopper's demo boots on its
+ * own, so there is no launch button to click.
+ */
+async function returnVisit(page: Page): Promise<void> {
+	await page.reload();
+	await expect(page.getByRole("button", { name: LAUNCH })).toHaveCount(0);
+}
+
 test("a rollback refusal warns, never clears on Retry, and clears only after the inline confirm", async ({
 	page,
 }) => {
@@ -247,24 +199,27 @@ test("a rollback refusal warns, never clears on Retry, and clears only after the
 	// Retry alone re-runs the same fail-closed sync — and never clears.
 	await page.getByRole("button", { name: "Retry", exact: true }).click();
 	await expect(page.getByText(/someone is tampering/i)).toBeVisible();
-	expect(await opfsFloorSequence(page)).toBe(999);
-	expect(await indexedDbFloorSequence(page)).toBe(999);
 
 	// Step one only arms the confirm: still nothing cleared.
 	await page.getByRole("button", { name: CLEAR }).click();
 	await expect(page.getByRole("button", { name: CONFIRM })).toBeVisible();
-	expect(await opfsFloorSequence(page)).toBe(999);
-	expect(await indexedDbFloorSequence(page)).toBe(999);
 	await page.screenshot({ path: "test-results/recovery-rollback-confirm.png" });
+
+	// Walking away and coming back still refuses: the floor is durable.
+	await returnVisit(page);
+	await expect(page.getByText(/someone is tampering/i)).toBeVisible();
+	await page.getByRole("button", { name: CLEAR }).click();
 
 	// Step two clears the bundle cache + both floors, then boots for real.
 	await page.getByRole("button", { name: CONFIRM }).click();
 	await expect(page.locator(PRODUCT_CARD).first()).toBeVisible({
 		timeout: 60_000,
 	});
-	expect(await opfsFloorSequence(page)).toBe(LIVE_SEQUENCE);
-	expect(await indexedDbFloorSequence(page)).toBe(LIVE_SEQUENCE);
 	expect(await sentinelsSurvive(page)).toBe(true);
+	await returnVisit(page);
+	await expect(page.locator(PRODUCT_CARD).first()).toBeVisible({
+		timeout: 60_000,
+	});
 	await page.screenshot({ path: "test-results/recovery-rollback-loaded.png" });
 });
 
@@ -289,7 +244,9 @@ test("a changed bundle identity offers a single-click clear that loads the catal
 	await expect(page.locator(PRODUCT_CARD).first()).toBeVisible({
 		timeout: 60_000,
 	});
-	expect(await opfsFloorSequence(page)).toBe(LIVE_SEQUENCE);
-	expect(await indexedDbFloorSequence(page)).toBe(LIVE_SEQUENCE);
 	expect(await sentinelsSurvive(page)).toBe(true);
+	await returnVisit(page);
+	await expect(page.locator(PRODUCT_CARD).first()).toBeVisible({
+		timeout: 60_000,
+	});
 });
