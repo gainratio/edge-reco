@@ -29,7 +29,7 @@ Two traps we hit on a real machine:
 ## 2. Clone, install and run it
 
 ```bash
-git clone https://github.com/hseshadr/edge-reco        # 3 s
+git clone https://github.com/gainratio/edge-reco        # 3 s
 cd edge-reco/frontend
 corepack enable
 pnpm install                                           # 12 s
@@ -103,8 +103,8 @@ catalog address (`localhost:8921`). If you then run `vite preview`, the app says
 The signed-catalog download and checking in the browser come from
 [`@gainratio/browser`](https://github.com/hseshadr/edgeproc-browser), installed from npm
 (`^0.2.0`, exact version locked in `pnpm-lock.yaml`). The Python side gets the same job from
-[`edge-proc`](https://github.com/hseshadr/edge-proc) on PyPI, which in turn uses
-[`edgeproc-core`](https://github.com/hseshadr/edgeproc-core). Changes to that plumbing
+[`edge-proc`](https://github.com/gainratio/edge-proc) on PyPI, which in turn uses
+[`edgeproc-core`](https://github.com/gainratio/edgeproc-core). Changes to that plumbing
 belong in those repos.
 
 ## 5. Make your first change

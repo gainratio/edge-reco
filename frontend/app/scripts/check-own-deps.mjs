@@ -3,7 +3,7 @@
 // tracks the latest release. This check FAILS the gate if any package.json in
 // the frontend workspace still names the retired @edgeproc/ scope, or pulls one
 // of our libraries from GitHub (a git-sha alias like
-// "github:hseshadr/edgeproc-browser#<sha>") instead of the registry.
+// "github:gainratio/edgeproc-browser#<sha>") instead of the registry.
 //
 //   node app/scripts/check-own-deps.mjs   (run from frontend/; exit 1 on a hit)
 
@@ -22,8 +22,11 @@ const OWN_SCOPE = "@gainratio/";
 /** A git / GitHub source rather than a registry version. */
 const GIT_SPEC =
 	/^(?:github:|git\+|git:|git@|https?:\/\/(?:www\.)?github\.com\/)/u;
-/** Our GitHub owner, in any spec form ("hseshadr/x", "github:hseshadr/x", URLs). */
-const OWN_REPO = /(?:^|[:/])hseshadr\//u;
+/**
+ * Our GitHub owners, in any spec form ("gainratio/x", "github:gainratio/x", URLs).
+ * gainratio is canonical; hseshadr stays until every library has moved to the org.
+ */
+const OWN_REPO = /(?:^|[:/])(?:gainratio|hseshadr)\//u;
 
 /** Every rule a single dependency entry breaks, as human-readable strings. */
 export function entryViolations(name, spec) {

@@ -17,7 +17,7 @@ describe("Footer", () => {
 		const link = screen.getByRole("link", { name: "edge-reco" });
 		expect(link).toHaveAttribute(
 			"href",
-			"https://github.com/hseshadr/edge-reco",
+			"https://github.com/gainratio/edge-reco",
 		);
 	});
 
@@ -36,7 +36,7 @@ describe("Footer", () => {
 		render(<Footer />);
 		expect(
 			screen.getByRole("link", { name: /EdgeProc substrate/i }),
-		).toHaveAttribute("href", "https://github.com/hseshadr/edge-proc");
+		).toHaveAttribute("href", "https://github.com/gainratio/edge-proc");
 	});
 
 	it("links to the EdgeProc entity page at its clean URL", () => {
@@ -70,10 +70,10 @@ describe("Footer", () => {
 		);
 	});
 
-	it("links to the maintainer's full repository list", () => {
+	it("links to the gainratio org's full repository list", () => {
 		render(<Footer />);
 		expect(
 			screen.getByRole("link", { name: /All repositories/i }),
-		).toHaveAttribute("href", "https://github.com/hseshadr");
+		).toHaveAttribute("href", "https://github.com/gainratio");
 	});
 });

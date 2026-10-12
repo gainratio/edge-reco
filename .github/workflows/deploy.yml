@@ -38,6 +38,7 @@ jobs:
           HEAD_SHA: ${{ github.event.workflow_run.head_sha }}
           RUN_ID: ${{ github.event.workflow_run.id }}
           RUN_ATTEMPT: ${{ github.event.workflow_run.run_attempt }}
+          REPOSITORY: ${{ github.repository }}
         with:
           version: "0.21.8"
           call: >-
@@ -48,3 +49,4 @@ jobs:
             --commit-sha="$HEAD_SHA"
             --workflow-run-id="$RUN_ID"
             --run-attempt="$RUN_ATTEMPT"
+            --repository="$REPOSITORY"

@@ -18,7 +18,7 @@ Other approaches you weighed and why this one is better.
 **Scope / fit**
 How does this fit EdgeReco's role as a *backend-free recommender* — the scoring runs in
 the shopper's browser tab (and an optional FastAPI edge tier), built on top of the
-[edge-proc](https://github.com/hseshadr/edge-proc) substrate? Does it belong in the
+[edge-proc](https://github.com/gainratio/edge-proc) substrate? Does it belong in the
 engine core, the Nimbus storefront, or as a signed-bundle config knob (`ranking_config.json`)?
 
 **Additional context**

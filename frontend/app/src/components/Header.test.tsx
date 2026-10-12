@@ -77,7 +77,7 @@ describe("Header", () => {
 		renderHeader();
 		expect(screen.getByRole("link", { name: /open source/i })).toHaveAttribute(
 			"href",
-			"https://github.com/hseshadr/edge-reco",
+			"https://github.com/gainratio/edge-reco",
 		);
 	});
 

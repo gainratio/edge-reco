@@ -66,7 +66,7 @@ describe("App launch gate", () => {
 		// so the open-source / entity links are reachable from every view.
 		expect(
 			screen.getByRole("link", { name: /EdgeProc substrate/i }),
-		).toHaveAttribute("href", "https://github.com/hseshadr/edge-proc");
+		).toHaveAttribute("href", "https://github.com/gainratio/edge-proc");
 	});
 
 	it("shows the Landing first and does NOT boot the engine", () => {
