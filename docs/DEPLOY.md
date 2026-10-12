@@ -145,6 +145,19 @@ Cloudflare provisions the DNS record (CNAME-flattening at the apex) and the TLS
 certificate automatically. Dagger builds and uploads the release after its exact `main`
 SHA has passed the canonical gate.
 
+**Keep Cloudflare Web Analytics automatic injection disabled for `edge-reco.com`**
+(Cloudflare dashboard → Web Analytics → `edge-reco.com` → *Disabled*; set 2026-10-12).
+When it is on, Cloudflare's edge rewrites the served HTML to add a
+`static.cloudflareinsights.com/beacon.min.js` script. That script is not in the build,
+so `network-allowlist.test.mjs` cannot see it, but the page's CSP refuses it, the browser
+logs a CSP error, and the post-deploy live verify fails closed on that console error. It
+would also send page-view data to a third party, which the privacy promise rules out.
+Check the live HTML after any Cloudflare dashboard change; this must print nothing:
+
+```bash
+curl -s -A Mozilla https://edge-reco.com/ | grep cloudflareinsights
+```
+
 > **Fork note:** to host your fork on a GitHub Pages *project* site instead (served
 > under `https://<you>.github.io/<repo>/`), run the same `build:pages` with
 > `VITE_BASE=/<repo>/` — the engine absolutizes the bundle + pinned-key URLs at
