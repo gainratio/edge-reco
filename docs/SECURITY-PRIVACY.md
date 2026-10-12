@@ -71,6 +71,10 @@ Guards that fail the build if this changes:
 
 ## Operator requirements
 
+- Keep Cloudflare Web Analytics automatic injection disabled for `edge-reco.com`. The
+  edge would otherwise inject a third-party beacon the build guards cannot see; the CSP
+  refuses it and the live verify fails. `curl -s -A Mozilla https://edge-reco.com/ | grep
+  cloudflareinsights` must print nothing (see [DEPLOY.md](DEPLOY.md)).
 - Keep the Ed25519 private key outside Git, CI build artifacts, Docker contexts, logs,
   and backups that are not explicitly protected as signing-key material.
 - Treat API access logs as search-history data. Disable query logging or set a short,
