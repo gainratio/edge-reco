@@ -38,7 +38,7 @@ CODEQL_CHECKSUM: Final = "sha256:0b152b004dec9fd57ccaf58d3fc410efa5be409e1b331cd
 UV_VERSION: Final = "0.11.32"
 PNPM_VERSION: Final = "11.5.0"
 CHECK_SHA: Final = "0000000000000000000000000000000000000000"
-CENTRAL_MODULE_SHA: Final = "a88866232e679b6353d2b75bceb01969be739f67"
+CENTRAL_MODULE_SHA: Final = "528eaec76121b75810c58bab610d9f2064b95227"
 DEPLOY_ROOT: Final = "dist"
 PAGES_DOMAINS: Final = ("www.edge-reco.com",)
 #: The Pages project's Git source owner. Pinned so a Git-linked project stays bound after the gainratio transfer.
