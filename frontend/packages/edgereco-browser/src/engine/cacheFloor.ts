@@ -1,18 +1,20 @@
-// The IndexedDB half of the signed-bundle cache: the anti-rollback floor.
+// The legacy (0.2.x) IndexedDB copy of the anti-rollback floor.
 //
-// @gainratio/browser keeps its durable active pointer twice — in OPFS and in an
-// IndexedDB database — and treats the higher of the two as the rollback floor.
-// `EngineClient.clear()` empties both under the cache's Web Lock. The explicit
-// "clear cached catalog" recovery then ALSO deletes the floor database, awaited
-// and bounded, so a floor can never silently survive the one action meant to
-// remove it. Nothing here runs except from that explicit user action.
+// Since @gainratio/browser 0.3.0 the active pointer and the rollback floor live
+// in the library's SQLite cache database on OPFS, and `EngineClient.clear()`
+// empties them under the cache's Web Lock. A 0.2.x install also kept the floor
+// in an IndexedDB database, which 0.3+ migrates from once. The explicit "clear
+// cached catalog" recovery ALSO deletes that legacy database, awaited and
+// bounded, so no pre-migration copy of a floor survives the one action meant
+// to remove it. Nothing here runs except from that explicit user action.
 
 import { resolveIndexedDbLayout } from "../gainratio";
 
 /**
- * The library's default floor database (`edgeproc-browser-cache`) — the one
- * EdgeReco's sync uses, since it passes no cache namespace or layout. Derived
- * from the library so a future default can never leave a stale floor behind.
+ * Where the library's 0.2.x default layout kept its IndexedDB floor
+ * (`edgeproc-browser-cache`); EdgeReco passes no cache namespace or layout.
+ * Derived from the library (`resolveIndexedDbLayout()` now names the legacy
+ * location to migrate from) so a changed default can never leave it behind.
  */
 export const BUNDLE_FLOOR_DATABASE: string = resolveIndexedDbLayout().database;
 
