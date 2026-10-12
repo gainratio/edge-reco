@@ -67,7 +67,7 @@ const openEngine: Parameters<typeof createSqlWorkerHandler>[0] = async (
 		storage: { persistence: "memory", reason: "opfs-unavailable" },
 		memoryProfile: resolveMemoryProfile(options.memoryProfile ?? "auto"),
 	});
-	return { engine, release: () => undefined };
+	return { engine, release: () => Promise.resolve() };
 };
 
 type WorkerFactory = NonNullable<OpenCatalogueSqlDeps["workerFactory"]>;
