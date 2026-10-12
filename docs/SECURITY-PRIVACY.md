@@ -39,8 +39,9 @@ boundary; no integrity error falls back to unverified data.
 | Self-hosted API-server search (optional, not in the demo) | Query text and parameters only; the server is stateless, keeps no session or profile, and ignores any session header | None; each request is ranked against an empty profile and nothing is kept after the response | Client-to-API request; normal access logs may contain the URL query and must be governed by the operator |
 
 SQLite is the only store for app data. Other browser storage holds no shopper data:
-the signed-bundle cache (content-addressed OPFS chunks plus `@gainratio/browser`'s
-IndexedDB anti-rollback record `edgeproc-browser-cache`), the service-worker
+the signed-bundle cache (`@gainratio/browser`'s SQLite cache database on OPFS:
+content-addressed chunks, manifests and the anti-rollback floor; a 0.2.x install's
+IndexedDB floor `edgeproc-browser-cache` is migrated into it once), the service-worker
 CacheStorage (app shell and model), the transformers.js model cache, and a per-tab
 sessionStorage "launched" flag.
 
