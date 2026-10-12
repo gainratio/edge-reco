@@ -8,7 +8,8 @@ import { expect, test } from "@playwright/test";
  * `window.__engineHarness` API and assert against real signals:
  *   - sync verifies + lands the live signed bundle in OPFS and promotes active,
  *   - readFile('catalog_meta.json') reassembles byte-correct (valid JSON),
- *   - the OPFS chunk dir is populated (files really landed on the device),
+ *   - the cache is the library's SQLite database on OPFS, and the chunks really
+ *     landed on the device: after a reload a fresh Worker fetches nothing,
  *   - a re-sync fetches nothing (chunksFetched == 0 — only-changed-chunks proof),
  *   - a tampered /latest signature is rejected fail-closed (nothing promoted),
  *     surfaces on the main thread as EngineOperationError{code:"integrity"},
@@ -25,6 +26,8 @@ interface SyncResult {
 	chunksFetched: number;
 	chunksReused: number;
 	bytesFetched: number;
+	/** Where the chunk cache lives (@gainratio/browser >= 0.3.0). */
+	cacheStorage: { persistence: "opfs" | "memory" };
 }
 
 declare global {
@@ -70,19 +73,19 @@ test("sync lands the live signed bundle in OPFS and readFile reassembles", async
 	const meta = JSON.parse(metaText ?? "{}") as Record<string, unknown>;
 	expect(typeof meta).toBe("object");
 
-	// the chunks actually landed on the device (OPFS chunk dir is populated)
-	const chunkCount = await page.evaluate(async () => {
-		const root = await navigator.storage.getDirectory();
-		const chunkDir = await root.getDirectoryHandle("chunk");
-		let count = 0;
-		for await (const _ of (
-			chunkDir as unknown as { keys(): AsyncIterable<string> }
-		).keys()) {
-			count += 1;
-		}
-		return count;
-	});
-	expect(chunkCount).toBe(result?.chunksFetched);
+	// The chunks landed in the library's SQLite cache on OPFS, not in memory.
+	// Since 0.3.0 that database is private to the library's SQL Worker, so the
+	// proof is durability: after a reload, a brand-new Worker reuses every chunk.
+	expect(result?.cacheStorage.persistence).toBe("opfs");
+	await page.reload();
+	await expect(page.locator("#status")).toHaveText("engine-ready");
+	const afterReload = await page.evaluate(
+		([base, key]) => window.__engineHarness?.sync(base, key),
+		[CATALOG, PUBKEY],
+	);
+	expect(afterReload?.cacheStorage.persistence).toBe("opfs");
+	expect(afterReload?.chunksFetched).toBe(0);
+	expect(afterReload?.chunksReused).toBe(result?.chunksFetched);
 });
 
 test("re-sync after first sync fetches only-changed chunks (chunksFetched == 0)", async ({
