@@ -18,13 +18,13 @@
   "dependencies": [
     {
       "name": "cloudflare-pages",
-      "source": "github.com/gainratio/ci/modules/cloudflare-pages@fbc02232928fbca80da1013e9e1676a3e41424a6",
-      "pin": "fbc02232928fbca80da1013e9e1676a3e41424a6"
+      "source": "github.com/gainratio/ci/modules/cloudflare-pages@8420264d5560b0817579d9c5323ae3a69ce4558d",
+      "pin": "8420264d5560b0817579d9c5323ae3a69ce4558d"
     },
     {
       "name": "foundation",
-      "source": "github.com/gainratio/ci/modules/portfolio-foundation@fbc02232928fbca80da1013e9e1676a3e41424a6",
-      "pin": "fbc02232928fbca80da1013e9e1676a3e41424a6"
+      "source": "github.com/gainratio/ci/modules/portfolio-foundation@8420264d5560b0817579d9c5323ae3a69ce4558d",
+      "pin": "8420264d5560b0817579d9c5323ae3a69ce4558d"
     }
   ],
   "source": ".dagger"

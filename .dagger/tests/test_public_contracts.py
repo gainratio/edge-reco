@@ -24,7 +24,7 @@ from edge_reco.live_release import LiveSmokeError
 from edge_reco.main import EdgeReco, parse_release_evidence
 from edge_reco.targets import EdgeRecoTarget
 
-FOUNDATION_SHA = "fbc02232928fbca80da1013e9e1676a3e41424a6"
+FOUNDATION_SHA = "8420264d5560b0817579d9c5323ae3a69ce4558d"
 REPOSITORY = "gainratio/edge-reco"
 #: Kept on the allow-list until the gainratio org move finishes; never a default.
 PRE_TRANSFER_REPOSITORY = "hseshadr/edge-reco"
@@ -48,7 +48,7 @@ RECORDING_ACCOUNT = (RECORDING_CLOUDFLARE_TOKEN, RECORDING_CLOUDFLARE_ACCOUNT, "
 PRETRANSPORT_SOURCE = """\
 from dagger import dag, function, object_type
 
-SHA = "fbc02232928fbca80da1013e9e1676a3e41424a6"
+SHA = "8420264d5560b0817579d9c5323ae3a69ce4558d"
 COMMIT = "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
 REPOSITORY = "gainratio/edge-reco"
 
