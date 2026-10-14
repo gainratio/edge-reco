@@ -1,50 +1,81 @@
 # Keep dependencies current across every ecosystem this repo ships.
-#   - pip            : the Python core + demo server (backend/, uv-managed)
+#   - uv             : the Python core + demo server (backend/, uv.lock)
 #   - npm            : the pnpm storefront workspace (frontend/, pnpm-lock.yaml)
 #   - github-actions : the workflows under .github/workflows/
-# Weekly, except the frontend npm entry (daily, for @gainratio/*). Dependabot's "npm" ecosystem natively understands pnpm-lock.yaml.
-# Each ecosystem is GROUPED into a single consolidated PR per run, so updates
-# arrive as one reviewable PR instead of a flood of one-per-dependency PRs.
+# Monthly, with a 7-day cooldown, minor + patch grouped into one PR per ecosystem.
+# Semver-major updates are ignored: majors are migrated by hand in their own PR.
+# The exception is our own @gainratio/* libraries: they get their own daily entry
+# so the bump PR opens the day after each release (apps track our latest).
+# Dependabot's "npm" ecosystem natively understands pnpm-lock.yaml, and its "uv"
+# ecosystem relocks uv.lock ("pip" would bump pyproject.toml without relocking).
 version: 2
 updates:
-  - package-ecosystem: "pip"
+  - package-ecosystem: "uv"
     directory: "/backend"
+    # .dagger/ holds a generated, gitignored Dagger SDK (path dependency
+    # dagger-io), so the updater cannot fetch it and the job crashes.
+    exclude-paths: [".dagger/**"]
     schedule:
-      interval: "weekly"
+      interval: "monthly"
+    cooldown:
+      default-days: 7
+    ignore:
+      # Majors are migrated by hand.
+      - dependency-name: "*"
+        update-types: ["version-update:semver-major"]
     groups:
-      backend-pip:
+      backend-uv:
         patterns: ["*"]
         update-types: ["minor", "patch"]
 
-  # DAILY, not weekly: our own libraries (@gainratio/*) must track their latest
-  # npm release, so the bump PR should open the day a release ships. Dependabot
-  # allows only one entry per ecosystem + directory, so the whole /frontend npm
-  # entry runs daily; the @gainratio group is listed first so our libraries get
-  # their own PR (a dependency joins the first group it matches), and everything
-  # else stays in the one consolidated frontend-npm PR.
   - package-ecosystem: "npm"
     directory: "/frontend"
     schedule:
-      interval: "daily"
-    # transformers.js >=4.3.0 pulls onnxruntime-web 1.31.0-dev, whose
-    # ort-wasm-simd-threaded.asyncify.wasm (26,861,777 B) exceeds the Cloudflare
-    # Pages 25 MiB per-file limit that the self-hosted ORT runtime must fit
-    # (stage-ort-wasm preflight, CLAUDE.md "Zero runtime CDN"). Held at 4.2.x in
-    # #116. Drop this entry once a release's asyncify wasm is < 26,214,400 B.
+      interval: "monthly"
+    cooldown:
+      default-days: 7
     ignore:
+      # Owned by the daily @gainratio entry below; keep them out of this PR.
+      - dependency-name: "@gainratio/*"
+      # Majors are migrated by hand.
+      - dependency-name: "*"
+        update-types: ["version-update:semver-major"]
+      # transformers.js >=4.3.0 pulls onnxruntime-web 1.31.0-dev, whose
+      # ort-wasm-simd-threaded.asyncify.wasm (26,861,777 B) exceeds the Cloudflare
+      # Pages 25 MiB per-file limit that the self-hosted ORT runtime must fit
+      # (stage-ort-wasm preflight, CLAUDE.md "Zero runtime CDN"). Held at 4.2.x in
+      # #116. Drop this entry once a release's asyncify wasm is < 26,214,400 B.
       - dependency-name: "@huggingface/transformers"
         versions: [">=4.3.0"]
     groups:
-      gainratio:
-        patterns: ["@gainratio/*"]
       frontend-npm:
         patterns: ["*"]
         update-types: ["minor", "patch"]
 
+  # Our own libraries, daily and in their own PR, all update types (no caps).
+  # Dependabot needs a unique (ecosystem, directory, target-branch) per entry,
+  # so this one names target-branch explicitly to sit beside the monthly entry.
+  - package-ecosystem: "npm"
+    directory: "/frontend"
+    target-branch: "main"
+    schedule:
+      interval: "daily"
+    allow:
+      - dependency-name: "@gainratio/*"
+    groups:
+      gainratio:
+        patterns: ["@gainratio/*"]
+
   - package-ecosystem: "github-actions"
     directory: "/"
     schedule:
-      interval: "weekly"
+      interval: "monthly"
+    cooldown:
+      default-days: 7
+    ignore:
+      # Majors are migrated by hand.
+      - dependency-name: "*"
+        update-types: ["version-update:semver-major"]
     groups:
       github-actions:
         patterns: ["*"]
