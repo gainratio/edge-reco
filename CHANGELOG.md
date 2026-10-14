@@ -16,6 +16,12 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
   once the uplink was removed.
 
 ### Changed
+- **The publish lock file now stays in the origin after release.** filelock 3.29.5
+  stopped deleting released lock files on Unix: deleting one lets a waiter hold the
+  old file while a newcomer locks a new one at the same path, so two publishers could
+  both sign N+1. `ORIGIN_DIR/.publish.lock` is now left in place (empty, never read
+  by clients). The test that asserted it was removed is inverted, and the `filelock`
+  floor is 3.29.5. Bumps the backend-uv group (18 updates, Dependabot #174).
 - **SQLite is the only store for app data.** The taste log (timestamp, event type,
   product id; newest 500) moved from the OPFS file `taste/events.jsonl` into a
   `taste_events` table in the shopper's own SQLite database (`edgereco-user`), kept
