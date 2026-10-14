@@ -386,8 +386,11 @@ It trusts a local `ORIGIN_DIR/latest` as that floor only when it is a regular fi
 its `sequence` is a plain integer below 2^53, and it carries a valid signature by the
 publishing key for this `--catalog-id`. Anything else is refused, not guessed past.
 `--sequence` must be between 1 and 2^53 - 1. Publishers on one `ORIGIN_DIR` are
-serialized by a lock file (`ORIGIN_DIR/.publish.lock`, removed on release) held from
-that read to the `latest` write, so two of them can never sign the same sequence.
+serialized by a lock file (`ORIGIN_DIR/.publish.lock`) held from that read to the
+`latest` write, so two of them can never sign the same sequence. The file is empty and
+stays in place after release on purpose: deleting a released lock file lets two
+publishers lock two different files at the same path. edge-proc's own
+`.mutation.lock` stays there too. Neither carries data, and no client reads them.
 
 The pointer flip (`latest` upload) is the only thing the consumer reacts to. Chunks are immutable, so the order of upload doesn't matter as long as the pointer goes last.
 

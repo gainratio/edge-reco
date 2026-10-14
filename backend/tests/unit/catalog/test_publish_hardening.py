@@ -168,11 +168,24 @@ def test_a_slow_publisher_cannot_land_an_older_sequence_over_a_newer_one(
     assert _served(origin) == 7
 
 
-def test_publish_lock_file_does_not_linger_in_the_origin(tmp_path: Path) -> None:
+def test_publish_lock_file_stays_in_the_origin_as_an_empty_file(tmp_path: Path) -> None:
+    """INVERTED 2026-10-14: this used to assert the lock file was removed on release.
+
+    filelock 3.29.5 stopped unlinking released lock files on Unix, on purpose: a
+    waiter can hold the unlinked inode while a newcomer creates and locks a fresh one
+    at the same path, so two publishers could both sign N+1. Mutual exclusion wins
+    over a tidy origin. The file stays, holds no data, and the next publisher reuses it.
+    """
     key_path = _key(tmp_path)
     origin = tmp_path / "origin"
     _publish(tmp_path, key_path, origin, "A", None)
-    assert not (origin / ".publish.lock").exists()
+    lock_path = origin / ".publish.lock"
+    assert lock_path.is_file()
+    assert not lock_path.is_symlink()
+    assert lock_path.stat().st_size == 0
+
+    _publish(tmp_path, key_path, origin, "B", None)
+    assert _served(origin) == 2
 
 
 def test_publish_refuses_a_symlinked_publish_lock(tmp_path: Path) -> None:

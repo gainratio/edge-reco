@@ -197,6 +197,9 @@ def _publish_lock(origin_dir: Path) -> Iterator[None]:
 
     Separate from edge-proc's own store lock on purpose: that one covers only the
     bundle write, and nesting inside its private path would couple us to it.
+
+    The lock file stays after release (filelock >= 3.29.5). Never unlink it here:
+    a waiter could then hold the old inode while a newcomer locks a new one.
     """
     lock_path = origin_dir / _PUBLISH_LOCK_NAME
     if lock_path.is_symlink():

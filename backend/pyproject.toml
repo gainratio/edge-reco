@@ -70,8 +70,10 @@ dependencies = [
   # 0.5.2 floor: rename-only release (npm moved to @gainratio/avow), Python unchanged.
   "avow>=0.5.2",
   # Direct: catalog/publish.py holds a FileLock on ORIGIN_DIR/.publish.lock from the
-  # served-`latest` read through the `latest` write. Same floor as edge-proc's own.
-  "filelock>=3.20",
+  # served-`latest` read through the `latest` write. 3.29.5 floor: from there the
+  # lock file stays in place on release (unlinking it can split waiters across two
+  # inodes); test_publish_hardening pins that behaviour.
+  "filelock>=3.29.5",
   # Security floors on transitive deps (pulled via fastapi / edge-proc[bundles] /
   # sentence-transformers); pinned to the CVE-fixed releases. NO suppression — bump
   # where a fix exists. See `poe audit`.
