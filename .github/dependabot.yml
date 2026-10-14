@@ -12,6 +12,9 @@ version: 2
 updates:
   - package-ecosystem: "uv"
     directory: "/backend"
+    # .dagger/ holds a generated, gitignored Dagger SDK (path dependency
+    # dagger-io), so the updater cannot fetch it and the job crashes.
+    exclude-paths: [".dagger/**"]
     schedule:
       interval: "monthly"
     cooldown:
