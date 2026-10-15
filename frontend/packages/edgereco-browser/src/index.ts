@@ -74,5 +74,10 @@ export {
 	TasteResetIncompleteError,
 	type TasteStore,
 } from "./engine/tasteStore";
+export {
+	type CatalogueSwapOptions,
+	DEFAULT_SWAP_TIMEOUT_MS,
+	SqlSwapTimeoutError,
+} from "./engine/catalogueDb";
 // --- the SyncResult shape leaks through BootStage; expose its type only ---
 export type { SyncResult } from "./gainratio";

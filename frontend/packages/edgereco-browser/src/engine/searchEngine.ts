@@ -16,7 +16,10 @@
 // The C2b vector-only parity path is a TEST-ONLY helper, exported separately
 // as `__searchVectorForParity` (not on the public SearchEngine interface).
 
-import type { CatalogueStoreFactory } from "./catalogueDb";
+import type {
+	CatalogueStoreFactory,
+	CatalogueSwapOptions,
+} from "./catalogueDb";
 import { type CooccurrenceMatrix, EMPTY_COOCCURRENCE } from "./cooccurrence";
 import type {
 	BrowseResponse,
@@ -87,6 +90,7 @@ export interface SimilarOptions {
 /** Options for a catalog browse. */
 export interface BrowseOptions {
 	readonly limit?: number;
+	readonly offset?: number;
 	readonly category?: string;
 }
 
@@ -108,6 +112,19 @@ export interface SearchEngine {
 	similar(productId: string, opts?: SimilarOptions): Promise<RecommendResponse>;
 	/** Catalog listing path (browse/category pages). */
 	browse(opts?: BrowseOptions): BrowseResponse;
+	/** Async SQL-backed catalog browse over the SQLite `products` table. */
+	browseSql?(opts?: BrowseOptions): Promise<BrowseResponse>;
+	/**
+	 * Hot-swap the active catalog, ranking config, co-occurrence matrix, and
+	 * ranking proof in place behind the SQLite swap gate (`swapTimeoutMs`).
+	 */
+	reload?(
+		files: VectorIndexFiles,
+		config?: RankingConfig,
+		cooccurrence?: CooccurrenceMatrix,
+		proofEvidence?: RankingProofEvidence,
+		options?: CatalogueSwapOptions,
+	): Promise<void>;
 	/** The full catalog in bundle order — the lookup the events path folds clicks over. */
 	catalog(): ReadonlyArray<Product>;
 	/**
@@ -147,10 +164,10 @@ function hydrateFused(
 class HybridSearchEngine implements SearchEngine {
 	readonly #index: VectorIndex;
 	readonly #embedder: Embedder;
-	readonly #catalog: ReadonlyArray<Product>;
-	readonly #config: RankingConfig;
-	readonly #cooccurrence: CooccurrenceMatrix;
-	readonly #proofEvidence: RankingProofEvidence;
+	#catalog: ReadonlyArray<Product>;
+	#config: RankingConfig;
+	#cooccurrence: CooccurrenceMatrix;
+	#proofEvidence: RankingProofEvidence;
 
 	public constructor(
 		index: VectorIndex,
@@ -185,6 +202,20 @@ class HybridSearchEngine implements SearchEngine {
 
 	public rankingProofEvidence(): RankingProofEvidence {
 		return this.#proofEvidence;
+	}
+
+	public async reload(
+		files: VectorIndexFiles,
+		config: RankingConfig = this.#config,
+		cooccurrence: CooccurrenceMatrix = this.#cooccurrence,
+		proofEvidence: RankingProofEvidence = this.#proofEvidence,
+		options?: CatalogueSwapOptions,
+	): Promise<void> {
+		await this.#index.reload(files, options);
+		this.#catalog = this.#index.products();
+		this.#config = config;
+		this.#cooccurrence = cooccurrence;
+		this.#proofEvidence = proofEvidence;
 	}
 
 	public async search(
@@ -407,6 +438,7 @@ class HybridSearchEngine implements SearchEngine {
 
 	public browse(opts?: BrowseOptions): BrowseResponse {
 		const limit = opts?.limit ?? DEFAULT_LIMIT;
+		const offset = Math.max(0, opts?.offset ?? 0);
 		const filtered =
 			opts?.category !== undefined
 				? this.#catalog.filter((p) => p.category === opts.category)
@@ -415,10 +447,22 @@ class HybridSearchEngine implements SearchEngine {
 			...new Set(this.#catalog.map((p) => p.category)),
 		].sort();
 		return {
-			products: filtered.slice(0, limit),
+			products: filtered.slice(offset, offset + limit),
 			total: filtered.length,
 			categories,
 		};
+	}
+
+	public async browseSql(opts?: BrowseOptions): Promise<BrowseResponse> {
+		const sqlResult = this.#index.browseSql({
+			...(opts?.category !== undefined ? { category: opts.category } : {}),
+			limit: opts?.limit ?? DEFAULT_LIMIT,
+			...(opts?.offset !== undefined ? { offset: opts.offset } : {}),
+		});
+		if (sqlResult !== null) {
+			return sqlResult;
+		}
+		return this.browse(opts);
 	}
 
 	public dispose(): Promise<void> {
