@@ -695,7 +695,8 @@ describe("Origin-First cold start, SqlSwapTimeoutError fallback, and syncUpdate(
 						: {
 								...synced,
 								version: `v${revision}`,
-								manifestHash: revision === 2 ? synced.manifestHash : "b".repeat(64),
+								manifestHash:
+									revision === 2 ? synced.manifestHash : "b".repeat(64),
 							};
 				},
 				readFile: (path) => base.readFile(path),

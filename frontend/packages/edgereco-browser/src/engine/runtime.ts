@@ -318,7 +318,9 @@ export class EngineRuntime {
 	): Promise<SyncResult | null> {
 		const ready = this.#ready;
 		if (ready === null) {
-			throw new Error("engine not ready — call bootstrap() before syncUpdate()");
+			throw new Error(
+				"engine not ready — call bootstrap() before syncUpdate()",
+			);
 		}
 		if (ready.reload === undefined) {
 			return null;
