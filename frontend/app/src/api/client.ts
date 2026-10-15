@@ -333,6 +333,7 @@ export function createDataClient(deps: ClientDeps = {}): DataClient {
 			return tasteLogDurable();
 		},
 		search(q: string, opts?: SearchOptions): Promise<SearchResponse> {
+			const fallback = originFallback?.search;
 			return withOriginFallback(
 				(engine) =>
 					engine.search(q, {
@@ -342,24 +343,20 @@ export function createDataClient(deps: ClientDeps = {}): DataClient {
 							? { category: opts.category }
 							: {}),
 					}),
-				originFallback?.search !== undefined
-					? () => originFallback.search!(q, opts)
-					: undefined,
+				fallback !== undefined ? () => fallback(q, opts) : undefined,
 			);
 		},
 		recommend(limit?: number): Promise<RecommendResponse> {
+			const fallback = originFallback?.recommend;
 			return withOriginFallback(
 				(engine) =>
 					engine.recommend({
 						profile,
 						...(limit !== undefined ? { limit } : {}),
 					}),
-				originFallback?.recommend !== undefined
+				fallback !== undefined
 					? () =>
-							originFallback.recommend!(
-								"for_you",
-								limit !== undefined ? { limit } : undefined,
-							)
+							fallback("for_you", limit !== undefined ? { limit } : undefined)
 					: undefined,
 			);
 		},
@@ -367,6 +364,7 @@ export function createDataClient(deps: ClientDeps = {}): DataClient {
 			strategy: string,
 			opts?: RecommendStrategyOptions,
 		): Promise<RecommendResponse> {
+			const fallback = originFallback?.recommend;
 			const liveProfile = PERSONALIZED_STRATEGIES.has(strategy)
 				? profile
 				: emptyProfile();
@@ -378,15 +376,14 @@ export function createDataClient(deps: ClientDeps = {}): DataClient {
 						...(opts?.limit !== undefined ? { limit: opts.limit } : {}),
 						...(opts?.seed !== undefined ? { seed: opts.seed } : {}),
 					}),
-				originFallback?.recommend !== undefined
-					? () => originFallback.recommend!(strategy, opts)
-					: undefined,
+				fallback !== undefined ? () => fallback(strategy, opts) : undefined,
 			);
 		},
 		similar(
 			productId: string,
 			opts?: SimilarOptions,
 		): Promise<RecommendResponse> {
+			const fallback = originFallback?.similar;
 			// similar_items is a stable, seed-driven rail: empty profile so the
 			// ordering depends on the seed, not the session.
 			return withOriginFallback(
@@ -398,9 +395,7 @@ export function createDataClient(deps: ClientDeps = {}): DataClient {
 							? { strategy: opts.strategy }
 							: {}),
 					}),
-				originFallback?.similar !== undefined
-					? () => originFallback.similar!(productId, opts)
-					: undefined,
+				fallback !== undefined ? () => fallback(productId, opts) : undefined,
 			);
 		},
 		strategies(): Record<string, Strategy> {
@@ -413,6 +408,7 @@ export function createDataClient(deps: ClientDeps = {}): DataClient {
 			return requireEngine().catalog();
 		},
 		browse(opts?: BrowseOptions): Promise<BrowseResponse> {
+			const fallback = originFallback?.browse;
 			return withOriginFallback(
 				(engine) =>
 					Promise.resolve(
@@ -424,9 +420,7 @@ export function createDataClient(deps: ClientDeps = {}): DataClient {
 								: {}),
 						}),
 					),
-				originFallback?.browse !== undefined
-					? () => originFallback.browse!(opts)
-					: undefined,
+				fallback !== undefined ? () => fallback(opts) : undefined,
 			);
 		},
 		async sendEvent(evt: InteractionEvent): Promise<void> {
