@@ -45,7 +45,9 @@ dependencies = [
   # set or EDGEPROC_ALLOW_MODEL_DOWNLOAD=1 (see embeddings/encoder.py). 0.4.1 made
   # saved FAISS snapshots crash-atomic. 0.5.0 adds the keyring trust root the
   # browser tier already speaks, and raises its own core floor to 0.4.3.
-  "edge-proc[localvec,bundles]>=0.5.0",
+  # 0.5.1 floor: adds edgeproc.bundles.sqlite (canonicalize_sqlite, canonicalize_sqlite_bytes)
+  # and automatic 4 KiB page-aligned SQLite canonicalization inside build_bundle().
+  "edge-proc[localvec,bundles]>=0.5.1",
   # Direct dependency (not just transitive via edge-proc): edgereco imports
   # edgeproc_core.vector_mgmt.core.types in embeddings/index.py, so the
   # import is declared honestly here. Published on PyPI. 0.4.3 is the floor edge-proc

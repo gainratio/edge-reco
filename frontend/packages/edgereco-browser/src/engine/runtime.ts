@@ -38,11 +38,13 @@ import {
 import { createSearchEngine, type SearchEngine } from "./searchEngine";
 import type { VectorIndexFiles } from "./vectorIndex";
 
-/** The four bundle files the in-browser index is assembled from. */
+/** The bundle files the in-browser index is assembled from. */
 const META_PATH = "catalog_meta.json";
 const STATE_PATH = "vector/state.json";
 const EMBEDDINGS_PATH = "vector/embeddings.f32";
 const PRODUCTS_PATH = "products.jsonl";
+/** Optional canonical pre-built SQLite database (`products` + `products_fts` + `embedding`). */
+const SQLITE_PATH = "catalogue.sqlite";
 /** The signed ranking weights; absent on bundles that predate the feature. */
 const RANKING_CONFIG_PATH = "ranking_config.json";
 /** Avow envelope containing EdgeReco's static Assay ranking proof. */
@@ -142,13 +144,20 @@ export function defaultRuntimeDeps(): RuntimeDeps {
 }
 
 async function readBundleFiles(engine: EnginePort): Promise<VectorIndexFiles> {
-	const [meta, state, embeddings, products] = await Promise.all([
+	const [meta, state, embeddings, products, sqlite] = await Promise.all([
 		engine.readFile(META_PATH),
 		engine.readFile(STATE_PATH),
 		engine.readFile(EMBEDDINGS_PATH),
 		engine.readFile(PRODUCTS_PATH),
+		readOptionalBundleFile(engine, SQLITE_PATH),
 	]);
-	return { meta, state, embeddings, products };
+	return {
+		meta,
+		state,
+		embeddings,
+		products,
+		...(sqlite !== undefined ? { sqlite } : {}),
+	};
 }
 
 /**

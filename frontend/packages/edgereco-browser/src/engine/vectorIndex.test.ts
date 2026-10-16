@@ -520,4 +520,32 @@ describe("loadVectorIndex fail-closed validation", () => {
 		};
 		await expect(loadVectorIndex(files)).rejects.toThrow(VectorIndexError);
 	});
+
+	it("prefers store.importSqlite() over store.replace() when files.sqlite is present on load and reload", async () => {
+		const imported: Uint8Array[] = [];
+		let replaced = 0;
+		const sqliteBytes = new Uint8Array([83, 81, 76, 105]);
+		const reloadBytes = new Uint8Array([83, 81, 76, 50]);
+		const index = await loadVectorIndex(
+			{ ...validFiles(), sqlite: sqliteBytes },
+			async () => ({
+				replace: async () => {
+					replaced += 1;
+				},
+				importSqlite: async (bytes) => {
+					imported.push(bytes);
+				},
+				hybrid: async () => [],
+				vectorSearch: async () => [],
+				nearest: async () => [],
+				dispose: async () => {},
+			}),
+		);
+		expect(replaced).toBe(0);
+		expect(imported).toEqual([sqliteBytes]);
+		await index.reload({ ...validFiles(), sqlite: reloadBytes });
+		expect(replaced).toBe(0);
+		expect(imported).toEqual([sqliteBytes, reloadBytes]);
+		await index.dispose();
+	});
 });

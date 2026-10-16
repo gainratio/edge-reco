@@ -301,6 +301,14 @@ export interface CatalogueStore {
 		revision: CatalogueImport,
 		options?: CatalogueSwapOptions,
 	): Promise<void>;
+	/**
+	 * Atomically validate and import a canonical `catalogue.sqlite` database image
+	 * in place without rebuilding FTS5 on cold boot.
+	 */
+	importSqlite?(
+		bytes: Uint8Array,
+		options?: CatalogueSwapOptions,
+	): Promise<void>;
 	hybrid(
 		query: string,
 		vector: Float32Array,
@@ -431,6 +439,41 @@ export class CatalogueDb implements CatalogueStore {
 				},
 				{ sql: "INSERT INTO products_fts(products_fts) VALUES ('rebuild')" },
 			]);
+		});
+	}
+
+	/**
+	 * Atomically validate and swap in a canonical pre-built `catalogue.sqlite`
+	 * database image (including its pre-populated `products_fts` FTS5 shadow
+	 * tables and `embedding` BLOBs), then re-register `sqlite-vector` on
+	 * `products.embedding`.
+	 */
+	public async importSqlite(
+		bytes: Uint8Array,
+		options?: CatalogueSwapOptions,
+	): Promise<void> {
+		const importDatabase = this.#sql.importDatabase;
+		if (importDatabase === undefined) {
+			throw new Error("SQL connection does not support importDatabase");
+		}
+		const timeoutMs = options?.swapTimeoutMs ?? DEFAULT_SWAP_TIMEOUT_MS;
+		const expectedBytes = this.#dimension * Float32Array.BYTES_PER_ELEMENT;
+		await this.#withSwapGate(timeoutMs, async () => {
+			await importDatabase.call(this.#sql, bytes, {
+				virtualTableModules: ["fts5"],
+				swapTimeoutMs: timeoutMs,
+				expectedSchema: {
+					checks: [
+						"SELECT count(*) = 1 FROM sqlite_schema WHERE type = 'table' AND name = 'products'",
+						"SELECT count(*) = 1 FROM sqlite_schema WHERE type = 'table' AND name = 'products_fts'",
+						`SELECT count(*) = 0 FROM products WHERE length(embedding) <> ${expectedBytes}`,
+					],
+				},
+			});
+			await this.#sql.query(
+				"SELECT vector_init('products', 'embedding', ?) AS initialized",
+				[`dimension=${this.#dimension},type=FLOAT32,distance=COSINE`],
+			);
 		});
 	}
 

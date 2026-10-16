@@ -17,45 +17,25 @@ import { fileURLToPath } from "node:url";
 import { resolveMemoryProfile } from "@gainratio/browser/sqlite";
 import { SqlEngine } from "../../../node_modules/@gainratio/browser/dist/sql/engine.js";
 import { createSqlWorkerHandler } from "../../../node_modules/@gainratio/browser/dist/sql/handler.js";
-// @ts-expect-error -- sqlite3.mjs ships without type declarations.
-import sqlite3InitModule from "../../../node_modules/@gainratio/browser/dist/vector/sqlite/assets/sqlite3.mjs";
+import {
+	type InProcessSqlite,
+	initInProcessSqlite,
+} from "../../../node_modules/@gainratio/browser/dist/sql/nodeRuntime.js";
 import type { OpenCatalogueSqlDeps } from "../catalogueSql";
 
 type Handler = ReturnType<typeof createSqlWorkerHandler>;
 type Request = Parameters<Handler>[0];
-type RawDatabase = ConstructorParameters<typeof SqlEngine>[0];
-
-interface NodeSqlite {
-	readonly oo1: { readonly DB: new (filename: string) => RawDatabase };
-}
 
 const WASM_PATH = join(
 	dirname(fileURLToPath(import.meta.url)),
 	"../../../node_modules/@gainratio/browser/dist/vector/sqlite/assets/sqlite3.wasm",
 );
 
-let loaded: Promise<NodeSqlite> | undefined;
+let loaded: Promise<InProcessSqlite> | undefined;
 
-async function load(): Promise<NodeSqlite> {
+async function load(): Promise<InProcessSqlite> {
 	const wasmBinary = new Uint8Array(await readFile(WASM_PATH));
-	const original = Object.getOwnPropertyDescriptor(globalThis, "location");
-	Object.defineProperty(globalThis, "location", {
-		configurable: true,
-		value: { href: "https://edgereco.invalid/?opfs-disable&opfs-wl-disable" },
-	});
-	try {
-		return await sqlite3InitModule({
-			wasmBinary,
-			print: () => undefined,
-			printErr: () => undefined,
-		});
-	} finally {
-		if (original === undefined) {
-			delete (globalThis as { location?: unknown }).location;
-		} else {
-			Object.defineProperty(globalThis, "location", original);
-		}
-	}
+	return initInProcessSqlite(wasmBinary);
 }
 
 const openEngine: Parameters<typeof createSqlWorkerHandler>[0] = async (
@@ -63,9 +43,11 @@ const openEngine: Parameters<typeof createSqlWorkerHandler>[0] = async (
 ) => {
 	loaded ??= load();
 	const sqlite = await loaded;
-	const engine = new SqlEngine(new sqlite.oo1.DB(":memory:"), {
+	const engine = new SqlEngine(sqlite.openMemory(), {
 		storage: { persistence: "memory", reason: "opfs-unavailable" },
 		memoryProfile: resolveMemoryProfile(options.memoryProfile ?? "auto"),
+		serializer: sqlite.serializer,
+		control: sqlite.control,
 	});
 	return { engine, release: () => Promise.resolve() };
 };

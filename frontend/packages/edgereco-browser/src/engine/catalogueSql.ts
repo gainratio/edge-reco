@@ -13,6 +13,8 @@ import {
 	openSqlDatabase,
 	removeOpfsPool,
 	type SqlBind,
+	type SqlImportOptions,
+	type SqlImportResult,
 	type SqlRow,
 	type SqlStatement,
 	type SqlStorage,
@@ -20,7 +22,14 @@ import {
 	sqliteVectorPoolName,
 } from "../gainratio";
 
-export type { SqlBind, SqlRow, SqlStatement, SqlStorage };
+export type {
+	SqlBind,
+	SqlImportOptions,
+	SqlImportResult,
+	SqlRow,
+	SqlStatement,
+	SqlStorage,
+};
 
 /** The catalogue database's stable name (hashed into its OPFS pool). */
 export const CATALOGUE_DATABASE = "edgereco-catalogue";
@@ -36,6 +45,13 @@ export interface CatalogueSql {
 	query(sql: string, bind?: SqlBind): Promise<ReadonlyArray<SqlRow>>;
 	/** All statements in one BEGIN IMMEDIATE … COMMIT. */
 	transaction(statements: ReadonlyArray<SqlStatement>): Promise<unknown>;
+	/** Atomically validate and swap in a canonical SQLite database image. */
+	importDatabase?(
+		bytes: Uint8Array,
+		options?: SqlImportOptions,
+	): Promise<SqlImportResult>;
+	/** Serialize the open SQLite database into a standalone SQLite image. */
+	exportDatabase?(): Promise<Uint8Array>;
 	close(): Promise<void>;
 }
 
