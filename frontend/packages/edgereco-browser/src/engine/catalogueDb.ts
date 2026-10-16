@@ -71,10 +71,14 @@ export interface CatalogueProduct {
 	readonly tags: ReadonlyArray<string>;
 	readonly brand: string;
 	readonly description?: string;
-	readonly price?: number;
+	readonly subcategories?: ReadonlyArray<string>;
+	readonly price?: number | null;
+	readonly currency?: string;
 	readonly popularity_score?: number;
 	readonly freshness_score?: number;
 	readonly image_url?: string;
+	readonly url?: string;
+	readonly attributes?: Readonly<Record<string, string>>;
 }
 
 /** One verified catalogue revision, in bundle row order. */
@@ -262,7 +266,7 @@ function vectorBlob(vector: Float32Array): Uint8Array {
 }
 
 function hydrateProductRow(row: SqlRow): Product {
-	let tags: ReadonlyArray<string> = [];
+	let tags: string[] = [];
 	if (typeof row.tags_json === "string") {
 		try {
 			const parsed = JSON.parse(row.tags_json) as unknown;
@@ -278,12 +282,16 @@ function hydrateProductRow(row: SqlRow): Product {
 		title: String(row.title ?? ""),
 		description: String(row.description ?? ""),
 		category: String(row.category ?? ""),
+		subcategories: [],
 		brand: String(row.brand ?? ""),
 		price: Number(row.price ?? 0),
+		currency: "USD",
 		popularity_score: Number(row.popularity_score ?? 0),
 		freshness_score: Number(row.freshness_score ?? 0),
 		tags,
 		image_url: String(row.image_url ?? ""),
+		url: "",
+		attributes: {},
 	};
 }
 

@@ -357,12 +357,16 @@ describe("openCatalogueStore", () => {
 				title: "Alpha Jacket",
 				description: "Warm coat",
 				category: "apparel",
+				subcategories: [],
 				tags: ["winter", "warm"],
 				brand: "Arc",
 				price: 199.5,
+				currency: "USD",
 				popularity_score: 0.9,
 				freshness_score: 0.8,
 				image_url: "https://example.com/a.jpg",
+				url: "",
+				attributes: {},
 			},
 		]);
 		const filtered = await db.browseSql({ category: "camping" });
