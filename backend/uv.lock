@@ -526,7 +526,7 @@ wheels = [
 
 [[package]]
 name = "edge-proc"
-version = "0.5.0"
+version = "0.5.1"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
     { name = "edgeproc-core" },
@@ -534,9 +534,9 @@ dependencies = [
     { name = "pydantic-settings" },
     { name = "typer" },
 ]
-sdist = { url = "https://files.pythonhosted.org/packages/cb/cb/241a84436a58ada1be949ed95073d4b62cc8b756fb47b24c5f5f4d63bb10/edge_proc-0.5.0.tar.gz", hash = "sha256:f1d8174becce15865c730d7144b44449fe451b8dc9fcf4f1938cab1d074c7bfc", size = 479965, upload-time = "2026-09-23T23:01:01.158Z" }
+sdist = { url = "https://files.pythonhosted.org/packages/af/ef/168c37d22adce1fc365ae857ce6b3fcc7b9dc19457b13783b5521c943fb0/edge_proc-0.5.1.tar.gz", hash = "sha256:3f213d650d492b253aa97bbce58c25348a723bf47352a06e85297504ad98c85e", size = 480172, upload-time = "2026-10-16T17:04:59.271Z" }
 wheels = [
-    { url = "https://files.pythonhosted.org/packages/9b/a6/aae3d52b83b38bc486f850e82e33dc11fff048ff2cf37fc51d3b08203dca/edge_proc-0.5.0-py3-none-any.whl", hash = "sha256:b12ad6e1324c33998632030551cfd30189ac2f6c9494d02eac08dade2ee760a7", size = 92804, upload-time = "2026-09-23T23:00:59.931Z" },
+    { url = "https://files.pythonhosted.org/packages/dc/27/9c14e2c55962b1ab116df7439d3111e66e5c9b94232de0c77ad2d0fe97fc/edge_proc-0.5.1-py3-none-any.whl", hash = "sha256:bf537df5656e93c0cddcb0b80531fdcf642ea76507d2a4fbcb939d76d4ab8c45", size = 83600, upload-time = "2026-10-16T17:04:57.777Z" },
 ]
 
 [package.optional-dependencies]
@@ -617,7 +617,7 @@ requires-dist = [
     { name = "assay-engine", extras = ["metrics"], specifier = "==0.5.0.dev6" },
     { name = "avow", specifier = ">=0.5.2" },
     { name = "cryptography", specifier = ">=50" },
-    { name = "edge-proc", extras = ["localvec", "bundles"], specifier = ">=0.5.0" },
+    { name = "edge-proc", extras = ["localvec", "bundles"], specifier = ">=0.5.1" },
     { name = "edgeproc-core", specifier = ">=0.4.3" },
     { name = "faiss-cpu", specifier = ">=1.9" },
     { name = "fastapi", specifier = ">=0.115" },
@@ -691,11 +691,11 @@ wheels = [
 
 [[package]]
 name = "filelock"
-version = "3.32.7"
+version = "4.2.0"
 source = { registry = "https://pypi.org/simple" }
-sdist = { url = "https://files.pythonhosted.org/packages/0f/59/e19834834cb01a32febfbb0f8a23a9088088f5d45991824ff2bc3b5e8acb/filelock-3.32.7.tar.gz", hash = "sha256:37b8a3d9811b0f9aef7e5ec5c71bb320de52df51e6ca9bcd6f5ad81187660da7", size = 225154, upload-time = "2026-09-16T00:24:20.907Z" }
+sdist = { url = "https://files.pythonhosted.org/packages/f4/a9/1af41b37c3279712b22cdc63aac78a52432202b6fe1f9666a2a3d2831fb4/filelock-4.2.0.tar.gz", hash = "sha256:7a60906c75227cf04d0c273afadc8219400f11aeb13cc69591d4f6cdc6c8036e", size = 569667, upload-time = "2026-10-14T20:57:13.11Z" }
 wheels = [
-    { url = "https://files.pythonhosted.org/packages/15/df/31098c5aeb4d966b553641472bd55fcf5fdfac953549894b8a765ba44e91/filelock-3.32.7-py3-none-any.whl", hash = "sha256:65ff0d0190ea42038b32bda4b77834fb05be2cad4c5b9b01aa4dfb3614536e52", size = 100157, upload-time = "2026-09-16T00:24:19.543Z" },
+    { url = "https://files.pythonhosted.org/packages/8e/a3/9bc26acff301fe1aaea1cc3d82a1d57e0a34df3e1cadbfa91ac2dbcdde5c/filelock-4.2.0-py3-none-any.whl", hash = "sha256:2ff5690882e8cdb00ef31fb3d01a3094c29f30985426c59495afb1733f3b7238", size = 135032, upload-time = "2026-10-14T20:57:11.349Z" },
 ]
 
 [[package]]

@@ -31,6 +31,8 @@ export {
 	openSqlDatabase,
 	removeOpfsPool,
 	type SqlBind,
+	type SqlImportOptions,
+	type SqlImportResult,
 	type SqlRow,
 	type SqlStatement,
 	type SqlStorage,

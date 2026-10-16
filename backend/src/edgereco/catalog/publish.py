@@ -48,6 +48,11 @@ from filelock import FileLock, Timeout
 from pydantic import BaseModel
 
 from edgereco.catalog.product_image import ImageMode, localize_catalog
+from edgereco.catalog.sqlite_bundle import (
+    CATALOGUE_SQLITE_NAME,
+    build_catalogue_sqlite,
+    can_stage_catalogue_sqlite,
+)
 from edgereco.reco.cooccurrence import CooccurrenceMatrix
 from edgereco.reco.ranking_config import DEFAULT_RANKING_CONFIG, RankingConfig
 from edgereco.reco.score_receipt import (
@@ -307,7 +312,25 @@ def _stage_files(
     _ensure_ranking_config(staging_dir, require_present=require_feature_files)
     _ensure_cooccurrence(staging_dir, require_present=require_feature_files)
     _write_ranking_receipt(staging_dir, private_key_path)
+    _maybe_stage_catalogue_sqlite(staging_dir, meta)
     return _read_bundle_files(staging_dir)
+
+
+def _maybe_stage_catalogue_sqlite(staging_dir: Path, meta: CatalogMeta) -> None:
+    """Build canonical ``catalogue.sqlite`` when the staged vector artifacts are complete."""
+    sqlite_path = staging_dir / CATALOGUE_SQLITE_NAME
+    _refuse_symlink(sqlite_path, staging_dir)
+    if can_stage_catalogue_sqlite(
+        staging_dir,
+        embedding_dim=meta.embedding_dim,
+        embedding_count=meta.embedding_count,
+    ):
+        payload = build_catalogue_sqlite(
+            staging_dir,
+            embedding_dim=meta.embedding_dim,
+            embedding_count=meta.embedding_count,
+        )
+        _write_bytes_no_follow(sqlite_path, payload)
 
 
 def _ensure_ranking_config(staging_dir: Path, *, require_present: bool = False) -> None:
@@ -503,6 +526,10 @@ def _read_bundle_files(staging_dir: Path) -> dict[str, bytes]:
         path = staging_dir / name
         _refuse_symlink(path, staging_dir)
         files[name] = path.read_bytes()
+    sqlite_path = staging_dir / CATALOGUE_SQLITE_NAME
+    _refuse_symlink(sqlite_path, staging_dir)
+    if sqlite_path.is_file():
+        files[CATALOGUE_SQLITE_NAME] = sqlite_path.read_bytes()
     _read_tree(staging_dir, "vector", files)
     _read_tree(staging_dir, "images", files, skip_extensions=_PHOTO_EXTENSIONS)
     return files

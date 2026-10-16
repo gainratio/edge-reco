@@ -407,4 +407,30 @@ describe("openCatalogueStore", () => {
 		expect(await db.count()).toBe(1);
 		await db.dispose();
 	});
+
+	it("imports a canonical pre-built SQLite database via importSqlite() with FTS5 and sqlite-vector ready", async () => {
+		const sourceSql = await openCatalogueSql();
+		const sourceDb = await CatalogueDb.open(sourceSql, 2);
+		await sourceDb.replace({ products: PRODUCTS, vectors: VECTORS });
+		if (sourceSql.exportDatabase === undefined) {
+			throw new Error("expected exportDatabase on CatalogueSql");
+		}
+		const sqliteBytes = await sourceSql.exportDatabase();
+		await sourceDb.dispose();
+
+		const targetDb = await fresh();
+		await targetDb.importSqlite(sqliteBytes);
+		expect(await targetDb.count()).toBe(5);
+		expect((await lexical(targetDb, "polo")).map((h) => h.id)).toEqual(["a"]);
+		expect((await targetDb.vectorSearch(FAR, 3)).map((h) => h.id)).toEqual([
+			"c",
+			"b",
+			"d",
+		]);
+		await expect(
+			targetDb.importSqlite(new Uint8Array([1, 2, 3])),
+		).rejects.toThrow(/not a SQLite database/);
+		expect(await targetDb.count()).toBe(5);
+		await targetDb.dispose();
+	});
 });

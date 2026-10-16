@@ -19,7 +19,7 @@ import type { BrowseResponse, Product } from "./domain";
 
 const DECODER = new TextDecoder();
 
-/** The four reassembled bundle files the index is built from. */
+/** The reassembled bundle files the index is built from. */
 export interface VectorIndexFiles {
 	/** catalog_meta.json — carries embedding_count / embedding_dim. */
 	readonly meta: Uint8Array;
@@ -29,6 +29,8 @@ export interface VectorIndexFiles {
 	readonly embeddings: Uint8Array;
 	/** products.jsonl — one Product JSON object per line. */
 	readonly products: Uint8Array;
+	/** catalogue.sqlite — optional canonical pre-built SQLite database. */
+	readonly sqlite?: Uint8Array;
 }
 
 /** A scored retrieval hit: a product id and its cosine similarity to the query. */
@@ -301,15 +303,19 @@ export class VectorIndex {
 		options?: CatalogueSwapOptions,
 	): Promise<void> {
 		const parsed = parseBundleRevision(files, this.#dim);
-		await this.#store.replace(
-			{
-				products: parsed.ids.map((id) =>
-					catalogueRow(id, parsed.products.get(id)),
-				),
-				vectors: parsed.matrix,
-			},
-			options,
-		);
+		if (files.sqlite !== undefined && this.#store.importSqlite !== undefined) {
+			await this.#store.importSqlite(files.sqlite, options);
+		} else {
+			await this.#store.replace(
+				{
+					products: parsed.ids.map((id) =>
+						catalogueRow(id, parsed.products.get(id)),
+					),
+					vectors: parsed.matrix,
+				},
+				options,
+			);
+		}
 		this.#ids = parsed.ids;
 		this.#known = new Set(parsed.ids);
 		this.#products = parsed.products;
@@ -412,14 +418,18 @@ export async function loadVectorIndex(
 	const { dim, ids, matrix, products } = parseBundleRevision(files);
 	const store = await openCatalogue(factory, dim);
 	try {
-		// The database is durable across catalogue revisions; replace() swaps the
-		// whole revision (products, FTS5 index, vectors) in ONE transaction, so a
-		// removed product cannot linger and an interrupted import leaves the old
-		// revision intact. Bootstrap fails closed and the next attempt redoes it.
-		await store.replace({
-			products: ids.map((id) => catalogueRow(id, products.get(id))),
-			vectors: matrix,
-		});
+		if (files.sqlite !== undefined && store.importSqlite !== undefined) {
+			await store.importSqlite(files.sqlite);
+		} else {
+			// The database is durable across catalogue revisions; replace() swaps the
+			// whole revision (products, FTS5 index, vectors) in ONE transaction, so a
+			// removed product cannot linger and an interrupted import leaves the old
+			// revision intact. Bootstrap fails closed and the next attempt redoes it.
+			await store.replace({
+				products: ids.map((id) => catalogueRow(id, products.get(id))),
+				vectors: matrix,
+			});
+		}
 		return new VectorIndex(store, ids, products, dim);
 	} catch (error) {
 		await store.dispose();
