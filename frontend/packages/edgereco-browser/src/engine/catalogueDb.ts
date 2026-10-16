@@ -31,14 +31,54 @@ import {
 	type SqlBind,
 	type SqlRow,
 } from "./catalogueSql";
+import type { BrowseResponse, Product } from "./domain";
 
-/** The product fields the keyword index reads. */
+/** Default gate timeout (ms) while an atomic catalogue swap is in flight. */
+export const DEFAULT_SWAP_TIMEOUT_MS = 150;
+
+export interface CatalogueSwapOptions {
+	/**
+	 * Maximum time in milliseconds a concurrent query may wait behind an active
+	 * catalogue swap before rejecting with {@link SqlSwapTimeoutError}.
+	 * Default 150 ms.
+	 */
+	readonly swapTimeoutMs?: number;
+}
+
+/**
+ * Thrown when a concurrent query waits longer than `swapTimeoutMs` behind an
+ * active catalogue hot-swap ({@link CatalogueDb.replace} or {@link CatalogueDb.importSqlite}).
+ */
+export class SqlSwapTimeoutError extends Error {
+	public readonly code = "sql.swap_timeout" as const;
+	public readonly timeoutMs: number;
+
+	public constructor(
+		timeoutMs: number = DEFAULT_SWAP_TIMEOUT_MS,
+		message = `SQL database swap exceeded ${timeoutMs}ms gate timeout`,
+	) {
+		super(message);
+		this.name = "SqlSwapTimeoutError";
+		this.timeoutMs = timeoutMs;
+	}
+}
+
+/** The product fields the catalogue database stores and indexes. */
 export interface CatalogueProduct {
 	readonly id: string;
 	readonly title: string;
 	readonly category: string;
 	readonly tags: ReadonlyArray<string>;
 	readonly brand: string;
+	readonly description?: string;
+	readonly subcategories?: ReadonlyArray<string>;
+	readonly price?: number | null;
+	readonly currency?: string;
+	readonly popularity_score?: number;
+	readonly freshness_score?: number;
+	readonly image_url?: string;
+	readonly url?: string;
+	readonly attributes?: Readonly<Record<string, string>>;
 }
 
 /** One verified catalogue revision, in bundle row order. */
@@ -46,6 +86,13 @@ export interface CatalogueImport {
 	/** products[i] is bundle row i; its vector is vectors[i*dim .. (i+1)*dim). */
 	readonly products: ReadonlyArray<CatalogueProduct>;
 	readonly vectors: Float32Array;
+}
+
+/** Options for SQL-backed catalogue browse queries. */
+export interface CatalogueBrowseOptions {
+	readonly category?: string;
+	readonly limit?: number;
+	readonly offset?: number;
 }
 
 /** A ranked id with its score (bm25 relevance, cosine, or fused RRF). */
@@ -91,16 +138,50 @@ const SCHEMA = `
 		rowid INTEGER PRIMARY KEY,
 		id TEXT NOT NULL UNIQUE,
 		title TEXT NOT NULL,
+		description TEXT NOT NULL DEFAULT '',
 		category TEXT NOT NULL,
 		tags TEXT NOT NULL,
+		tags_json TEXT NOT NULL DEFAULT '[]',
 		brand TEXT NOT NULL,
+		price REAL NOT NULL DEFAULT 0,
+		popularity_score REAL NOT NULL DEFAULT 0,
+		freshness_score REAL NOT NULL DEFAULT 0,
+		image_url TEXT NOT NULL DEFAULT '',
 		embedding BLOB NOT NULL
 	);
+	CREATE INDEX IF NOT EXISTS idx_products_category_rowid
+		ON products(category, rowid);
+	CREATE INDEX IF NOT EXISTS idx_products_popularity
+		ON products(popularity_score DESC, rowid ASC);
+	CREATE INDEX IF NOT EXISTS idx_products_freshness
+		ON products(freshness_score DESC, rowid ASC);
 	CREATE VIRTUAL TABLE IF NOT EXISTS products_fts USING fts5(
 		title, category, tags, brand,
 		content = 'products', content_rowid = 'rowid',
 		tokenize = "unicode61 remove_diacritics 2 tokenchars '-'''"
 	);
+`;
+
+const BROWSE_ROWS_SQL = `
+	SELECT id, title, description, category, tags_json, brand,
+		price, popularity_score, freshness_score, image_url
+	FROM products
+	WHERE (?1 IS NULL OR category = ?1)
+	ORDER BY rowid ASC
+	LIMIT ?2 OFFSET ?3
+`;
+
+const BROWSE_TOTAL_SQL = `
+	SELECT count(*) AS total
+	FROM products
+	WHERE (?1 IS NULL OR category = ?1)
+`;
+
+const BROWSE_CATEGORIES_SQL = `
+	SELECT DISTINCT category
+	FROM products
+	WHERE category <> ''
+	ORDER BY category ASC
 `;
 
 const HYBRID_SQL = `
@@ -184,9 +265,42 @@ function vectorBlob(vector: Float32Array): Uint8Array {
 	return new Uint8Array(vector.buffer, vector.byteOffset, vector.byteLength);
 }
 
+function hydrateProductRow(row: SqlRow): Product {
+	let tags: string[] = [];
+	if (typeof row.tags_json === "string") {
+		try {
+			const parsed = JSON.parse(row.tags_json) as unknown;
+			if (Array.isArray(parsed)) {
+				tags = parsed.map(String);
+			}
+		} catch {
+			tags = [];
+		}
+	}
+	return {
+		id: String(row.id ?? ""),
+		title: String(row.title ?? ""),
+		description: String(row.description ?? ""),
+		category: String(row.category ?? ""),
+		subcategories: [],
+		brand: String(row.brand ?? ""),
+		price: Number(row.price ?? 0),
+		currency: "USD",
+		popularity_score: Number(row.popularity_score ?? 0),
+		freshness_score: Number(row.freshness_score ?? 0),
+		tags,
+		image_url: String(row.image_url ?? ""),
+		url: "",
+		attributes: {},
+	};
+}
+
 /** The async catalogue surface the search engine uses. */
 export interface CatalogueStore {
-	replace(revision: CatalogueImport): Promise<void>;
+	replace(
+		revision: CatalogueImport,
+		options?: CatalogueSwapOptions,
+	): Promise<void>;
 	hybrid(
 		query: string,
 		vector: Float32Array,
@@ -197,6 +311,7 @@ export interface CatalogueStore {
 		k: number,
 	): Promise<ReadonlyArray<ScoredId>>;
 	nearest(id: string, k: number): Promise<ReadonlyArray<ScoredId>>;
+	browseSql?(options?: CatalogueBrowseOptions): Promise<BrowseResponse>;
 	dispose(): Promise<void>;
 }
 
@@ -225,6 +340,10 @@ export class CatalogueDb implements CatalogueStore {
 	readonly #sql: CatalogueSql;
 	readonly #dimension: number;
 	readonly #weights: LexicalWeights;
+	#activeSwap: {
+		readonly done: Promise<void>;
+		readonly timeoutMs: number;
+	} | null = null;
 
 	private constructor(
 		sql: CatalogueSql,
@@ -246,6 +365,17 @@ export class CatalogueDb implements CatalogueStore {
 			if (!Number.isInteger(dimension) || dimension < 1) {
 				throw new RangeError(`vector dimension must be a positive integer`);
 			}
+			const existing = await sql.query(
+				"SELECT name FROM pragma_table_info('products')",
+			);
+			if (
+				existing.length > 0 &&
+				!existing.some((col) => col.name === "tags_json")
+			) {
+				await sql.exec(
+					"DROP TABLE IF EXISTS products_fts; DROP TABLE IF EXISTS products;",
+				);
+			}
 			await sql.exec(SCHEMA);
 			await sql.query(
 				"SELECT vector_init('products', 'embedding', ?) AS initialized",
@@ -258,8 +388,16 @@ export class CatalogueDb implements CatalogueStore {
 		}
 	}
 
-	/** Replace the whole catalogue with one verified revision, atomically. */
-	public async replace(revision: CatalogueImport): Promise<void> {
+	/**
+	 * Replace the whole catalogue with one verified revision, atomically.
+	 * Concurrent queries wait at the swap gate up to `swapTimeoutMs` (default
+	 * 150 ms) and either run against the new revision or reject with
+	 * {@link SqlSwapTimeoutError}.
+	 */
+	public async replace(
+		revision: CatalogueImport,
+		options?: CatalogueSwapOptions,
+	): Promise<void> {
 		const { products, vectors } = revision;
 		const dim = this.#dimension;
 		if (vectors.length !== products.length * dim) {
@@ -272,22 +410,60 @@ export class CatalogueDb implements CatalogueStore {
 			row,
 			product.id,
 			product.title,
+			product.description ?? "",
 			product.category,
 			product.tags.join(" "),
+			JSON.stringify(product.tags),
 			product.brand,
+			product.price ?? 0,
+			product.popularity_score ?? 0,
+			product.freshness_score ?? 0,
+			product.image_url ?? "",
 			vectorBlob(vectors.subarray(row * dim, (row + 1) * dim)),
 		]);
-		await this.#sql.transaction([
-			{ sql: "DELETE FROM products" },
-			{ sql: "INSERT INTO products VALUES (?, ?, ?, ?, ?, ?, ?)", rows },
-			{ sql: "INSERT INTO products_fts(products_fts) VALUES ('rebuild')" },
-		]);
+		const timeoutMs = options?.swapTimeoutMs ?? DEFAULT_SWAP_TIMEOUT_MS;
+		await this.#withSwapGate(timeoutMs, async () => {
+			await this.#sql.transaction([
+				{ sql: "DELETE FROM products" },
+				{
+					sql: "INSERT INTO products VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+					rows,
+				},
+				{ sql: "INSERT INTO products_fts(products_fts) VALUES ('rebuild')" },
+			]);
+		});
 	}
 
 	/** Number of products in the database. */
 	public async count(): Promise<number> {
-		const [row] = await this.#sql.query("SELECT count(*) AS n FROM products");
-		return Number(row?.n ?? 0);
+		return this.#readThroughGate(async () => {
+			const [row] = await this.#sql.query("SELECT count(*) AS n FROM products");
+			return Number(row?.n ?? 0);
+		});
+	}
+
+	/**
+	 * SQL-backed browse query over `products` (category filter, limit/offset
+	 * pagination, total count, and sorted distinct category list).
+	 */
+	public async browseSql(
+		options: CatalogueBrowseOptions = {},
+	): Promise<BrowseResponse> {
+		return this.#readThroughGate(async () => {
+			const category = options.category ?? null;
+			const limit = Math.max(0, options.limit ?? 24);
+			const offset = Math.max(0, options.offset ?? 0);
+			const [rows, totalRows, categoryRows] = await Promise.all([
+				this.#sql.query(BROWSE_ROWS_SQL, [category, limit, offset]),
+				this.#sql.query(BROWSE_TOTAL_SQL, [category]),
+				this.#sql.query(BROWSE_CATEGORIES_SQL),
+			]);
+			return {
+				products: rows.map(hydrateProductRow),
+				total: Number(totalRows[0]?.total ?? 0),
+				categories: categoryRows.map((r) => String(r.category)),
+			};
+		});
 	}
 
 	/**
@@ -300,25 +476,27 @@ export class CatalogueDb implements CatalogueStore {
 		k: number,
 	): Promise<ReadonlyArray<HybridRow>> {
 		this.#assertVector(vector);
-		const w = this.#weights;
-		const rows = await this.#sql.query(HYBRID_SQL, [
-			w.title,
-			w.category,
-			w.tags,
-			w.brand,
-			matchExpression(query) ?? MATCH_NOTHING,
-			Math.max(0, k),
-			vectorBlob(vector),
-			RRF_K,
-		]);
-		return rows.map((row) => ({
-			id: String(row.id),
-			fused: Number(row.fused),
-			lexicalScore: asNumberOrNull(row.lexical_score),
-			lexicalRank: asNumberOrNull(row.lexical_rank),
-			semanticScore: asNumberOrNull(row.semantic_score),
-			semanticRank: asNumberOrNull(row.semantic_rank),
-		}));
+		return this.#readThroughGate(async () => {
+			const w = this.#weights;
+			const rows = await this.#sql.query(HYBRID_SQL, [
+				w.title,
+				w.category,
+				w.tags,
+				w.brand,
+				matchExpression(query) ?? MATCH_NOTHING,
+				Math.max(0, k),
+				vectorBlob(vector),
+				RRF_K,
+			]);
+			return rows.map((row) => ({
+				id: String(row.id),
+				fused: Number(row.fused),
+				lexicalScore: asNumberOrNull(row.lexical_score),
+				lexicalRank: asNumberOrNull(row.lexical_rank),
+				semanticScore: asNumberOrNull(row.semantic_score),
+				semanticRank: asNumberOrNull(row.semantic_rank),
+			}));
+		});
 	}
 
 	/** Exact cosine top-k for a query vector, ties broken by bundle row. */
@@ -327,7 +505,9 @@ export class CatalogueDb implements CatalogueStore {
 		k: number,
 	): Promise<ReadonlyArray<ScoredId>> {
 		this.#assertVector(vector);
-		return this.#scored(VECTOR_SQL, [vectorBlob(vector), Math.max(0, k)]);
+		return this.#readThroughGate(() =>
+			this.#scored(VECTOR_SQL, [vectorBlob(vector), Math.max(0, k)]),
+		);
 	}
 
 	/** Top-k neighbours of a stored product, the product itself excluded. */
@@ -335,18 +515,50 @@ export class CatalogueDb implements CatalogueStore {
 		id: string,
 		k: number,
 	): Promise<ReadonlyArray<ScoredId>> {
-		const known = await this.#sql.query(
-			"SELECT 1 AS known FROM products WHERE id = ?",
-			[id],
-		);
-		if (known.length === 0) {
-			throw new Error(`unknown product id: ${id}`);
-		}
-		return this.#scored(NEAREST_SQL, [id, Math.max(0, k)]);
+		return this.#readThroughGate(async () => {
+			const known = await this.#sql.query(
+				"SELECT 1 AS known FROM products WHERE id = ?",
+				[id],
+			);
+			if (known.length === 0) {
+				throw new Error(`unknown product id: ${id}`);
+			}
+			return this.#scored(NEAREST_SQL, [id, Math.max(0, k)]);
+		});
 	}
 
 	public dispose(): Promise<void> {
 		return this.#sql.close();
+	}
+
+	async #withSwapGate<T>(
+		timeoutMs: number,
+		work: () => Promise<T>,
+	): Promise<T> {
+		const previous = this.#activeSwap?.done ?? Promise.resolve();
+		let releaseGate: () => void = () => undefined;
+		const done = new Promise<void>((resolve) => {
+			releaseGate = resolve;
+		});
+		const entry = { done, timeoutMs };
+		this.#activeSwap = entry;
+		try {
+			await previous;
+			return await work();
+		} finally {
+			releaseGate();
+			if (this.#activeSwap === entry) {
+				this.#activeSwap = null;
+			}
+		}
+	}
+
+	async #readThroughGate<T>(read: () => Promise<T>): Promise<T> {
+		const active = this.#activeSwap;
+		if (active !== null) {
+			await waitWithSwapTimeout(active.done, active.timeoutMs);
+		}
+		return read();
 	}
 
 	async #scored(sql: string, bind: SqlBind): Promise<ReadonlyArray<ScoredId>> {
@@ -365,4 +577,19 @@ export class CatalogueDb implements CatalogueStore {
 		}
 		assertFinite(vector, "query vector");
 	}
+}
+
+function waitWithSwapTimeout(
+	done: Promise<void>,
+	timeoutMs: number,
+): Promise<void> {
+	return new Promise<void>((resolve, reject) => {
+		const timer = setTimeout(() => {
+			reject(new SqlSwapTimeoutError(timeoutMs));
+		}, timeoutMs);
+		void done.then(() => {
+			clearTimeout(timer);
+			resolve();
+		});
+	});
 }

@@ -9,6 +9,7 @@ import {
 	type Embedder,
 	type EnginePort,
 	type RankingConfig,
+	SqlSwapTimeoutError,
 	type SyncResult,
 } from "@edgereco/browser";
 import { catalogFetch } from "@edgereco/browser/testing/fixtures";
@@ -42,6 +43,7 @@ import {
 	sendEvent,
 	similar,
 	strategies,
+	syncUpdate,
 	tasteDurable,
 } from "./client";
 import type { Product } from "./types";
@@ -617,5 +619,94 @@ describe("clearCatalogCache — the explicit recovery", () => {
 		expect(clear).toHaveBeenCalledOnce();
 		expect(deleteFloorDatabase).toHaveBeenCalledOnce();
 		await expect(bootstrap()).resolves.toBeUndefined();
+	});
+});
+
+describe("Origin-First cold start, SqlSwapTimeoutError fallback, and syncUpdate()", () => {
+	afterEach(() => {
+		__setRuntimeForTests({
+			spawnEngine: () => fakeEnginePort(),
+			makeEmbedder: () => stubEmbedder,
+		});
+	});
+
+	it("routes cold-start queries to originFallback before bootstrap() resolves", async () => {
+		const fallbackSearch = vi.fn(async (q: string) => ({
+			query: q,
+			results: [],
+			total: 42,
+		}));
+		__setRuntimeForTests({
+			spawnEngine: () => fakeEnginePort(),
+			makeEmbedder: () => stubEmbedder,
+			originFallback: { search: fallbackSearch },
+		});
+
+		const coldRes = await search("tent", { limit: 4 });
+		expect(coldRes.total).toBe(42);
+		expect(fallbackSearch).toHaveBeenCalledOnce();
+
+		await bootstrap();
+		const warmRes = await search("tent", { limit: 4 });
+		expect(fallbackSearch).toHaveBeenCalledOnce();
+		expect(warmRes.query).toBe("tent");
+	});
+
+	it("falls back to originFallback when a live SQLite swap throws SqlSwapTimeoutError", async () => {
+		const fallbackSearch = vi.fn(async (q: string) => ({
+			query: q,
+			results: [],
+			total: 99,
+		}));
+		const slowEmbedder: Embedder = {
+			embed: () => Promise.reject(new SqlSwapTimeoutError(150)),
+		};
+		let warmed = false;
+		__setRuntimeForTests({
+			spawnEngine: () => fakeEnginePort(),
+			makeEmbedder: () => ({
+				embed(prompt: string): Promise<Float32Array> {
+					if (!warmed) {
+						warmed = true;
+						return stubEmbedder.embed(prompt);
+					}
+					return slowEmbedder.embed(prompt);
+				},
+			}),
+			originFallback: { search: fallbackSearch },
+		});
+		await bootstrap();
+
+		const res = await search("jacket");
+		expect(res.total).toBe(99);
+		expect(fallbackSearch).toHaveBeenCalledOnce();
+	});
+
+	it("syncUpdate() returns null when manifestHash is unchanged and hot-swaps when updated", async () => {
+		let revision = 0;
+		const base = fakeEnginePort();
+		__setRuntimeForTests({
+			spawnEngine: () => ({
+				async sync(...args) {
+					const synced = await base.sync(...args);
+					revision += 1;
+					return revision === 1
+						? synced
+						: {
+								...synced,
+								version: `v${revision}`,
+								manifestHash:
+									revision === 2 ? synced.manifestHash : "b".repeat(64),
+							};
+				},
+				readFile: (path) => base.readFile(path),
+			}),
+			makeEmbedder: () => stubEmbedder,
+		});
+		await bootstrap();
+		expect(await syncUpdate()).toBeNull();
+		const swapped = await syncUpdate();
+		expect(swapped?.version).toBe("v3");
+		expect(swapped?.manifestHash).toBe("b".repeat(64));
 	});
 });

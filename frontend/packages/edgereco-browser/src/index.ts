@@ -10,6 +10,11 @@
 // `@edgereco/browser/testing/fixtures`. Generic test seams are imported
 // directly from `@gainratio/browser`.
 
+export {
+	type CatalogueSwapOptions,
+	DEFAULT_SWAP_TIMEOUT_MS,
+	SqlSwapTimeoutError,
+} from "./engine/catalogueDb";
 // --- the engine-owned domain contract (single source of truth) ---
 export type {
 	BrowseResponse,

@@ -13,6 +13,7 @@ import {
 	matchExpression,
 	openCatalogueStore,
 	RRF_K,
+	SqlSwapTimeoutError,
 } from "./catalogueDb";
 import { openCatalogueSql } from "./catalogueSql";
 
@@ -314,5 +315,96 @@ describe("openCatalogueStore", () => {
 		await store.replace({ products: PRODUCTS, vectors: VECTORS });
 		expect((await store.vectorSearch(FAR, 1)).map((h) => h.id)).toEqual(["c"]);
 		await store.dispose();
+	});
+
+	it("executes browseSql() with category filter, pagination, and full Product hydration", async () => {
+		const db = await fresh();
+		await db.replace({
+			products: [
+				{
+					id: "p1",
+					title: "Alpha Jacket",
+					description: "Warm coat",
+					category: "apparel",
+					tags: ["winter", "warm"],
+					brand: "Arc",
+					price: 199.5,
+					popularity_score: 0.9,
+					freshness_score: 0.8,
+					image_url: "https://example.com/a.jpg",
+				},
+				{
+					id: "p2",
+					title: "Beta Tent",
+					description: "2-person tent",
+					category: "camping",
+					tags: ["outdoor"],
+					brand: "Peak",
+					price: 299,
+					popularity_score: 0.7,
+					freshness_score: 0.6,
+					image_url: "https://example.com/b.jpg",
+				},
+			],
+			vectors: new Float32Array([1, 0, 0, 1]),
+		});
+		const all = await db.browseSql({ limit: 1, offset: 0 });
+		expect(all.total).toBe(2);
+		expect(all.categories).toEqual(["apparel", "camping"]);
+		expect(all.products).toEqual([
+			{
+				id: "p1",
+				title: "Alpha Jacket",
+				description: "Warm coat",
+				category: "apparel",
+				subcategories: [],
+				tags: ["winter", "warm"],
+				brand: "Arc",
+				price: 199.5,
+				currency: "USD",
+				popularity_score: 0.9,
+				freshness_score: 0.8,
+				image_url: "https://example.com/a.jpg",
+				url: "",
+				attributes: {},
+			},
+		]);
+		const filtered = await db.browseSql({ category: "camping" });
+		expect(filtered.total).toBe(1);
+		expect(filtered.products.map((p) => p.id)).toEqual(["p2"]);
+		await db.dispose();
+	});
+
+	it("gates concurrent queries during replace() and throws SqlSwapTimeoutError when swapTimeoutMs is exceeded", async () => {
+		const sql = await openCatalogueSql();
+		const origTx = sql.transaction.bind(sql);
+		let delayMs = 0;
+		sql.transaction = (async (input: Parameters<typeof origTx>[0]) => {
+			if (delayMs > 0) {
+				await new Promise((resolve) => setTimeout(resolve, delayMs));
+			}
+			return origTx(input as never);
+		}) as typeof sql.transaction;
+
+		const db = await CatalogueDb.open(sql, 2);
+		await db.replace({ products: PRODUCTS, vectors: VECTORS });
+
+		delayMs = 60;
+		const slowSwap = db.replace(
+			{
+				products: [product("z", "kayak")],
+				vectors: new Float32Array([1, 0]),
+			},
+			{ swapTimeoutMs: 10 },
+		);
+		const concurrent = db.count();
+		await expect(concurrent).rejects.toBeInstanceOf(SqlSwapTimeoutError);
+		await expect(concurrent).rejects.toMatchObject({
+			code: "sql.swap_timeout",
+			timeoutMs: 10,
+		});
+		await slowSwap;
+		expect(await db.count()).toBe(1);
+		await db.dispose();
 	});
 });

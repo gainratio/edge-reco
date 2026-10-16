@@ -265,6 +265,7 @@ export class EngineRuntime {
 	readonly #deps: RuntimeDeps;
 	#enginePromise: Promise<SearchEngine> | null = null;
 	#ready: SearchEngine | null = null;
+	#manifestHash: string | null = null;
 	#enginePort: EnginePort | null = null;
 	#embedder: Embedder | null = null;
 	#generation = 0;
@@ -276,6 +277,11 @@ export class EngineRuntime {
 	/** The ready engine, or null before the first successful bootstrap. */
 	public engine(): SearchEngine | null {
 		return this.#ready;
+	}
+
+	/** Content hash of the currently active bundle manifest, or null before boot. */
+	public activeManifestHash(): string | null {
+		return this.#manifestHash;
 	}
 
 	/** Build (or reuse) the engine over the synced bundle, reporting progress. */
@@ -297,6 +303,64 @@ export class EngineRuntime {
 			);
 		}
 		return this.#enginePromise;
+	}
+
+	/**
+	 * Background delta sync + live SQLite hot-swap: checks `/latest` via a
+	 * short-lived sync Worker, pulls only missing Gear-CDC chunks, and if the
+	 * manifest hash changed, atomically swaps the live `SearchEngine` in place
+	 * behind the 150 ms SQLite swap gate without reloading the embedder.
+	 * Returns `null` when the active manifest is already up to date.
+	 */
+	public async syncUpdate(
+		config: RuntimeConfig,
+		onStage: OnStage = () => {},
+	): Promise<SyncResult | null> {
+		const ready = this.#ready;
+		if (ready === null) {
+			throw new Error(
+				"engine not ready — call bootstrap() before syncUpdate()",
+			);
+		}
+		if (ready.reload === undefined) {
+			return null;
+		}
+		const generation = this.#generation;
+		const engineClient = this.#deps.spawnEngine();
+		this.#enginePort = engineClient;
+		try {
+			onStage({ kind: "syncing" });
+			const result = await engineClient.sync(
+				config.bundleBaseUrl,
+				config.pubkeyUrl,
+				config.expectedBundleId,
+				config.expectedChannel,
+			);
+			this.#assertCurrent(generation);
+			if (result.manifestHash === this.#manifestHash) {
+				return null;
+			}
+			onStage({ kind: "synced", result });
+			onStage({ kind: "reassembling" });
+			const [files, rankingConfig, cooccurrence] = await Promise.all([
+				readBundleFiles(engineClient),
+				readRankingConfig(engineClient),
+				readCooccurrence(engineClient),
+			]);
+			const proofEvidence = await readRankingProofEvidence(
+				engineClient,
+				rankingConfig,
+				config.pubkeyUrl,
+				this.#deps.loadPublisherKey ?? defaultLoadPublisherKey,
+			);
+			this.#assertCurrent(generation);
+			await ready.reload(files, rankingConfig, cooccurrence, proofEvidence);
+			this.#manifestHash = result.manifestHash;
+			onStage({ kind: "ready" });
+			return result;
+		} finally {
+			this.#releaseEngine(engineClient);
+		}
 	}
 
 	async #build(
@@ -356,6 +420,7 @@ export class EngineRuntime {
 			);
 			this.#assertCurrent(generation);
 			this.#ready = searchEngine;
+			this.#manifestHash = result.manifestHash;
 			onStage({ kind: "ready" });
 			return searchEngine;
 		} catch (error) {
@@ -379,6 +444,7 @@ export class EngineRuntime {
 	public async dispose(): Promise<void> {
 		this.#generation += 1;
 		this.#enginePromise = null;
+		this.#manifestHash = null;
 		const ready = this.#ready;
 		this.#ready = null;
 		if (ready !== null) {

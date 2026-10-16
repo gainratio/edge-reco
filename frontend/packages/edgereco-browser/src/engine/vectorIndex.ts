@@ -7,13 +7,15 @@
 // off the UI thread.
 
 import {
+	type CatalogueBrowseOptions,
 	type CatalogueProduct,
 	type CatalogueStore,
 	type CatalogueStoreFactory,
+	type CatalogueSwapOptions,
 	type HybridRow,
 	openCatalogueStore,
 } from "./catalogueDb";
-import type { Product } from "./domain";
+import type { BrowseResponse, Product } from "./domain";
 
 const DECODER = new TextDecoder();
 
@@ -239,9 +241,9 @@ function parseProducts(bytes: Uint8Array): ReadonlyMap<string, Product> {
 /** Loaded, query-ready catalogue index over the synced bundle. */
 export class VectorIndex {
 	readonly #store: CatalogueStore;
-	readonly #ids: ReadonlyArray<string>;
-	readonly #known: ReadonlySet<string>;
-	readonly #products: ReadonlyMap<string, Product>;
+	#ids: ReadonlyArray<string>;
+	#known: ReadonlySet<string>;
+	#products: ReadonlyMap<string, Product>;
 	readonly #dim: number;
 
 	public constructor(
@@ -290,6 +292,42 @@ export class VectorIndex {
 	}
 
 	/**
+	 * Hot-swap the live catalogue index in place over the same SQLite Worker
+	 * connection, gated by `swapTimeoutMs` (default 150 ms). If validation or
+	 * the SQLite transaction fails, the live index remains untouched.
+	 */
+	public async reload(
+		files: VectorIndexFiles,
+		options?: CatalogueSwapOptions,
+	): Promise<void> {
+		const parsed = parseBundleRevision(files, this.#dim);
+		await this.#store.replace(
+			{
+				products: parsed.ids.map((id) =>
+					catalogueRow(id, parsed.products.get(id)),
+				),
+				vectors: parsed.matrix,
+			},
+			options,
+		);
+		this.#ids = parsed.ids;
+		this.#known = new Set(parsed.ids);
+		this.#products = parsed.products;
+	}
+
+	/**
+	 * SQL-backed browse query over the SQLite `products` table when supported by
+	 * the underlying `CatalogueStore`.
+	 */
+	public browseSql(
+		options?: CatalogueBrowseOptions,
+	): Promise<BrowseResponse> | null {
+		return this.#store.browseSql !== undefined
+			? this.#store.browseSql(options)
+			: null;
+	}
+
+	/**
 	 * Exact cosine top-k through sqlite-vector, nearest first. Exact-distance ties
 	 * keep the authenticated state.json row order, like Python FAISS.
 	 */
@@ -331,6 +369,34 @@ export class VectorIndex {
 	}
 }
 
+function parseBundleRevision(
+	files: VectorIndexFiles,
+	expectedDim?: number,
+): {
+	readonly dim: number;
+	readonly ids: ReadonlyArray<string>;
+	readonly matrix: Float32Array;
+	readonly products: ReadonlyMap<string, Product>;
+} {
+	const meta = parseCatalogMeta(files.meta);
+	const state = parseVectorState(files.state);
+	const dim = meta.embedding_dim;
+	if (expectedDim !== undefined && dim !== expectedDim) {
+		throw new VectorIndexError(
+			`catalog_meta embedding_dim ${dim} != active index dimension ${expectedDim}`,
+		);
+	}
+	const ntotal = state.faiss_ids.length;
+	if (meta.embedding_count !== ntotal) {
+		throw new VectorIndexError(
+			`catalog_meta embedding_count ${meta.embedding_count} != faiss_ids length ${ntotal}`,
+		);
+	}
+	const matrix = asMatrix(files.embeddings, ntotal, dim);
+	const products = parseProducts(files.products);
+	return { dim, ids: state.faiss_ids, matrix, products };
+}
+
 /**
  * Parse the synced files and build a query-ready VectorIndex.
  *
@@ -343,17 +409,7 @@ export async function loadVectorIndex(
 	files: VectorIndexFiles,
 	factory: CatalogueStoreFactory = openCatalogueStore,
 ): Promise<VectorIndex> {
-	const meta = parseCatalogMeta(files.meta);
-	const state = parseVectorState(files.state);
-	const dim = meta.embedding_dim;
-	const ntotal = state.faiss_ids.length;
-	if (meta.embedding_count !== ntotal) {
-		throw new VectorIndexError(
-			`catalog_meta embedding_count ${meta.embedding_count} != faiss_ids length ${ntotal}`,
-		);
-	}
-	const matrix = asMatrix(files.embeddings, ntotal, dim);
-	const products = parseProducts(files.products);
+	const { dim, ids, matrix, products } = parseBundleRevision(files);
 	const store = await openCatalogue(factory, dim);
 	try {
 		// The database is durable across catalogue revisions; replace() swaps the
@@ -361,10 +417,10 @@ export async function loadVectorIndex(
 		// removed product cannot linger and an interrupted import leaves the old
 		// revision intact. Bootstrap fails closed and the next attempt redoes it.
 		await store.replace({
-			products: state.faiss_ids.map((id) => catalogueRow(id, products.get(id))),
+			products: ids.map((id) => catalogueRow(id, products.get(id))),
 			vectors: matrix,
 		});
-		return new VectorIndex(store, state.faiss_ids, products, dim);
+		return new VectorIndex(store, ids, products, dim);
 	} catch (error) {
 		await store.dispose();
 		const message = error instanceof Error ? error.message : String(error);
@@ -372,7 +428,7 @@ export async function loadVectorIndex(
 	}
 }
 
-/** The keyword-indexed fields of a product; a vector with no product row is
+/** The stored and keyword-indexed fields of a product; a vector with no product row is
  * still searchable by similarity but has no text (hydration drops it, as before). */
 function catalogueRow(
 	id: string,
@@ -384,5 +440,18 @@ function catalogueRow(
 		category: product?.category ?? "",
 		tags: product?.tags ?? [],
 		brand: product?.brand ?? "",
+		...(product?.description !== undefined
+			? { description: product.description }
+			: {}),
+		...(typeof product?.price === "number" ? { price: product.price } : {}),
+		...(typeof product?.popularity_score === "number"
+			? { popularity_score: product.popularity_score }
+			: {}),
+		...(typeof product?.freshness_score === "number"
+			? { freshness_score: product.freshness_score }
+			: {}),
+		...(product?.image_url !== undefined
+			? { image_url: product.image_url }
+			: {}),
 	};
 }

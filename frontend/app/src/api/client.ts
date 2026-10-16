@@ -33,6 +33,8 @@ import {
 	type RuntimeDeps,
 	type SearchEngine,
 	type SessionProfile,
+	SqlSwapTimeoutError,
+	type SyncResult,
 	type TasteStore,
 } from "@edgereco/browser";
 import { record } from "../metrics/store";
@@ -82,6 +84,24 @@ interface SimilarOptions {
 }
 
 /**
+ * Optional origin fallback adapter for Origin-First cold start (when queries
+ * arrive before `bootstrap()` finishes) and gated hot-swap fallback (when an
+ * in-flight SQLite swap exceeds the 150 ms `SqlSwapTimeoutError` gate).
+ */
+export interface OriginFallback {
+	search?(q: string, opts?: SearchOptions): Promise<SearchResponse>;
+	recommend?(
+		strategy: string,
+		opts?: RecommendStrategyOptions,
+	): Promise<RecommendResponse>;
+	similar?(
+		productId: string,
+		opts?: SimilarOptions,
+	): Promise<RecommendResponse>;
+	browse?(opts?: BrowseOptions): Promise<BrowseResponse>;
+}
+
+/**
  * Strategies that re-rank with the live session profile. The rest
  * (`trending`, `new_arrivals`, `similar_items`) are intentionally stable —
  * popularity/freshness/seed-driven — so they get an empty profile and never
@@ -125,6 +145,15 @@ function appRuntimeConfig(): RuntimeConfig {
 export interface DataClient {
 	bootstrap(onStage?: OnStage, config?: RuntimeConfig): Promise<void>;
 	/**
+	 * Background delta sync + live SQLite hot-swap: checks `/latest`, pulls only
+	 * missing Gear-CDC chunks, and swaps the live catalog in place behind the
+	 * 150 ms SQLite swap gate. Returns `null` when already up to date.
+	 */
+	syncUpdate(
+		onStage?: OnStage,
+		config?: RuntimeConfig,
+	): Promise<SyncResult | null>;
+	/**
 	 * Clear ONLY the cached signed catalog (OPFS bundle + its rollback floor) so
 	 * the next bootstrap re-syncs from scratch. The explicit, user-initiated
 	 * recovery for a stuck integrity refusal — never called automatically.
@@ -162,9 +191,10 @@ export interface DataClient {
  * the production app uses `defaultRuntimeDeps()` (real Workers) with an
  * optional embedder override from `window.__edgeprocDemoTestHooks`.
  */
-/** Runtime deps plus the user-database opener (tests inject a shared one). */
+/** Runtime deps plus the user-database opener and optional origin fallback. */
 export interface ClientDeps extends Partial<RuntimeDeps> {
 	readonly openTasteStore?: () => Promise<TasteStore>;
+	readonly originFallback?: OriginFallback;
 }
 
 /**
@@ -182,8 +212,18 @@ async function openUserStore(
 	}
 }
 
+function isSwapTimeoutError(error: unknown): boolean {
+	return (
+		error instanceof SqlSwapTimeoutError ||
+		(typeof error === "object" &&
+			error !== null &&
+			(error as { readonly code?: unknown }).code === "sql.swap_timeout")
+	);
+}
+
 export function createDataClient(deps: ClientDeps = {}): DataClient {
 	const runtime = new EngineRuntime(resolveDeps(deps));
+	const originFallback = deps.originFallback;
 	let userStore: Promise<TasteStore | null> | null = null;
 	let profile: SessionProfile = emptyProfile();
 	let productById: ReadonlyMap<string, Product> = new Map();
@@ -200,6 +240,27 @@ export function createDataClient(deps: ClientDeps = {}): DataClient {
 			throw new Error("engine not ready — call bootstrap() first");
 		}
 		return engine;
+	}
+
+	async function withOriginFallback<T>(
+		localCall: (engine: SearchEngine) => Promise<T>,
+		fallbackCall?: () => Promise<T>,
+	): Promise<T> {
+		const engine = runtime.engine();
+		if (engine === null) {
+			if (fallbackCall !== undefined) {
+				return fallbackCall();
+			}
+			throw new Error("engine not ready — call bootstrap() first");
+		}
+		try {
+			return await localCall(engine);
+		} catch (error) {
+			if (isSwapTimeoutError(error) && fallbackCall !== undefined) {
+				return fallbackCall();
+			}
+			throw error;
+		}
 	}
 
 	return {
@@ -242,6 +303,21 @@ export function createDataClient(deps: ClientDeps = {}): DataClient {
 				(event) => event.type !== "view" && productById.has(event.productId),
 			).length;
 		},
+		async syncUpdate(
+			onStage: OnStage = () => {},
+			config: RuntimeConfig = appRuntimeConfig(),
+		): Promise<SyncResult | null> {
+			const updated = await runtime.syncUpdate(config, (stage) => {
+				warnIfExpired(stage);
+				onStage(stage);
+			});
+			const engine = runtime.engine();
+			if (updated !== null && engine !== null) {
+				productById = new Map(engine.catalog().map((p) => [p.id, p]));
+				interactionWeights = engine.interactionWeights();
+			}
+			return updated;
+		},
 		clearCatalogCache(): Promise<void> {
 			return runtime.clearBundleCache();
 		},
@@ -257,48 +333,69 @@ export function createDataClient(deps: ClientDeps = {}): DataClient {
 			return tasteLogDurable();
 		},
 		search(q: string, opts?: SearchOptions): Promise<SearchResponse> {
-			return requireEngine().search(q, {
-				profile,
-				...(opts?.limit !== undefined ? { limit: opts.limit } : {}),
-				...(opts?.category !== undefined ? { category: opts.category } : {}),
-			});
+			const fallback = originFallback?.search;
+			return withOriginFallback(
+				(engine) =>
+					engine.search(q, {
+						profile,
+						...(opts?.limit !== undefined ? { limit: opts.limit } : {}),
+						...(opts?.category !== undefined
+							? { category: opts.category }
+							: {}),
+					}),
+				fallback !== undefined ? () => fallback(q, opts) : undefined,
+			);
 		},
 		recommend(limit?: number): Promise<RecommendResponse> {
-			return Promise.resolve(
-				requireEngine().recommend({
-					profile,
-					...(limit !== undefined ? { limit } : {}),
-				}),
+			const fallback = originFallback?.recommend;
+			return withOriginFallback(
+				(engine) =>
+					engine.recommend({
+						profile,
+						...(limit !== undefined ? { limit } : {}),
+					}),
+				fallback !== undefined
+					? () =>
+							fallback("for_you", limit !== undefined ? { limit } : undefined)
+					: undefined,
 			);
 		},
 		recommendStrategy(
 			strategy: string,
 			opts?: RecommendStrategyOptions,
 		): Promise<RecommendResponse> {
+			const fallback = originFallback?.recommend;
 			const liveProfile = PERSONALIZED_STRATEGIES.has(strategy)
 				? profile
 				: emptyProfile();
-			return Promise.resolve(
-				requireEngine().recommend({
-					profile: liveProfile,
-					strategy,
-					...(opts?.limit !== undefined ? { limit: opts.limit } : {}),
-					...(opts?.seed !== undefined ? { seed: opts.seed } : {}),
-				}),
+			return withOriginFallback(
+				(engine) =>
+					engine.recommend({
+						profile: liveProfile,
+						strategy,
+						...(opts?.limit !== undefined ? { limit: opts.limit } : {}),
+						...(opts?.seed !== undefined ? { seed: opts.seed } : {}),
+					}),
+				fallback !== undefined ? () => fallback(strategy, opts) : undefined,
 			);
 		},
 		similar(
 			productId: string,
 			opts?: SimilarOptions,
 		): Promise<RecommendResponse> {
+			const fallback = originFallback?.similar;
 			// similar_items is a stable, seed-driven rail: empty profile so the
 			// ordering depends on the seed, not the session.
-			return Promise.resolve(
-				requireEngine().similar(productId, {
-					profile: emptyProfile(),
-					...(opts?.limit !== undefined ? { limit: opts.limit } : {}),
-					...(opts?.strategy !== undefined ? { strategy: opts.strategy } : {}),
-				}),
+			return withOriginFallback(
+				(engine) =>
+					engine.similar(productId, {
+						profile: emptyProfile(),
+						...(opts?.limit !== undefined ? { limit: opts.limit } : {}),
+						...(opts?.strategy !== undefined
+							? { strategy: opts.strategy }
+							: {}),
+					}),
+				fallback !== undefined ? () => fallback(productId, opts) : undefined,
 			);
 		},
 		strategies(): Record<string, Strategy> {
@@ -311,11 +408,19 @@ export function createDataClient(deps: ClientDeps = {}): DataClient {
 			return requireEngine().catalog();
 		},
 		browse(opts?: BrowseOptions): Promise<BrowseResponse> {
-			return Promise.resolve(
-				requireEngine().browse({
-					...(opts?.limit !== undefined ? { limit: opts.limit } : {}),
-					...(opts?.category !== undefined ? { category: opts.category } : {}),
-				}),
+			const fallback = originFallback?.browse;
+			return withOriginFallback(
+				(engine) =>
+					Promise.resolve(
+						engine.browse({
+							...(opts?.limit !== undefined ? { limit: opts.limit } : {}),
+							...(opts?.offset !== undefined ? { offset: opts.offset } : {}),
+							...(opts?.category !== undefined
+								? { category: opts.category }
+								: {}),
+						}),
+					),
+				fallback !== undefined ? () => fallback(opts) : undefined,
 			);
 		},
 		async sendEvent(evt: InteractionEvent): Promise<void> {
@@ -399,6 +504,12 @@ export function bootstrap(
 	config?: RuntimeConfig,
 ): Promise<void> {
 	return active.bootstrap(onStage, config);
+}
+export function syncUpdate(
+	onStage?: OnStage,
+	config?: RuntimeConfig,
+): Promise<SyncResult | null> {
+	return active.syncUpdate(onStage, config);
 }
 export function clearCatalogCache(): Promise<void> {
 	return active.clearCatalogCache();
