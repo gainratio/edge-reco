@@ -14,10 +14,19 @@ import { useMetrics } from "../metrics/store";
  *
  * Reads the metrics store via useMetrics(); renders nothing it cannot measure.
  */
-export function MetricsStrip() {
+interface MetricsStripProps {
+	readonly onApplyDelta?: () => void;
+	readonly applyingDelta?: boolean;
+}
+
+export function MetricsStrip({
+	onApplyDelta,
+	applyingDelta = false,
+}: MetricsStripProps = {}) {
 	const { t } = useTranslation("storefront");
 	const m = useMetrics();
 	const latencyMs = m.recommendMs ?? m.searchMs;
+	const isPatched = m.syncStats?.version === "v2";
 
 	return (
 		<div
@@ -64,6 +73,21 @@ export function MetricsStrip() {
 						steady={m.syncStats.chunksFetched === 0}
 					/>
 				)}
+			{onApplyDelta !== undefined && (
+				<button
+					type="button"
+					className="metrics-strip__action"
+					onClick={onApplyDelta}
+					disabled={applyingDelta}
+					title={t("metrics.applyDeltaTitle")}
+				>
+					{applyingDelta
+						? t("metrics.applyingDelta")
+						: isPatched
+							? t("metrics.replayDelta")
+							: t("metrics.applyDelta")}
+				</button>
+			)}
 		</div>
 	);
 }

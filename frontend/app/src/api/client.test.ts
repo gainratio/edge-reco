@@ -709,4 +709,44 @@ describe("Origin-First cold start, SqlSwapTimeoutError fallback, and syncUpdate(
 		expect(swapped?.version).toBe("v3");
 		expect(swapped?.manifestHash).toBe("b".repeat(64));
 	});
+
+	it("applyDeltaPatch() syncs the -delta bundle and replays cleanly from v1 when called again", async () => {
+		let revision = 0;
+		const clear = vi.fn(() => Promise.resolve());
+		const deleteFloorDatabase = vi.fn(() => Promise.resolve());
+		const base = fakeEnginePort();
+		__setRuntimeForTests({
+			spawnEngine: () => ({
+				async sync(...args) {
+					const synced = await base.sync(...args);
+					revision += 1;
+					return {
+						...synced,
+						version: revision % 2 === 0 ? "v2" : "v1",
+						chunksFetched: revision % 2 === 0 ? 3 : 812,
+						chunksReused: revision % 2 === 0 ? 809 : 0,
+						manifestHash: `${revision}`.padStart(64, "a"),
+					};
+				},
+				readFile: (path) => base.readFile(path),
+				clear,
+			}),
+			makeEmbedder: () => stubEmbedder,
+			deleteFloorDatabase,
+		});
+		await bootstrap();
+		const { applyDeltaPatch } = await import("./client");
+		const { isDeltaBundleChannel, setDeltaBundleChannel } = await import(
+			"./bundleUrl"
+		);
+		const first = await applyDeltaPatch();
+		expect(first?.version).toBe("v2");
+		expect(first?.chunksFetched).toBe(3);
+		expect(first?.chunksReused).toBe(809);
+		expect(isDeltaBundleChannel()).toBe(true);
+		const replayed = await applyDeltaPatch();
+		expect(clear).toHaveBeenCalledOnce();
+		expect(replayed?.version).toBe("v2");
+		setDeltaBundleChannel(false);
+	});
 });

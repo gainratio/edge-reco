@@ -40,15 +40,22 @@ numbers (search time, start-up time, memory) are measured live on your machine a
    for you**. The counter next to it goes to 1, then 2 signals, and the row re-orders
    toward the massager's category (Health & Household). Those signals are saved only in
    your browser. **Reset taste** clears them.
+4. Click **⚡ Apply delta** in the top metrics bar to simulate a live price update.
+   Because the catalog ships as a page-aligned SQLite database split into content-addressed
+   chunks, your browser downloads only the 3 changed chunks (about 18 KB) and reuses the
+   other 809 chunks from its local cache — updating prices in place without reloading the
+   page or the language model.
 
 ## How it works
 
-The store builds its catalog once: the products, a prebuilt search index, and the
-ranking weights. It signs that bundle with a private key. The shopper's browser downloads
-the bundle, checks every piece against a public key built into the app, and refuses to
-load anything that does not match. After that, each search runs a keyword match and a
-meaning match side by side, merges the two lists, and re-orders the result using what
-this shopper has clicked.
+The store builds its catalog once: the products, a prebuilt SQLite search and vector
+index, and the ranking weights. It signs that bundle with a private key. The shopper's
+browser downloads the bundle, checks every piece against a public key built into the app,
+and refuses to load anything that does not match. When products or prices change, the
+browser compares the new signed manifest against its cached chunks, downloads only the
+changed SQLite pages, and swaps the catalog in place. After that, each search runs a
+keyword match and a meaning match side by side, merges the two lists, and re-orders the
+result using what this shopper has clicked.
 
 ## Your data stays on your device
 

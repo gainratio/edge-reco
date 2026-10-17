@@ -14,6 +14,7 @@ const HERE = dirname(fileURLToPath(import.meta.url));
 // (the signed catalog + pinned keys moved under backend/ in the 2026-05 restructure).
 const EXAMPLES = join(HERE, "..", "..", "..", "..", "backend", "examples");
 const CATALOG = join(EXAMPLES, "catalog");
+const CATALOG_DELTA = join(EXAMPLES, "catalog-delta");
 const KEYS = join(EXAMPLES, "keys");
 const PORT = Number(process.env.CATALOG_PORT ?? "8910");
 
@@ -34,29 +35,37 @@ async function tamperedLatest() {
 	return JSON.stringify(raw);
 }
 
-async function serveCatalogFile(rel, res, tampered) {
+async function readOverlayFile(...segments) {
+	try {
+		return await readFile(join(CATALOG_DELTA, ...segments));
+	} catch {
+		return await readFile(join(CATALOG, ...segments));
+	}
+}
+
+async function serveCatalogFile(rel, res, tampered, delta = false) {
 	if (rel === "latest") {
 		if (tampered) {
 			return send(res, 200, await tamperedLatest(), "application/json");
 		}
-		return send(
-			res,
-			200,
-			await readFile(join(CATALOG, "latest")),
-			"application/json",
-		);
+		const latestBytes = delta
+			? await readOverlayFile("latest")
+			: await readFile(join(CATALOG, "latest"));
+		return send(res, 200, latestBytes, "application/json");
 	}
 	const manifest = rel.match(/^manifest\/([0-9a-f]+)$/);
 	if (manifest) {
-		return send(
-			res,
-			200,
-			await readFile(join(CATALOG, "manifest", manifest[1])),
-		);
+		const manifestBytes = delta
+			? await readOverlayFile("manifest", manifest[1])
+			: await readFile(join(CATALOG, "manifest", manifest[1]));
+		return send(res, 200, manifestBytes);
 	}
 	const chunk = rel.match(/^chunk\/([0-9a-f]+)$/);
 	if (chunk) {
-		return send(res, 200, await readFile(join(CATALOG, "chunk", chunk[1])));
+		const chunkBytes = delta
+			? await readOverlayFile("chunk", chunk[1])
+			: await readFile(join(CATALOG, "chunk", chunk[1]));
+		return send(res, 200, chunkBytes);
 	}
 	return send(res, 404, "not found", "text/plain");
 }
@@ -72,6 +81,14 @@ const server = createServer((req, res) => {
 			return serveCatalogFile(
 				path.slice("/catalog-tampered/".length),
 				res,
+				true,
+			);
+		}
+		if (path.startsWith("/catalog-delta/")) {
+			return serveCatalogFile(
+				path.slice("/catalog-delta/".length),
+				res,
+				false,
 				true,
 			);
 		}

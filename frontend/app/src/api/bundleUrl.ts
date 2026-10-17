@@ -10,7 +10,17 @@
 // Resolution base: the Vite base (import.meta.env.BASE_URL) on the page
 // origin, so one build works at "/" locally and "/edge-reco/" on Pages.
 
-export function resolveBundleBaseUrl(
+let deltaBundleChannel = false;
+
+export function isDeltaBundleChannel(): boolean {
+	return deltaBundleChannel;
+}
+
+export function setDeltaBundleChannel(enabled: boolean): void {
+	deltaBundleChannel = enabled;
+}
+
+export function resolveBaseBundleUrl(
 	raw: string = import.meta.env.VITE_BUNDLE_BASE_URL,
 	appBase: string = import.meta.env.BASE_URL,
 	origin: string = window.location.origin,
@@ -19,4 +29,28 @@ export function resolveBundleBaseUrl(
 	const resolved = new URL(raw, pageBase).toString();
 	// The engine joins `${baseUrl}/latest` — keep exactly one slash at the seam.
 	return resolved.replace(/\/+$/, "");
+}
+
+export function resolveDeltaBundleUrl(
+	raw: string = import.meta.env.VITE_BUNDLE_BASE_URL,
+	appBase: string = import.meta.env.BASE_URL,
+	origin: string = window.location.origin,
+): string {
+	return `${resolveBaseBundleUrl(raw, appBase, origin)}-delta`;
+}
+
+export function resolveBundleBaseUrl(
+	raw?: string,
+	appBase: string = import.meta.env.BASE_URL,
+	origin: string = window.location.origin,
+): string {
+	const base = resolveBaseBundleUrl(
+		raw ?? import.meta.env.VITE_BUNDLE_BASE_URL,
+		appBase,
+		origin,
+	);
+	if (raw === undefined && isDeltaBundleChannel()) {
+		return `${base}-delta`;
+	}
+	return base;
 }

@@ -146,6 +146,7 @@ const pwa = process.env.VITEST
 					// this same `dist/` through the live origin's asset semantics.
 					globIgnores: [
 						"**/bundle/**",
+						"**/bundle-delta/**",
 						"**/models/**",
 						"**/ort/**",
 						"_worker.js",
@@ -158,7 +159,7 @@ const pwa = process.env.VITEST
 					// SPA: serve index.html for navigations the precache can't match (offline reload).
 					navigateFallback: "index.html",
 					// The signed bundle origin is cross-origin in the Docker shape; never fall back to it.
-					navigateFallbackDenylist: [/\/bundle\//],
+					navigateFallbackDenylist: [/\/bundle(?:-delta)?\//],
 					runtimeCaching: [
 						{
 							// The same-origin onnxruntime-web WASM mirror stays offline-capable

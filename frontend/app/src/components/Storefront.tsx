@@ -3,6 +3,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { resolveBundleBaseUrl } from "../api/bundleUrl";
 import {
+	applyDeltaPatch,
 	browse,
 	catalog,
 	catalogInfo,
@@ -163,6 +164,8 @@ export function Storefront() {
 
 	const [error, setError] = useState<string | null>(null);
 	const [toast, setToast] = useState<string | null>(null);
+	const [applyingDelta, setApplyingDelta] = useState(false);
+	const [syncEpoch, setSyncEpoch] = useState(0);
 	const toastTimer = useRef<number | undefined>(undefined);
 	// Monotonic id for grid loads: a slow older search must not clobber a newer
 	// one that already resolved (typing "de" then "desk" races two in-flight queries).
@@ -308,20 +311,59 @@ export function Storefront() {
 	// sound `readyAt` for the post-sync backend-call observer. We also record the
 	// catalog size here (the engine's ntotal) — honest because the engine is ready.
 	useEffect(() => {
+		void syncEpoch;
 		const stop = startMetricsObservers({
 			readyAt: performance.now(),
 			edgeOrigin: new URL(resolveBundleBaseUrl()).origin,
 			appOrigin: window.location.origin,
 		});
+		record({ backendCalls: 0 });
 		void catalogInfo().then(({ count }) => record({ productCount: count }));
 		return stop;
-	}, []);
+	}, [syncEpoch]);
 
 	const flashToast = useCallback((message: string) => {
 		setToast(message);
 		window.clearTimeout(toastTimer.current);
 		toastTimer.current = window.setTimeout(() => setToast(null), TOAST_MS);
 	}, []);
+
+	const onApplyDelta = useCallback(async () => {
+		setApplyingDelta(true);
+		setError(null);
+		try {
+			const updated = await applyDeltaPatch();
+			setSyncEpoch((n) => n + 1);
+			await Promise.all([loadGrid(), refreshRails()]);
+			if (view.kind === "product") {
+				const refreshed = catalog().find((p) => p.id === view.product.id);
+				if (refreshed !== undefined) {
+					setView({ kind: "product", product: refreshed });
+					void loadPdpRails(refreshed);
+				}
+			}
+			if (updated !== null) {
+				flashToast(
+					t("metrics.deltaToast", {
+						fetched: updated.chunksFetched,
+						reused: updated.chunksReused,
+					}),
+				);
+			}
+		} catch (err) {
+			setError(toErrorMessage(err));
+		} finally {
+			setApplyingDelta(false);
+		}
+	}, [
+		flashToast,
+		loadGrid,
+		loadPdpRails,
+		refreshRails,
+		t,
+		toErrorMessage,
+		view,
+	]);
 
 	const emitExplicit = useCallback(
 		async (eventType: EventType, product: Product): Promise<boolean> => {
@@ -520,7 +562,7 @@ export function Storefront() {
 				cartCount={cartCount}
 			/>
 
-			<MetricsStrip />
+			<MetricsStrip onApplyDelta={onApplyDelta} applyingDelta={applyingDelta} />
 
 			{/* Browse gets a modifier: its grid (the page h1) precedes the rails in
 			    DOM order for a sound heading outline, while CSS `order` keeps the

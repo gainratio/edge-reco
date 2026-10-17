@@ -104,4 +104,38 @@ describe("MetricsStrip", () => {
 		render(<MetricsStrip />);
 		expect(screen.getByText("Synced (60 chunks)")).toBeInTheDocument();
 	});
+
+	it("renders the Apply/Replay delta button when onApplyDelta is provided", () => {
+		record({
+			syncStats: {
+				version: "v1",
+				chunksFetched: 0,
+				chunksReused: 812,
+				bytesFetched: 0,
+			},
+		});
+		const onApply = () => {};
+		const { rerender } = render(<MetricsStrip onApplyDelta={onApply} />);
+		expect(
+			screen.getByRole("button", { name: "⚡ Apply delta" }),
+		).toBeInTheDocument();
+
+		record({
+			syncStats: {
+				version: "v2",
+				chunksFetched: 3,
+				chunksReused: 809,
+				bytesFetched: 18_000,
+			},
+		});
+		rerender(<MetricsStrip onApplyDelta={onApply} />);
+		expect(
+			screen.getByRole("button", { name: "↻ Replay delta" }),
+		).toBeInTheDocument();
+
+		rerender(<MetricsStrip onApplyDelta={onApply} applyingDelta />);
+		expect(
+			screen.getByRole("button", { name: "Applying delta…" }),
+		).toBeDisabled();
+	});
 });

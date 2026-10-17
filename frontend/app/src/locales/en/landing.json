@@ -54,7 +54,7 @@
 		},
 		"offline": {
 			"title": "Offline",
-			"body": "Once the one-time download finishes, the store keeps working even if the network drops."
+			"body": "Once the one-time download finishes, the store keeps working even if the network drops. When prices change, the browser patches only the changed SQLite pages and reuses every unchanged chunk."
 		},
 		"instant": {
 			"title": "Instant",
@@ -73,10 +73,10 @@
 		"ariaLabel": "How it works",
 		"title": "How it works",
 		"steps": {
-			"sync": "sync signed bundle",
+			"sync": "sync or delta-patch signed bundle",
 			"verify": "verify (Ed25519 + SHA-256, fail-closed)",
-			"persist": "persist to OPFS",
-			"load": "load prebuilt index + embedder",
+			"persist": "persist Gear-CDC chunks + SQLite to OPFS",
+			"load": "hot-swap prebuilt SQLite + embedder",
 			"search": "hybrid search + rerank, in-tab"
 		}
 	}

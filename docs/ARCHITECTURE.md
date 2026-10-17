@@ -345,16 +345,23 @@ recommendation-specific embedding, search, ranking and session logic.
 ## Delivery and updates
 
 The whole engine ships as static files: the app code, plus the signed bundle holding the
-products, the prebuilt vector index, the ranking weights and the "also bought" map. The
-live demo serves all of it from Cloudflare Pages on its own origin; any static host
-works.
+products, a prebuilt 4 KiB page-aligned SQLite database (`catalogue.sqlite` with FTS5 and
+`sqlite-vector` indices already populated and vacuumed), the ranking weights and the "also
+bought" map. The live demo serves all of it from Cloudflare Pages on its own origin; any
+static host works.
 
-Updates are a patch, not a re-download. Because every piece is named by the hash of its
-bytes, a client compares the new manifest with what it already has and fetches only the
-pieces that changed, reusing the rest (notably the large vector index). A republish that
-only moves popularity scores and "also bought" links re-fetches a few small pieces. As
-[DEPLOY.md](DEPLOY.md) puts it: *"a one-line edit re-publishes one chunk; every consumer
-fetches one chunk and reuses the rest."*
+Updates are a patch, not a re-download. Because `catalogue.sqlite` is built with a 4,096-byte
+page size (`journal_mode = DELETE`, `VACUUM`) and chunked with Gear-CDC, a localized catalog
+edit modifies only the touched SQLite B-tree leaf pages while every surrounding chunk hash
+stays identical. A client compares the new manifest with what it already has in OPFS and
+fetches only the pieces that changed, reusing the rest (notably the unaffected SQLite pages
+and vector rows). In the live Nimbus storefront, clicking **⚡ Apply delta** switches from the
+baseline catalog (`sequence: 16`) to the flash-sale delta overlay (`sequence: 17`, `/bundle-delta/`),
+fetches only **3 changed chunks (~18 KB)** while reusing **809 cached chunks** from OPFS (including
+**49 of 50** `catalogue.sqlite` chunks), and calls `EngineRuntime.syncUpdate()` to hot-swap the
+SQLite database in place — without reloading the page, the 23 MB ONNX model, or the shopper's
+`taste_events`. As [DEPLOY.md](DEPLOY.md) puts it: *"a one-line edit re-publishes one chunk;
+every consumer fetches one chunk and reuses the rest."*
 
 ## Offline use and install
 
