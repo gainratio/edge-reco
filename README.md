@@ -63,7 +63,7 @@ the top says so.
 
 EdgeReco is built on three sibling projects by the same author:
 
-- [edgeproc-browser](https://github.com/hseshadr/edgeproc-browser) (`@gainratio/browser`)
+- [edgeproc-browser](https://github.com/gainratio/edgeproc-browser) (`@gainratio/browser`)
   does the download, signature check and offline storage in the browser.
 - [edge-proc](https://github.com/gainratio/edge-proc) does the same job for the optional
   Python side: it publishes and syncs the signed catalog, and searches it on a server.

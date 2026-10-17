@@ -513,6 +513,10 @@ class EdgeReco:
 
     def _dependencies(self, source: dagger.Directory, commit: str = CHECK_SHA) -> dagger.Container:
         container = self._node(source, commit).with_exec(["pnpm", "config", "set", "store-dir", "/pnpm/store"])
+        # onnxruntime-node's postinstall otherwise downloads the CUDA 12 provider from
+        # NuGet on linux/x64 (failed Live Probe run 39031471258). We only run its bundled
+        # CPU runtime; `skip` is the package's documented install flag.
+        container = container.with_env_variable("ONNXRUNTIME_NODE_INSTALL", "skip")
         return container.with_exec(["pnpm", "install", "--frozen-lockfile"])
 
     def _modeled(self, source: dagger.Directory, commit: str = CHECK_SHA) -> dagger.Container:

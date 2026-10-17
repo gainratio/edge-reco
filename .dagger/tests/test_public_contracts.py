@@ -452,6 +452,9 @@ class GraphDirectory:
 class GraphContainer:
     """Typed fluent container double for pure Dagger graph construction."""
 
+    def __init__(self) -> None:
+        self.events: list[str] = []
+
     def from_(self, _image: str) -> GraphContainer:
         return self
 
@@ -462,6 +465,7 @@ class GraphContainer:
         return self
 
     def with_exec(self, _command: list[str], **_options: object) -> GraphContainer:
+        self.events.append(f"exec:{' '.join(_command)}")
         return self
 
     def with_file(self, _path: str, _file: dagger.File) -> GraphContainer:
@@ -474,6 +478,7 @@ class GraphContainer:
         return self
 
     def with_env_variable(self, _name: str, _value: str) -> GraphContainer:
+        self.events.append(f"env:{_name}={_value}")
         return self
 
     def with_mounted_cache(self, _path: str, _cache: object) -> GraphContainer:
@@ -1673,3 +1678,21 @@ def test_should_reinstall_the_same_assay_release_the_backend_locks() -> None:
     # Then
     assert pinned == ["assay-engine[metrics]==0.5.0.dev6"]
     assert requirement == "assay-engine==0.5.0.dev6"
+
+
+def test_should_skip_the_onnxruntime_cuda_download_when_dependencies_install(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    # Given: onnxruntime-node's postinstall fetches the CUDA 12 provider from NuGet
+    # on linux/x64 unless ONNXRUNTIME_NODE_INSTALL=skip. edge-reco only runs the
+    # bundled CPU runtime, and that download failed Live Probe run 39031471258.
+    monkeypatch.setattr(main_module, "dag", GraphDag())
+    subject = EdgeReco.__new__(EdgeReco)
+
+    # When
+    container = cast(GraphContainer, subject._dependencies(cast(dagger.Directory, object())))
+
+    # Then
+    install = container.events.index("exec:pnpm install --frozen-lockfile")
+    skip = container.events.index("env:ONNXRUNTIME_NODE_INSTALL=skip")
+    assert skip < install
