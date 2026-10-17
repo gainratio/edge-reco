@@ -62,7 +62,12 @@ export const nodeSqlWorkerFactory: WorkerFactory = () => {
 	const handle: Handler = createSqlWorkerHandler(openEngine);
 	return {
 		postMessage(request: Request): void {
-			void handle(structuredClone(request)).then((response) => {
+			const cloned = structuredClone(request);
+			const normalized: Request =
+				cloned.operation === "import"
+					? { ...cloned, bytes: new Uint8Array(cloned.bytes) }
+					: cloned;
+			void handle(normalized).then((response) => {
 				for (const listener of listeners) {
 					listener({ data: structuredClone(response) } as never);
 				}

@@ -304,6 +304,7 @@ def main() -> None:
     for sub in ("manifest", "chunk"):
         shutil.rmtree(CATALOG / sub, ignore_errors=True)
     (CATALOG / "latest").unlink(missing_ok=True)
+    KEY.chmod(0o600)
     publish_bundle(
         staging_dir=staging,
         origin_dir=CATALOG,

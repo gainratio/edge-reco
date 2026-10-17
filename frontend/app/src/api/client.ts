@@ -270,6 +270,16 @@ export function createDataClient(deps: ClientDeps = {}): DataClient {
 		): Promise<void> {
 			const engine = await runtime.bootstrap(config, (stage) => {
 				warnIfExpired(stage);
+				if (stage.kind === "synced") {
+					record({
+						syncStats: {
+							version: stage.result.version,
+							chunksFetched: stage.result.chunksFetched,
+							chunksReused: stage.result.chunksReused,
+							bytesFetched: stage.result.bytesFetched,
+						},
+					});
+				}
 				onStage(stage);
 			});
 			productById = new Map(engine.catalog().map((p) => [p.id, p]));
@@ -309,6 +319,16 @@ export function createDataClient(deps: ClientDeps = {}): DataClient {
 		): Promise<SyncResult | null> {
 			const updated = await runtime.syncUpdate(config, (stage) => {
 				warnIfExpired(stage);
+				if (stage.kind === "synced") {
+					record({
+						syncStats: {
+							version: stage.result.version,
+							chunksFetched: stage.result.chunksFetched,
+							chunksReused: stage.result.chunksReused,
+							bytesFetched: stage.result.bytesFetched,
+						},
+					});
+				}
 				onStage(stage);
 			});
 			const engine = runtime.engine();

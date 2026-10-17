@@ -42,6 +42,28 @@ export function MetricsStrip() {
 				label={t("metrics.catalog")}
 				value={countLabel(m.productCount)}
 			/>
+			{m.syncStats !== null &&
+				m.syncStats !== undefined &&
+				(m.syncStats.chunksFetched > 0 || m.syncStats.chunksReused > 0) && (
+					<MetricTile
+						label={t("metrics.catalogSync")}
+						value={
+							m.syncStats.chunksFetched > 0 && m.syncStats.chunksReused > 0
+								? t("metrics.patchApplied", {
+										fetched: m.syncStats.chunksFetched,
+										reused: m.syncStats.chunksReused,
+									})
+								: m.syncStats.chunksFetched === 0
+									? t("metrics.patchCached", {
+											reused: m.syncStats.chunksReused,
+										})
+									: t("metrics.patchInitial", {
+											fetched: m.syncStats.chunksFetched,
+										})
+						}
+						steady={m.syncStats.chunksFetched === 0}
+					/>
+				)}
 		</div>
 	);
 }
