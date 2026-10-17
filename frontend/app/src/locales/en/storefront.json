@@ -22,7 +22,11 @@
 		"backendCalls": "backend calls",
 		"coldStart": "cold start",
 		"heap": "JS heap",
-		"catalog": "catalog"
+		"catalog": "catalog",
+		"catalogSync": "catalog sync",
+		"patchApplied": "Patch applied ({{fetched}} new · {{reused}} cached)",
+		"patchCached": "Cached ({{reused}} chunks reused)",
+		"patchInitial": "Synced ({{fetched}} chunks)"
 	},
 	"why": {
 		"calculationHead": "How calculated — Assay",

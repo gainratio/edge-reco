@@ -1,5 +1,12 @@
 import { useSyncExternalStore } from "react";
 
+export interface CatalogSyncStats {
+	readonly version: string;
+	readonly chunksFetched: number;
+	readonly chunksReused: number;
+	readonly bytesFetched: number;
+}
+
 /**
  * Live metrics snapshot shown in the in-tab metrics UI.
  * All timing fields are `null` until the first measurement arrives.
@@ -17,6 +24,8 @@ export interface MetricsSnapshot {
 	productCount: number | null;
 	/** Count of post-sync same-origin/edge network calls. Starts at 0. */
 	backendCalls: number;
+	/** Latest signed catalog chunk/delta-sync statistics, or null before sync. */
+	syncStats?: CatalogSyncStats | null;
 }
 
 const INITIAL_SNAPSHOT: MetricsSnapshot = {
@@ -26,6 +35,7 @@ const INITIAL_SNAPSHOT: MetricsSnapshot = {
 	heapMb: null,
 	productCount: null,
 	backendCalls: 0,
+	syncStats: null,
 };
 
 // ---- Singleton store state --------------------------------------------------

@@ -62,4 +62,46 @@ describe("MetricsStrip", () => {
 		expect(screen.getByText("JS heap")).toBeInTheDocument();
 		expect(screen.getByText("17.2 MB")).toBeInTheDocument();
 	});
+
+	it("renders Patch applied when a delta sync updates some chunks and reuses cached chunks", () => {
+		record({
+			syncStats: {
+				version: "v1",
+				chunksFetched: 4,
+				chunksReused: 56,
+				bytesFetched: 120_000,
+			},
+		});
+		render(<MetricsStrip />);
+		expect(
+			screen.getByText("Patch applied (4 new · 56 cached)"),
+		).toBeInTheDocument();
+		expect(screen.getByText("catalog sync")).toBeInTheDocument();
+	});
+
+	it("renders Cached when all catalog chunks were reused with zero fetches", () => {
+		record({
+			syncStats: {
+				version: "v1",
+				chunksFetched: 0,
+				chunksReused: 60,
+				bytesFetched: 0,
+			},
+		});
+		render(<MetricsStrip />);
+		expect(screen.getByText("Cached (60 chunks reused)")).toBeInTheDocument();
+	});
+
+	it("renders Synced on initial full catalog download", () => {
+		record({
+			syncStats: {
+				version: "v1",
+				chunksFetched: 60,
+				chunksReused: 0,
+				bytesFetched: 2_800_000,
+			},
+		});
+		render(<MetricsStrip />);
+		expect(screen.getByText("Synced (60 chunks)")).toBeInTheDocument();
+	});
 });
