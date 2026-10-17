@@ -322,11 +322,71 @@ def main() -> None:
     # download failed, so mirroring here is what keeps the static origin and the signed
     # bundle serving the exact same set of files.
     _mirror_images_to_public(staging)
+    _build_delta_overlay(staging, sequence + 1, count)
     shutil.rmtree(staging)
     _drop_producer_scratch()
     print(
         f"rebuilt {CATALOG} with strategy-map ranking_config "
         f"({count} products, image mode {IMAGE_MODE.value}, sequence {sequence})"
+    )
+
+
+def _apply_flash_sale_prices(products_path: Path, limit: int = 4) -> None:
+    """Apply a deterministic flash-sale price drop to the first ``limit`` products."""
+    lines = [line for line in products_path.read_text(encoding="utf-8").split("\n") if line.strip()]
+    updated: list[str] = []
+    for idx, line in enumerate(lines):
+        record = json.loads(line)
+        if idx < limit:
+            discounted = max(1, int(float(record["price"]) * 0.8)) + 0.99
+            if discounted == float(record["price"]):
+                discounted = round(max(0.99, float(record["price"]) - 2.0), 2)
+            record["price"] = discounted
+        updated.append(json.dumps(record, ensure_ascii=False, separators=(",", ":")))
+    products_path.write_text("".join(f"{line}\n" for line in updated), encoding="utf-8")
+
+
+def _build_delta_overlay(staging: Path, delta_sequence: int, count: int) -> None:
+    """Build the companion v2 delta overlay (``examples/catalog-delta``).
+
+    Updates 4 product prices in ``products.jsonl`` and republishes at ``sequence + 1``
+    so ``catalogue.sqlite`` is rebuilt with 4 KiB page-aligned canonicalization. Only
+    the signed ``latest`` pointer, the new ``manifest/<hash>``, and the ~3 changed
+    Gear-CDC chunks are stored in ``examples/catalog-delta``; the remaining 809 chunks
+    are shared with ``examples/catalog``.
+    """
+    delta_origin = CATALOG.parent / "_delta_origin"
+    delta_overlay = CATALOG.parent / "catalog-delta"
+    shutil.rmtree(delta_origin, ignore_errors=True)
+    shutil.rmtree(delta_overlay, ignore_errors=True)
+    _apply_flash_sale_prices(staging / "products.jsonl")
+    publish_bundle(
+        staging_dir=staging,
+        origin_dir=delta_origin,
+        private_key_path=KEY,
+        catalog_id=CATALOG_ID,
+        version="v2",
+        embedding_model=EMBEDDING_MODEL,
+        embedding_dim=DIM,
+        embedding_count=count,
+        product_count=count,
+        sequence=delta_sequence,
+        image_mode=IMAGE_MODE,
+    )
+    (delta_overlay / "manifest").mkdir(parents=True, exist_ok=True)
+    (delta_overlay / "chunk").mkdir(parents=True, exist_ok=True)
+    shutil.copy2(delta_origin / "latest", delta_overlay / "latest")
+    for manifest_file in (delta_origin / "manifest").iterdir():
+        shutil.copy2(manifest_file, delta_overlay / "manifest" / manifest_file.name)
+    base_chunks = {p.name for p in (CATALOG / "chunk").iterdir()}
+    delta_chunks = 0
+    for chunk_file in (delta_origin / "chunk").iterdir():
+        if chunk_file.name not in base_chunks:
+            shutil.copy2(chunk_file, delta_overlay / "chunk" / chunk_file.name)
+            delta_chunks += 1
+    shutil.rmtree(delta_origin, ignore_errors=True)
+    print(
+        f"built {delta_overlay} (version v2, sequence {delta_sequence}, {delta_chunks} new chunks)"
     )
 
 
@@ -350,6 +410,7 @@ def _drop_producer_scratch() -> None:
     shutil.rmtree(CATALOG / "chunks", ignore_errors=True)
     shutil.rmtree(CATALOG / "manifests", ignore_errors=True)
     (CATALOG / "active").unlink(missing_ok=True)
+    (CATALOG / ".publish.lock").unlink(missing_ok=True)
 
 
 if __name__ == "__main__":

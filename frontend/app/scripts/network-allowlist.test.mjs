@@ -98,7 +98,7 @@ async function builtScripts(dir) {
 		// models/ and ort/ are mirrored third-party binaries/runtime, pinned by
 		// their own preflight hashes; the catalog bundle is signed data.
 		if (entry.isDirectory()) {
-			if (!["models", "ort", "bundle"].includes(rel)) {
+			if (!["models", "ort", "bundle", "bundle-delta"].includes(rel)) {
 				out.push(...(await builtScripts(path)));
 			}
 		} else if (/\.(?:m?js|html|css)$/u.test(entry.name)) {

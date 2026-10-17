@@ -42,8 +42,19 @@ export const CATALOG_DIR = resolve(
 	"catalog",
 );
 
+/** Companion v2 delta overlay (latest + v2 manifest + changed Gear-CDC chunks). */
+export const CATALOG_DELTA_DIR = resolve(
+	APP_DIR,
+	"..",
+	"..",
+	"backend",
+	"examples",
+	"catalog-delta",
+);
+
 const DIST_DIR = join(APP_DIR, "dist");
 const DIST_BUNDLE_DIR = join(DIST_DIR, "bundle");
+const DIST_BUNDLE_DELTA_DIR = join(DIST_DIR, "bundle-delta");
 
 /** Static build env: fill the two host knobs unless the caller already set them. */
 export function pagesEnv(env) {
@@ -165,11 +176,19 @@ function main() {
 	if (!existsSync(join(DIST_BUNDLE_DIR, "latest"))) {
 		die("bundle copy failed — dist/bundle/latest missing.");
 	}
+	rmSync(DIST_BUNDLE_DELTA_DIR, { recursive: true, force: true });
+	cpSync(CATALOG_DIR, DIST_BUNDLE_DELTA_DIR, { recursive: true });
+	if (existsSync(CATALOG_DELTA_DIR)) {
+		cpSync(CATALOG_DELTA_DIR, DIST_BUNDLE_DELTA_DIR, { recursive: true });
+	}
+	if (!existsSync(join(DIST_BUNDLE_DELTA_DIR, "latest"))) {
+		die("bundle-delta copy failed — dist/bundle-delta/latest missing.");
+	}
 	requireShippedProductImages(env);
 	writeBuildIdentity(env);
 	applyImageModeCsp(env);
 	process.stdout.write(
-		`>> Pages dist ready: ${DIST_DIR} (signed bundle copied same-origin to dist/bundle)\n`,
+		`>> Pages dist ready: ${DIST_DIR} (signed bundle copied same-origin to dist/bundle and dist/bundle-delta)\n`,
 	);
 }
 

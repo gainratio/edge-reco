@@ -6,22 +6,22 @@
     "locale": "en",
     "quality_profile": "showcase",
     "repository": {
-      "url": "https://github.com/hseshadr/edge-reco",
-      "revision": "00dcc0b27bbf38f0f7372072a1b24e5f5ab496fc"
+      "url": "https://github.com/gainratio/edge-reco",
+      "revision": "bf9a33d4d8ae606d78843369f99ed007835cac74"
     },
     "viewBox": [1390, 700],
     "views": [
       {
         "id": "delivery-path",
-        "label": "Catalog delivery",
+        "label": "Catalog delivery & delta sync",
         "focus": ["catalog_builder", "publisher", "static_origin", "sync_worker", "bundle_cache"],
-        "note": "The build host signs one content-addressed catalog that every browser can verify independently."
+        "note": "The build host signs a 4 KiB page-aligned SQLite catalog chunked with Gear-CDC so browsers fetch only changed chunks."
       },
       {
         "id": "discovery-path",
         "label": "On-device discovery",
         "focus": ["bundle_cache", "runtime", "sqlite_vector", "embedder_worker", "hybrid_engine", "nimbus_ui", "shopper"],
-        "note": "Keyword and semantic retrieval, fusion, and reranking run in the shopper's tab."
+        "note": "Keyword and semantic retrieval, fusion, and reranking run in the shopper's tab over the hot-swappable SQLite catalog."
       },
       {
         "id": "personalization",
@@ -36,7 +36,7 @@
       "id": "publisher",
       "type": "backend",
       "label": "Catalog Publisher",
-      "sublabel": "Build + sign",
+      "sublabel": "Gear-CDC + sign",
       "pos": [50, 320],
       "size": [125, 72],
       "sources": [{ "path": "backend/src/edgereco/catalog/publish.py", "line": 1, "end_line": 28, "label": "Bundle producer" }]
@@ -54,7 +54,7 @@
       "id": "sync_worker",
       "type": "security",
       "label": "@gainratio/browser",
-      "sublabel": "Verify + sync Worker",
+      "sublabel": "Verify + delta sync",
       "tag": "fail closed",
       "pos": [355, 320],
       "size": [130, 72],
@@ -64,7 +64,7 @@
       "id": "bundle_cache",
       "type": "database",
       "label": "OPFS CAS Cache",
-      "sublabel": "Local bundle cache",
+      "sublabel": "Cached CDC chunks",
       "pos": [510, 320],
       "size": [130, 72],
       "sources": [{ "path": "docs/ARCHITECTURE.md", "line": 178, "end_line": 211, "label": "Shared OPFS substrate" }]
@@ -73,7 +73,7 @@
       "id": "runtime",
       "type": "backend",
       "label": "EngineRuntime",
-      "sublabel": "Bundle lifecycle",
+      "sublabel": "Boot + syncUpdate",
       "pos": [665, 320],
       "size": [130, 72],
       "sources": [{ "path": "frontend/packages/edgereco-browser/src/engine/runtime.ts", "line": 1, "end_line": 30, "label": "Product runtime" }]
@@ -91,7 +91,7 @@
       "id": "nimbus_ui",
       "type": "frontend",
       "label": "Nimbus Storefront",
-      "sublabel": "Search + recommend",
+      "sublabel": "Search + delta UI",
       "pos": [975, 320],
       "size": [130, 72],
       "sources": [{ "path": "frontend/app/src/App.tsx", "line": 19, "end_line": 65, "label": "Launch and storefront" }]
@@ -109,7 +109,7 @@
       "id": "catalog_builder",
       "type": "backend",
       "label": "Catalog Build",
-      "sublabel": "Catalog + vectors",
+      "sublabel": "SQLite + vectors",
       "pos": [50, 80],
       "size": [125, 66],
       "sources": [{ "path": "docs/ARCHITECTURE.md", "line": 157, "end_line": 173, "label": "Python build side" }]
@@ -136,7 +136,7 @@
       "id": "sqlite_vector",
       "type": "database",
       "label": "SQLite Vector Worker",
-      "sublabel": "sqlite-vector + OPFS",
+      "sublabel": "catalogue.sqlite",
       "tag": "no FAISS in browser",
       "pos": [665, 535],
       "size": [130, 66],
@@ -145,11 +145,11 @@
   ],
   "connections": [
     { "id": "publisher_serves", "from": "publisher", "to": "static_origin", "label": "signed bundle", "variant": "emphasis", "labelAt": [188, 415] },
-    { "id": "origin_delivers", "from": "static_origin", "to": "sync_worker", "label": "immutable bytes", "labelAt": [343, 415] },
+    { "id": "origin_delivers", "from": "static_origin", "to": "sync_worker", "label": "changed chunks", "labelAt": [343, 415] },
     { "id": "sync_promotes", "from": "sync_worker", "to": "bundle_cache", "label": "verified chunks", "variant": "security", "labelAt": [498, 415] },
     { "id": "cache_materializes", "from": "bundle_cache", "to": "runtime", "label": "bundle files", "labelAt": [653, 415] },
-    { "id": "runtime_imports", "from": "runtime", "to": "sqlite_vector", "label": "authenticated vectors", "variant": "security", "fromSide": "bottom", "toSide": "top", "labelAt": [730, 406] },
-    { "id": "sqlite_searches", "from": "sqlite_vector", "to": "hybrid_engine", "label": "exact cosine", "variant": "emphasis", "fromSide": "top", "toSide": "bottom", "labelAt": [785, 455] },
+    { "id": "runtime_imports", "from": "runtime", "to": "sqlite_vector", "label": "hot-swap SQLite", "variant": "security", "fromSide": "bottom", "toSide": "top", "labelAt": [730, 406] },
+    { "id": "sqlite_searches", "from": "sqlite_vector", "to": "hybrid_engine", "label": "FTS5 + cosine", "variant": "emphasis", "fromSide": "top", "toSide": "bottom", "labelAt": [785, 455] },
     { "id": "engine_ranks", "from": "hybrid_engine", "to": "nimbus_ui", "label": "ranked products", "variant": "emphasis", "labelAt": [963, 415] },
     { "id": "ui_serves", "from": "nimbus_ui", "to": "shopper", "label": "local results", "variant": "emphasis", "labelAt": [1118, 415] },
     { "id": "builder_stages", "from": "catalog_builder", "to": "publisher", "label": "staged artifacts", "fromSide": "bottom", "toSide": "top", "labelAt": [113, 235] },
@@ -159,13 +159,13 @@
   "cards": [
     {
       "dot": "rose",
-      "title": "One signed delivery substrate",
-      "items": ["Immutable chunks are named by SHA-256", "The browser verifies before it materializes any index"]
+      "title": "Page-aligned Gear-CDC delta sync",
+      "items": ["Immutable 4 KiB SQLite + index chunks are named by SHA-256", "Catalog updates fetch only changed chunks and reuse OPFS cache"]
     },
     {
       "dot": "cyan",
-      "title": "Discovery runs on the device",
-      "items": ["BM25 and SQLite-vector candidates fuse with Reciprocal Rank Fusion", "The OPFS index runs in a Worker, never as an in-memory browser fallback"]
+      "title": "Discovery & hot-swap on device",
+      "items": ["FTS5 BM25 and sqlite-vector candidates fuse with Reciprocal Rank Fusion", "EngineRuntime.syncUpdate hot-swaps SQLite in place without reloading ONNX"]
     },
     {
       "dot": "emerald",

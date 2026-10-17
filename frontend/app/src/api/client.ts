@@ -47,7 +47,13 @@ import {
 	readTasteEvents,
 	tasteDurable as tasteLogDurable,
 } from "../signals/tasteLog";
-import { resolveBundleBaseUrl } from "./bundleUrl";
+import {
+	isDeltaBundleChannel,
+	resolveBaseBundleUrl,
+	resolveBundleBaseUrl,
+	resolveDeltaBundleUrl,
+	setDeltaBundleChannel,
+} from "./bundleUrl";
 import type {
 	BrowseResponse,
 	InteractionEvent,
@@ -153,6 +159,12 @@ export interface DataClient {
 		onStage?: OnStage,
 		config?: RuntimeConfig,
 	): Promise<SyncResult | null>;
+	/**
+	 * Apply (or replay) the companion v2 SQLite page-delta update (`/bundle-delta`),
+	 * fetching only the changed Gear-CDC chunks and hot-swapping `catalogue.sqlite`
+	 * in place without reloading the page or embedding model.
+	 */
+	applyDeltaPatch(onStage?: OnStage): Promise<SyncResult | null>;
 	/**
 	 * Clear ONLY the cached signed catalog (OPFS bundle + its rollback floor) so
 	 * the next bootstrap re-syncs from scratch. The explicit, user-initiated
@@ -338,7 +350,33 @@ export function createDataClient(deps: ClientDeps = {}): DataClient {
 			}
 			return updated;
 		},
+		async applyDeltaPatch(
+			onStage: OnStage = () => {},
+		): Promise<SyncResult | null> {
+			const envConfig = configFromEnv();
+			if (isDeltaBundleChannel()) {
+				setDeltaBundleChannel(false);
+				if (runtime.resetBundleCacheForUpdate !== undefined) {
+					await runtime.resetBundleCacheForUpdate();
+				} else {
+					await runtime.clearBundleCache();
+				}
+				await runtime.syncUpdate({
+					...envConfig,
+					bundleBaseUrl: resolveBaseBundleUrl(),
+				});
+			}
+			const updated = await this.syncUpdate(onStage, {
+				...envConfig,
+				bundleBaseUrl: resolveDeltaBundleUrl(),
+			});
+			if (updated !== null) {
+				setDeltaBundleChannel(true);
+			}
+			return updated;
+		},
 		clearCatalogCache(): Promise<void> {
+			setDeltaBundleChannel(false);
 			return runtime.clearBundleCache();
 		},
 		resetSession(): Promise<void> {
@@ -530,6 +568,9 @@ export function syncUpdate(
 	config?: RuntimeConfig,
 ): Promise<SyncResult | null> {
 	return active.syncUpdate(onStage, config);
+}
+export function applyDeltaPatch(onStage?: OnStage): Promise<SyncResult | null> {
+	return active.applyDeltaPatch(onStage);
 }
 export function clearCatalogCache(): Promise<void> {
 	return active.clearCatalogCache();

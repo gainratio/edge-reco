@@ -26,7 +26,12 @@
 		"catalogSync": "catalog sync",
 		"patchApplied": "Patch applied ({{fetched}} new · {{reused}} cached)",
 		"patchCached": "Cached ({{reused}} chunks reused)",
-		"patchInitial": "Synced ({{fetched}} chunks)"
+		"patchInitial": "Synced ({{fetched}} chunks)",
+		"applyDelta": "⚡ Apply delta",
+		"replayDelta": "↻ Replay delta",
+		"applyingDelta": "Applying delta…",
+		"applyDeltaTitle": "Apply a signed 4 KiB SQLite page-delta update and hot-swap the catalog in place",
+		"deltaToast": "Delta patch applied — {{fetched}} new · {{reused}} cached chunks"
 	},
 	"why": {
 		"calculationHead": "How calculated — Assay",

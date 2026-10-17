@@ -106,6 +106,28 @@ test("re-sync after first sync fetches only-changed chunks (chunksFetched == 0)"
 	expect(second?.chunksReused).toBe(first?.chunksFetched);
 });
 
+test("delta-sync from /catalog (v1) to /catalog-delta (v2) fetches only the 3 changed chunks and reuses 809 cached chunks", async ({
+	page,
+}) => {
+	const first = await page.evaluate(
+		([base, key]) => window.__engineHarness?.sync(base, key),
+		[CATALOG, PUBKEY],
+	);
+	expect(first?.version).toBe("v1");
+	expect(first?.chunksFetched).toBe(812);
+	expect(first?.chunksReused).toBe(0);
+
+	const delta = await page.evaluate(
+		([base, key]) => window.__engineHarness?.sync(base, key),
+		[`${CATALOG}-delta`, PUBKEY],
+	);
+	expect(delta?.version).toBe("v2");
+	expect(delta?.chunksFetched).toBe(3);
+	expect(delta?.chunksReused).toBe(809);
+	expect(delta?.bytesFetched).toBeGreaterThan(0);
+	expect(delta?.bytesFetched).toBeLessThan(50_000);
+});
+
 test("a tampered /latest signature is rejected fail-closed — nothing promoted", async ({
 	page,
 }) => {

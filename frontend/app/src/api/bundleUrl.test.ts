@@ -4,8 +4,18 @@
 // Worker, where a relative URL would resolve against the worker script's URL
 // rather than the page, so the page must absolutize before handing it across.
 
-import { describe, expect, it } from "vitest";
-import { resolveBundleBaseUrl } from "./bundleUrl";
+import { afterEach, describe, expect, it } from "vitest";
+import {
+	isDeltaBundleChannel,
+	resolveBaseBundleUrl,
+	resolveBundleBaseUrl,
+	resolveDeltaBundleUrl,
+	setDeltaBundleChannel,
+} from "./bundleUrl";
+
+afterEach(() => {
+	setDeltaBundleChannel(false);
+});
 
 describe("resolveBundleBaseUrl", () => {
 	it("passes the Docker demo's absolute edge URL through unchanged", () => {
@@ -58,5 +68,25 @@ describe("resolveBundleBaseUrl", () => {
 				"https://hseshadr.github.io",
 			),
 		).toBe("https://hseshadr.github.io/edge-reco/bundle");
+	});
+
+	it("switches default bundle resolution to the -delta overlay when enabled", () => {
+		expect(isDeltaBundleChannel()).toBe(false);
+		expect(resolveDeltaBundleUrl("bundle", "/", "https://edge-reco.com")).toBe(
+			"https://edge-reco.com/bundle-delta",
+		);
+		setDeltaBundleChannel(true);
+		expect(isDeltaBundleChannel()).toBe(true);
+		const defaultBase = resolveBaseBundleUrl(
+			undefined,
+			"/",
+			"https://edge-reco.com",
+		);
+		expect(resolveBundleBaseUrl(undefined, "/", "https://edge-reco.com")).toBe(
+			`${defaultBase}-delta`,
+		);
+		expect(resolveBaseBundleUrl("bundle", "/", "https://edge-reco.com")).toBe(
+			"https://edge-reco.com/bundle",
+		);
 	});
 });

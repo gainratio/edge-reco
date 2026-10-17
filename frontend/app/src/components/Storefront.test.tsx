@@ -21,6 +21,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type { Product, SearchResult, Strategy } from "../api/types";
 
 const mocks = vi.hoisted(() => ({
+	applyDeltaPatch: vi.fn(),
 	browse: vi.fn(),
 	search: vi.fn(),
 	recommendStrategy: vi.fn(),
@@ -36,6 +37,7 @@ const mocks = vi.hoisted(() => ({
 }));
 
 vi.mock("../api/client", () => ({
+	applyDeltaPatch: mocks.applyDeltaPatch,
 	browse: mocks.browse,
 	search: mocks.search,
 	recommendStrategy: mocks.recommendStrategy,
@@ -555,6 +557,29 @@ describe("Storefront durable taste (badge restore + reset affordance)", () => {
 		// …and the copy tells the truth about where activity lives.
 		expect(
 			await screen.findByText(/stored only in this browser/i),
+		).toBeInTheDocument();
+	});
+
+	it("Apply delta triggers applyDeltaPatch, refreshes the grid and rails, and flashes a toast", async () => {
+		mocks.applyDeltaPatch.mockResolvedValue({
+			version: "v2",
+			chunksFetched: 3,
+			chunksReused: 809,
+			bytesFetched: 18_432,
+			manifestHash: "a".repeat(64),
+		});
+		render(<Storefront />);
+		await screen.findByText("Grid Gadget");
+		const browseCallsBefore = mocks.browse.mock.calls.length;
+
+		await userEvent.click(screen.getByRole("button", { name: /Apply delta/i }));
+
+		await waitFor(() => expect(mocks.applyDeltaPatch).toHaveBeenCalledTimes(1));
+		expect(mocks.browse.mock.calls.length).toBeGreaterThan(browseCallsBefore);
+		expect(
+			await screen.findByText(
+				/Delta patch applied — 3 new · 809 cached chunks/i,
+			),
 		).toBeInTheDocument();
 	});
 });

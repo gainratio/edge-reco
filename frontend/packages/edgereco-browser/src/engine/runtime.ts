@@ -516,6 +516,26 @@ export class EngineRuntime {
 		await (this.#deps.deleteFloorDatabase ?? deleteBundleFloorDatabase)();
 	}
 
+	/**
+	 * Reset the signed-bundle sync cache and anti-rollback floor while keeping
+	 * the live SearchEngine and Embedder warm, so an explicit user-triggered
+	 * delta-patch replay can re-seed `v1` (`sequence: 16`) and re-apply `v2`
+	 * (`sequence: 17`) via `syncUpdate()` without reloading the 23 MB ONNX model.
+	 */
+	public async resetBundleCacheForUpdate(): Promise<void> {
+		const port = this.#deps.spawnEngine();
+		try {
+			if (port.clear === undefined) {
+				throw new Error("this engine port cannot clear its bundle cache");
+			}
+			await port.clear();
+		} finally {
+			disposeResource(port);
+		}
+		await (this.#deps.deleteFloorDatabase ?? deleteBundleFloorDatabase)();
+		this.#manifestHash = null;
+	}
+
 	/** Release any sync/embedder worker still held while no boot is running. */
 	#teardownIdleWorkers(): void {
 		const enginePort = this.#enginePort;

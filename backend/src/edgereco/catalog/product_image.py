@@ -47,11 +47,12 @@ class ImageMode(StrEnum):
 
 _SAFE_ID = re.compile(r"^[A-Za-z0-9._-]+$")
 _FONT = "system-ui,-apple-system,'Segoe UI',Roboto,Helvetica,Arial,sans-serif"
-#: Lucide draws on a 24x24 grid; 7x makes a 168 px icon on the 600 px card.
-_ICON_SCALE = 7
-#: Centre of the icon. The storefront grid crops the square card to a ~2:1 strip
-#: (``object-fit: cover``), so everything that matters sits in the middle band.
-_ICON_CY = 278
+#: Lucide draws on a 24x24 grid; 6.5x makes a 156 px icon inside the studio tile.
+_ICON_SCALE = 6.5
+#: Centre of the studio object. The storefront grid crops the square card to a 4:3
+#: frame and horizontal rails crop to ~1.8:1 (``object-fit: cover``), so the podium,
+#: tile, icon, and brand badge all sit inside the y=145..455 safe band.
+_ICON_CY = 264
 
 
 def _require_safe_id(product_id: str) -> str:
@@ -146,22 +147,28 @@ def _hue(product_id: str) -> float:
     return int.from_bytes(digest[:2], "big") / 65536
 
 
-def _colors(product_id: str) -> tuple[str, str, str]:
-    """(light stop, deeper stop, ink): a pastel backdrop and a dark tone for the icon."""
+def _colors(product_id: str) -> tuple[str, str, str, str]:
+    """(light stop, deep stop, accent glow, deep ink) derived from the product id."""
     hue = _hue(product_id)
-    return _hex(hue, 0.95, 0.7), _hex(hue + 0.06, 0.86, 0.55), _hex(hue, 0.3, 0.55)
+    return (
+        _hex(hue, 0.95, 0.72),
+        _hex(hue + 0.06, 0.83, 0.58),
+        _hex(hue + 0.02, 0.62, 0.68),
+        _hex(hue, 0.24, 0.62),
+    )
 
 
 def generate_product_image(product: Product) -> str:
-    """Render one product as a deterministic, self-contained SVG card.
+    """Render one product as a deterministic, self-contained studio-lit SVG card.
 
-    A pastel backdrop (colour from the product id), the Lucide icon for the
-    product's shelf (``product_icons``), and the brand in small type underneath.
+    A studio backdrop and elevated podium tile (coloured from the product id),
+    the Lucide icon for the product's shelf (``product_icons``), and the brand
+    plinth underneath.
     """
-    light, deep, ink = _colors(product.id)
+    light, deep, accent, ink = _colors(product.id)
     body = "".join(
         (
-            _backdrop(light, deep),
+            _backdrop(light, deep, accent, ink),
             _icon(icon_for(product).name, ink),
             _brand(product.brand, ink),
         )
@@ -173,12 +180,15 @@ def generate_product_image(product: Product) -> str:
     )
 
 
-def _backdrop(light: str, deep: str) -> str:
+def _backdrop(light: str, deep: str, accent: str, ink: str) -> str:
     return (
         '<defs><linearGradient id="bg" x1="0" y1="0" x2="1" y2="1">'
         f'<stop offset="0" stop-color="{light}"/><stop offset="1" stop-color="{deep}"/>'
         '</linearGradient></defs><rect width="600" height="600" fill="url(#bg)"/>'
-        f'<circle cx="300" cy="{_ICON_CY}" r="118" fill="#fff" fill-opacity="0.55"/>'
+        f'<ellipse cx="300" cy="390" rx="116" ry="15" fill="{ink}" fill-opacity=".16"/>'
+        '<rect x="184" y="146" width="232" height="228" rx="42" fill="#fff" '
+        f'fill-opacity=".92" stroke="{deep}" stroke-width="2"/>'
+        f'<circle cx="300" cy="{_ICON_CY}" r="68" fill="{accent}" fill-opacity=".18"/>'
     )
 
 
@@ -186,7 +196,7 @@ def _icon(name: str, ink: str) -> str:
     return (
         f'<g data-icon="{escape(name)}" '
         f'transform="translate(300 {_ICON_CY}) scale({_ICON_SCALE}) translate(-12 -12)" '
-        f'fill="none" stroke="{ink}" stroke-width="1.5" '
+        f'fill="none" stroke="{ink}" stroke-width="1.75" '
         f'stroke-linecap="round" stroke-linejoin="round">{icon_body(name)}</g>'
     )
 
@@ -195,7 +205,8 @@ def _brand(brand: str, ink: str) -> str:
     if not brand.strip():
         return ""
     return (
-        f'<text x="300" y="432" font-family="{_FONT}" font-size="24" '
-        f'letter-spacing="4" fill="{ink}" fill-opacity="0.75" '
+        '<rect x="160" y="408" width="280" height="34" rx="17" fill="#fff" fill-opacity=".72"/>'
+        f'<text x="300" y="431" font-family="{_FONT}" font-size="18" font-weight="600" '
+        f'letter-spacing="3.5" fill="{ink}" fill-opacity=".86" '
         f'text-anchor="middle">{escape(brand.strip().upper())}</text>'
     )
