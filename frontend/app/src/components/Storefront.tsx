@@ -45,6 +45,7 @@ interface GridView {
 	products: Product[];
 	kicker?: string;
 	title: string;
+	searchedQuery?: string;
 }
 
 /** Home shows the grid + stacked rails; product shows the PDP for one item. */
@@ -493,12 +494,21 @@ export function Storefront() {
 		[emitExplicit],
 	);
 
+	const dwellRefreshInFlight = useRef(false);
 	const onDwell = useCallback(
 		(product: Product) => {
 			// Ambient impression: silent, uncounted, and failures never surface —
 			// a missed view must not interrupt browsing.
 			void emitInteraction("view", product)
-				.then((outcome) => (outcome.emitted ? refreshRails() : undefined))
+				.then((outcome) => {
+					if (!outcome.emitted || dwellRefreshInFlight.current) {
+						return;
+					}
+					dwellRefreshInFlight.current = true;
+					return refreshRails().finally(() => {
+						dwellRefreshInFlight.current = false;
+					});
+				})
 				.catch(() => undefined);
 		},
 		[refreshRails],
@@ -523,8 +533,8 @@ export function Storefront() {
 	// the "Search results" grid (with a screen-reader "Results for …" announcement)
 	// pinned right under the search box — with the personalized rails sliding below. Without this a query paints
 	// a 4th section beneath three unchanged rails and reads as if nothing happened.
-	const searchedQuery = debouncedQuery.trim();
-	const isSearching = searchedQuery !== "";
+	const searchedQuery = grid.searchedQuery ?? "";
+	const isSearching = debouncedQuery.trim() !== "";
 	const wasSearchingRef = useRef(false);
 	useEffect(() => {
 		if (isSearching && !wasSearchingRef.current) {
@@ -673,6 +683,7 @@ async function loadGridInner(
 				// The query already sits in the search box; the title only labels the
 				// view, so the shopper reads the query once (no kicker/title echo).
 				title: t("grid.titleSearch"),
+				searchedQuery: trimmed,
 			},
 		};
 	}

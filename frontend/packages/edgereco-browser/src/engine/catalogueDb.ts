@@ -230,7 +230,7 @@ const HYBRID_SQL = `
 	semantic AS (
 		SELECT rowid, 1.0 - distance AS score,
 			row_number() OVER (ORDER BY distance, rowid) AS rank
-		FROM vector_full_scan('products', 'embedding', ?7)
+		FROM vector_full_scan('products', 'embedding', ?7, max(?6 * 4, 256))
 		ORDER BY distance, rowid LIMIT ?6
 	),
 	fused AS (
@@ -254,7 +254,7 @@ const MATCH_NOTHING = '""';
 const NEAREST_SQL = `
 	SELECT p.id AS id, 1.0 - scan.distance AS score
 	FROM vector_full_scan('products', 'embedding',
-		(SELECT embedding FROM products WHERE id = ?1)) AS scan
+		(SELECT embedding FROM products WHERE id = ?1), max(?2 + 1, 64)) AS scan
 	JOIN products AS p ON p.rowid = scan.rowid
 	WHERE p.id <> ?1
 	ORDER BY scan.distance, p.rowid LIMIT ?2
@@ -262,7 +262,7 @@ const NEAREST_SQL = `
 
 const VECTOR_SQL = `
 	SELECT p.id AS id, 1.0 - scan.distance AS score
-	FROM vector_full_scan('products', 'embedding', ?1) AS scan
+	FROM vector_full_scan('products', 'embedding', ?1, max(?2 * 4, 256)) AS scan
 	JOIN products AS p ON p.rowid = scan.rowid
 	ORDER BY scan.distance, p.rowid LIMIT ?2
 `;
