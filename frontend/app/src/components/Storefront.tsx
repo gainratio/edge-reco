@@ -454,10 +454,10 @@ export function Storefront() {
 		// A PDP entry we pushed pops via real history (Back/Forward symmetric);
 		// a deep-linked PDP (first entry, nothing of ours to pop) swaps to
 		// browse in place so Back never exits the app unexpectedly.
+		setView({ kind: "browse" });
 		if (isAppPdpEntry()) {
 			window.history.back();
 		} else {
-			setView({ kind: "browse" });
 			window.history.replaceState(null, "", "#/");
 		}
 	}, []);
