@@ -14,7 +14,7 @@ import {
 	materializeFile,
 	syncIndex,
 } from "@gainratio/browser";
-import { describe, expect, it } from "vitest";
+import { afterEach, describe, expect, it } from "vitest";
 import cooccurrenceFixture from "./__fixtures__/cooccurrence_parity.json" with {
 	type: "json",
 };
@@ -28,6 +28,13 @@ const acceptVerify: Verify = () => Promise.resolve();
 const stubEmbedder: Embedder = {
 	embed: () => Promise.reject(new Error("embedder unused on these paths")),
 };
+const opened: SearchEngine[] = [];
+
+afterEach(async () => {
+	while (opened.length > 0) {
+		await opened.pop()?.dispose();
+	}
+});
 
 interface CooccurrenceCase {
 	readonly strategy: string;
@@ -64,21 +71,24 @@ async function engine(): Promise<SearchEngine> {
 	) as IndexManifest;
 	const read = (path: string): Promise<Uint8Array> =>
 		materializeFile(store, manifest, path);
-	const [meta, state, embeddings, products, rankingBytes, coocBytes] =
+	const [meta, state, embeddings, products, sqlite, rankingBytes, coocBytes] =
 		await Promise.all([
 			read("catalog_meta.json"),
 			read("vector/state.json"),
 			read("vector/embeddings.f32"),
 			read("products.jsonl"),
+			read("catalogue.sqlite"),
 			read("ranking_config.json"),
 			read("cooccurrence.json"),
 		]);
-	return createSearchEngine(
-		{ meta, state, embeddings, products },
+	const instance = await createSearchEngine(
+		{ meta, state, embeddings, products, sqlite },
 		stubEmbedder,
 		parseRankingConfig(rankingBytes),
 		parseCooccurrence(coocBytes),
 	);
+	opened.push(instance);
+	return instance;
 }
 
 describe("co-occurrence recommend() parity vs Python cooccurrence_parity.json", () => {

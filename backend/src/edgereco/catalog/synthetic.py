@@ -49,6 +49,8 @@ FRESH_DAYS: Final = (7305, 8644)
 TITLE_SEP: Final = " | "
 #: Brands a shelf draws from: a small window of the category's pool.
 BRANDS_PER_LEAF: Final = 3
+#: Full passes over the vocabulary leaves (7 * 720 = 5,040 products, 420 per category).
+CATALOG_PASSES: Final = 7
 
 
 class _Frozen(BaseModel):
@@ -156,13 +158,19 @@ def _title(slot: _Slot, seed: int, salt: int) -> str:
     """
     leaf = slot.category.leaves[slot.leaf_index]
     key = (slot.category.name, slot.leaf_index)
-    noun = _cycled(leaf.nouns, slot.ordinal, seed, *key, "noun")
-    first = _cycled(leaf.variants[0], slot.ordinal // len(leaf.nouns), seed, *key, "v0")
+    pass_index = slot.ordinal // leaf.count
+    step = slot.ordinal if pass_index == 0 else slot.ordinal + salt
+    noun = _cycled(leaf.nouns, step, seed, *key, "noun")
+    first = _cycled(leaf.variants[0], step // len(leaf.nouns), seed, *key, "v0")
     rest = [
         _pick(group, seed, *key, slot.ordinal, salt, "variant", i)
         for i, group in enumerate(leaf.variants[1:], start=1)
     ]
-    return TITLE_SEP.join([f"{_brand(slot, seed)} {noun}", first, *rest])
+    parts = [f"{_brand(slot, seed)} {noun}", first, *rest]
+    if pass_index > 0:
+        suffix = f"-{salt}" if salt else ""
+        parts.append(f"Nimbus Catalog Issue B{pass_index:02d}{suffix}")
+    return TITLE_SEP.join(parts)
 
 
 def _about(slot: _Slot, seed: int) -> str:
@@ -212,7 +220,8 @@ def _row(slot: _Slot, seed: int, title: str, number: int) -> CatalogRow:
 
 def _slots(vocab: Vocab) -> list[_Slot]:
     return [
-        _Slot(category=category, leaf_index=index, ordinal=ordinal)
+        _Slot(category=category, leaf_index=index, ordinal=pass_index * leaf.count + ordinal)
+        for pass_index in range(CATALOG_PASSES)
         for category in vocab.categories
         for index, leaf in enumerate(category.leaves)
         for ordinal in range(leaf.count)

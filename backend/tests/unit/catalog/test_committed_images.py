@@ -19,7 +19,12 @@ from typing import Final
 import zstandard as zstd
 
 from edgereco.catalog.models import Product
-from edgereco.catalog.product_image import generate_product_image, local_image_url
+from edgereco.catalog.product_icons import icon_for
+from edgereco.catalog.product_image import (
+    MAX_SIGNED_CARDS,
+    generate_product_image,
+    local_image_url,
+)
 
 _BACKEND: Final = Path(__file__).resolve().parents[3]
 _CATALOG: Final = _BACKEND / "examples" / "catalog"
@@ -49,6 +54,10 @@ def _products() -> list[Product]:
     return [Product.model_validate_json(line) for line in raw.split("\n") if line.strip()]
 
 
+def _signed_image_paths() -> list[str]:
+    return [path for path in _manifest() if path.startswith("images/")]
+
+
 def test_the_manifest_resolves_under_a_glob_too() -> None:
     # Guard the guard: exactly one manifest, and it is the one `latest` names.
     assert len(glob.glob(str(_CATALOG / "manifest" / "*"))) == 1
@@ -56,41 +65,58 @@ def test_the_manifest_resolves_under_a_glob_too() -> None:
 
 def test_every_product_points_at_its_own_local_card() -> None:
     products = _products()
-    assert len(products) == 720
-    wrong = [p.id for p in products if p.image_url != local_image_url(p.id)]
-    assert wrong == []
+    assert len(products) == 5040
+    by_id = {p.id: p for p in products}
+    wrong_pass0 = [
+        p.id for p in products[:MAX_SIGNED_CARDS] if p.image_url != local_image_url(p.id)
+    ]
+    assert wrong_pass0 == []
+    mismatched_card = [
+        p.id
+        for p in products
+        if not p.image_url.startswith("/images/")
+        or Path(p.image_url).stem not in by_id
+        or (
+            icon_for(by_id[Path(p.image_url).stem]).name,
+            by_id[Path(p.image_url).stem].brand.strip().casefold(),
+        )
+        != (icon_for(p).name, p.brand.strip().casefold())
+    ]
+    assert mismatched_card == []
 
 
 def test_every_product_card_is_signed_into_the_bundle() -> None:
-    missing = [p.id for p in _products() if f"images/{p.id}.svg" not in _manifest()]
+    missing = [p.id for p in _products() if p.image_url.lstrip("/") not in _manifest()]
     assert missing == []
 
 
 def test_every_product_card_is_served_by_the_static_origin() -> None:
-    missing = [p.id for p in _products() if not (_PUBLIC_IMAGES / f"{p.id}.svg").is_file()]
+    missing = [p.id for p in _products() if not (_PUBLIC_IMAGES / Path(p.image_url).name).is_file()]
     assert missing == []
 
 
 def test_static_origin_serves_exactly_the_signed_bytes() -> None:
     differ = [
-        p.id
-        for p in _products()
-        if hashlib.sha256((_PUBLIC_IMAGES / f"{p.id}.svg").read_bytes()).hexdigest()
-        != _manifest()[f"images/{p.id}.svg"]["file_sha256"]
+        relpath
+        for relpath in _signed_image_paths()
+        if hashlib.sha256((_PUBLIC_IMAGES / Path(relpath).name).read_bytes()).hexdigest()
+        != _manifest()[relpath]["file_sha256"]
     ]
     assert differ == []
 
 
 def test_static_origin_has_no_orphan_images() -> None:
-    ids = {p.id for p in _products()}
-    orphans = sorted(f.name for f in _PUBLIC_IMAGES.iterdir() if f.stem not in ids)
+    referenced = {Path(p.image_url).name for p in _products()}
+    orphans = sorted(f.name for f in _PUBLIC_IMAGES.iterdir() if f.name not in referenced)
     assert orphans == []
 
 
 def test_committed_cards_are_what_the_renderer_makes_today() -> None:
+    by_id = {p.id: p for p in _products()}
     stale = [
-        p.id
-        for p in _products()
-        if _materialize(f"images/{p.id}.svg") != generate_product_image(p).encode("utf-8")
+        relpath
+        for relpath in _signed_image_paths()
+        if _materialize(relpath)
+        != generate_product_image(by_id[Path(relpath).stem]).encode("utf-8")
     ]
     assert stale == []

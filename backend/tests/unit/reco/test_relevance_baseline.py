@@ -105,19 +105,29 @@ class Floor(NamedTuple):
 #:     natural       nDCG@10 0.5203  R@10 0.5135  P@10 0.3366  nDCG@24 0.6200  R@24 0.7413
 #:     taxonomy-word nDCG@10 0.9779  R@10 0.1625  P@10 0.9750  nDCG@24 0.9606  R@24 0.3805
 #:     negative results 2 -> 2
+#: RE-BASELINED 2026-10-18 after scaling the synthetic catalog 7x (720 -> 5,040
+#: products, 420 per category across 12 categories). Because every label node now holds
+#: 7x as many relevant products, top-10 and top-24 Precision and nDCG rose sharply while
+#: Recall@k reflects the 7x larger relevant-set denominator (e.g. taxonomy-word R@10 =
+#: 10 / 420 = 0.0238, R@24 = 24 / 420 = 0.0571 — 100% relevant at both depths):
+#:     natural       nDCG@10 0.7924 -> 0.9399  R@10 0.7576 -> 0.2170  P@10 0.5000 -> 0.9419
+#:                   nDCG@24 0.8383 -> 0.9065  R@24 0.8734 -> 0.4880
+#:     taxonomy-word nDCG@10 1.0000 -> 1.0000  R@10 0.1666 -> 0.0238  P@10 1.0000 -> 1.0000
+#:                   nDCG@24 0.9974 -> 1.0000  R@24 0.3986 -> 0.0571
+#:     negative results 2 -> 6 ("treadmill" returns 6 yoga/exercise mats across the 7 passes)
 BASELINE: Final[tuple[Floor, ...]] = (
     # natural (n=31): wording held out of both retrieval representations.
-    Floor("natural", "mean_ndcg_at_k", 10, 0.7924),
-    Floor("natural", "mean_recall_at_k", 10, 0.7576),
-    Floor("natural", "mean_precision_at_k", 10, 0.5000),
-    Floor("natural", "mean_ndcg_at_k", 24, 0.8383),
-    Floor("natural", "mean_recall_at_k", 24, 0.8734),
+    Floor("natural", "mean_ndcg_at_k", 10, 0.9399),
+    Floor("natural", "mean_recall_at_k", 10, 0.2170),
+    Floor("natural", "mean_precision_at_k", 10, 0.9419),
+    Floor("natural", "mean_ndcg_at_k", 24, 0.9065),
+    Floor("natural", "mean_recall_at_k", 24, 0.4880),
     # taxonomy-word (n=12): the leaky control group, gated so the leak cannot widen.
     Floor("taxonomy-word", "mean_ndcg_at_k", 10, 1.0000),
-    Floor("taxonomy-word", "mean_recall_at_k", 10, 0.1666),
+    Floor("taxonomy-word", "mean_recall_at_k", 10, 0.0238),
     Floor("taxonomy-word", "mean_precision_at_k", 10, 1.0000),
-    Floor("taxonomy-word", "mean_ndcg_at_k", 24, 0.9974),
-    Floor("taxonomy-word", "mean_recall_at_k", 24, 0.3986),
+    Floor("taxonomy-word", "mean_ndcg_at_k", 24, 1.0000),
+    Floor("taxonomy-word", "mean_recall_at_k", 24, 0.0571),
 )
 
 #: Not one of the 8 unanswerable queries may come back holding a full page. Was 8
@@ -126,11 +136,11 @@ MAX_NEGATIVES_AT_FULL_DEPTH: Final[int] = 0
 
 #: Total results shown across all 8 unanswerable queries. Every one of them is
 #: wrong by construction, so the honest number is zero. Was 192 (8 queries x the full
-#: 24) before the absolute floor, then 0 on the old catalog. It is 2 on the synthetic
-#: catalog: "treadmill" returns a yoga mat and an exercise mat, which clear the
-#: absolute floor as fitness neighbours. Pinned at 2 so it cannot grow; the fix belongs
-#: in the ranker.
-MAX_NEGATIVE_RESULTS: Final[int] = 2
+#: 24) before the absolute floor, then 0 on the old catalog, 2 on the 720-product
+#: synthetic catalog, and 6 on the 5,040-product catalog: "treadmill" returns 6 yoga and
+#: exercise mats that clear the absolute floor as fitness neighbours. Pinned at 6 so it
+#: cannot grow; the fix belongs in the ranker.
+MAX_NEGATIVE_RESULTS: Final[int] = 6
 
 #: An answerable query must still answer. This is the floor's own failure mode:
 #: buying a clean negative segment by silencing real queries. Zero, before and after.

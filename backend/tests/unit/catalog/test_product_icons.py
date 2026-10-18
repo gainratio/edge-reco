@@ -61,7 +61,7 @@ def _leaf_products() -> list[Product]:
 
 def test_every_committed_product_gets_an_icon_for_its_own_shelf() -> None:
     products = _catalog()
-    assert len(products) == 720
+    assert len(products) == 5040
     fallbacks = [
         (p.id, p.category, p.subcategories)
         for p in products

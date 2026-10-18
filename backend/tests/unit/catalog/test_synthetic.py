@@ -129,15 +129,15 @@ def test_the_committed_csv_is_the_generator_output(generated: str) -> None:
 def test_shape_matches_the_build_pipeline(generated: str) -> None:
     rows = _rows(generated)
     assert tuple(rows[0].keys()) == CSV_COLUMNS
-    assert len(rows) == 720
-    assert len({r["asin"] for r in rows}) == 720
-    assert len({r["title"] for r in rows}) == 720
+    assert len(rows) == 5040
+    assert len({r["asin"] for r in rows}) == 5040
+    assert len({r["title"] for r in rows}) == 5040
 
 
 def test_every_category_holds_sixty_products(generated: str) -> None:
     roots = Counter(r["breadcrumbs"].split(BREADCRUMB_SEP)[0].strip() for r in _rows(generated))
     assert len(roots) == 12
-    assert set(roots.values()) == {60}
+    assert set(roots.values()) == {420}
 
 
 def test_rows_parse_into_plausible_products(generated: str) -> None:

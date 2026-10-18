@@ -82,7 +82,7 @@ sequenceDiagram
 
 A query goes through three stages, on whichever tier is running it:
 
-1. **Retrieve** — BM25 (keyword) plus the tier's exact vector adapter — FAISS in Python, SQLite + sqlite-vector in the browser — return top-k candidates over the same id space. Vector retrieval is exact flat search (FAISS `IndexFlatIP` / sqlite-vector full scan); that is fine at demo scale (720 products), and there is no ANN index yet.
+1. **Retrieve** — BM25 (keyword) plus the tier's exact vector adapter — FAISS in Python, SQLite + sqlite-vector in the browser — return top-k candidates over the same id space. Vector retrieval is exact flat search (FAISS `IndexFlatIP` / sqlite-vector full scan); that is fine at demo scale (5,040 products), and there is no ANN index yet.
 2. **Fuse** — Reciprocal Rank Fusion (`rrf_score(d) = Σ 1/(k + rank_i)`) merges the two lists without depending on raw scores.
 3. **Rerank** — the session-aware scorer applies the published formula.
 
@@ -227,7 +227,7 @@ The SPA consumes the private `@edgereco/browser` workspace package and the stand
 
 `frontend/app/`:
 
-A React + Vite SPA over `@edgereco/browser`, which composes `@gainratio/browser`. The app boots through an intro landing page (its performance tiles quote a dated, recorded measurement of the live site — `src/metrics/live-measurement.json`, written by `pnpm run measure:live` in real Chromium — through `src/metrics/landing-figures.ts`, and `landing-figures.test.ts` recomputes every tile from the raw runs); once launched, the store shows a live `MetricsStrip` of real per-session numbers (recommend latency, backend calls, cold start, JS heap, catalog size). The home page is a 720-product Amazon catalog grid (balanced across 12 categories) with a search box and a `RailStack` of *For You* / *Trending* / *New arrivals* rails — the For You rail re-ranks live as the user clicks, favorites, adds to cart, or lingers; Trending / New arrivals are stable. Clicking a product opens the PDP (`ProductDetail.tsx`; a `#/p/<id>` hash history entry, no router library, so browser Back stays in-app and a reload restores the view) with its seed-based rails — *Similar items*, *Because you viewed*, *Customers also bought*, *Frequently bought together*. The taste itself is durable on the device: every folded interaction appends to an OPFS taste log (`src/signals/tasteLog.ts`, rolling 500-event window, no PII), boot replays it through the same fold with the bundle's `interaction_weights` to rebuild the profile, and a "Reset taste" control next to the For-You badge wipes log + profile back to baseline — still zero backend calls. The headline demo — `cd backend && uv run poe demo` (or `cd frontend && docker compose up` for a Docker-only run) — brings up the static signed-bundle origin + Caddy edge + the SPA; the browser does the search.
+A React + Vite SPA over `@edgereco/browser`, which composes `@gainratio/browser`. The app boots through an intro landing page (its performance tiles quote a dated, recorded measurement of the live site — `src/metrics/live-measurement.json`, written by `pnpm run measure:live` in real Chromium — through `src/metrics/landing-figures.ts`, and `landing-figures.test.ts` recomputes every tile from the raw runs); once launched, the store shows a live `MetricsStrip` of real per-session numbers (recommend latency, backend calls, cold start, JS heap, catalog size). The home page is a 5,040-product catalog grid (balanced across 12 categories, 420 products each) with a search box and a `RailStack` of *For You* / *Trending* / *New arrivals* rails — the For You rail re-ranks live as the user clicks, favorites, adds to cart, or lingers; Trending / New arrivals are stable. Clicking a product opens the PDP (`ProductDetail.tsx`; a `#/p/<id>` hash history entry, no router library, so browser Back stays in-app and a reload restores the view) with its seed-based rails — *Similar items*, *Because you viewed*, *Customers also bought*, *Frequently bought together*. The taste itself is durable on the device: every folded interaction appends to an OPFS taste log (`src/signals/tasteLog.ts`, rolling 500-event window, no PII), boot replays it through the same fold with the bundle's `interaction_weights` to rebuild the profile, and a "Reset taste" control next to the For-You badge wipes log + profile back to baseline — still zero backend calls. The headline demo — `cd backend && uv run poe demo` (or `cd frontend && docker compose up` for a Docker-only run) — brings up the static signed-bundle origin + Caddy edge + the SPA; the browser does the search.
 
 The SPA pins the verify public key (`public/public.key`) at build time — it never trusts the origin for the key. That trust root may be a raw 32-byte Ed25519 key or an `edgeproc.keyring/v1` JSON keyring (key rotation + revocation). The sync Worker and the ranking-proof check both parse it with `@gainratio/browser`'s `parseTrustRoot`, so the two readers always agree on its format.
 
@@ -273,7 +273,7 @@ that are not floats remain exact.
 
 ## Release reliability and performance contract
 
-The browser release gate uses the committed 720-product catalog, the real q8
+The browser release gate uses the committed 5,040-product catalog, the real q8
 MiniLM model, ONNX/WASM, signed-bundle sync, and headless Chromium. Budgets are
 chosen from the demo promise (a short first-load screen, then visibly instant local
 search), before measurement:
@@ -301,12 +301,12 @@ requires the exact-SHA and canonical-host checks in `.github/workflows/deploy.ym
 
 ```mermaid
 flowchart TB
-  build["Your cloud<br>build + sign the catalog<br>720 products → one 1.8 MB file"]
+  build["Your cloud<br>build + sign the catalog<br>5,040 products → one 17.0 MB bundle"]
   sync["Download once, then check it<br>Ed25519 + SHA-256<br>any mismatch aborts the load"]
   engine["Search + rank in the tab<br>keywords + meaning → fuse → personalize"]
   recs["Results and recommendations<br>0 backend calls · works offline"]
 
-  build -->|"one small signed file, served by any CDN"| sync
+  build -->|"one signed bundle, served by any CDN"| sync
   sync --> engine --> recs
 
   classDef cloud fill:#f0e8f8,stroke:#9472b0,color:#171717;
@@ -322,8 +322,8 @@ publish a new catalog, never to answer a search.
   search index and the ranking weights. *Content-addressed* means every piece is named by
   the hash of its own bytes, so it can be cached forever and cannot be changed without
   detection. It is a `latest` version pointer plus immutable `manifest/<hash>` and
-  `chunk/<hash>` objects. A committed 720-product bundle lives in
-  `backend/examples/catalog/` (1.8 MB on disk).
+  `chunk/<hash>` objects. A committed 5,040-product bundle lives in
+  `backend/examples/catalog/` (17.0 MB on disk).
 - **edge** is a Caddy reverse proxy (a small static web server standing in for a CDN)
   with the cache policy: immutable chunks cached forever, a short-lived pointer.
 - **browser tier**: the Nimbus single-page app syncs the bundle (fetches it, checks its
@@ -356,9 +356,9 @@ edit modifies only the touched SQLite B-tree leaf pages while every surrounding 
 stays identical. A client compares the new manifest with what it already has in OPFS and
 fetches only the pieces that changed, reusing the rest (notably the unaffected SQLite pages
 and vector rows). In the live Nimbus storefront, clicking **⚡ Apply delta** switches from the
-baseline catalog (`sequence: 16`) to the flash-sale delta overlay (`sequence: 17`, `/bundle-delta/`),
-fetches only **3 changed chunks (~18 KB)** while reusing **809 cached chunks** from OPFS (including
-**49 of 50** `catalogue.sqlite` chunks), and calls `EngineRuntime.syncUpdate()` to hot-swap the
+baseline catalog (`sequence: 18`) to the flash-sale delta overlay (`sequence: 19`, `/bundle-delta/`),
+fetches only **4 changed chunks (~42 KB)** while reusing **1,371 cached chunks** from OPFS (99.7%
+chunk reuse), and calls `EngineRuntime.syncUpdate()` to hot-swap the
 SQLite database in place — without reloading the page, the 23 MB ONNX model, or the shopper's
 `taste_events`. As [DEPLOY.md](DEPLOY.md) puts it: *"a one-line edit re-publishes one chunk;
 every consumer fetches one chunk and reuses the rest."*
@@ -504,7 +504,7 @@ without a coverage gap.
   - `backend/features/`: Gherkin behaviour specs, decoupled from step implementations
   - `backend/tests/`: `unit/` `bdd/` `integration/` `e2e/`
   - `backend/deploy/`: `Dockerfile`, `docker-compose.yml`, Caddy edge config
-  - `backend/examples/catalog/`: committed signed 720-product bundle (`latest` + `manifest/` + `chunk/`)
+  - `backend/examples/catalog/`: committed signed 5,040-product bundle (`latest` + `manifest/` + `chunk/`)
   - `backend/examples/source/catalog.csv`: committed, reproducible build source (12 balanced categories)
   - `backend/examples/keys/public.key`: pinned Ed25519 verify key for the bundle
   - `backend/demo_server/`: optional FastAPI launcher (not in the main checks); ships the synthetic fixture

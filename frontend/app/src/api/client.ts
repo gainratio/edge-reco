@@ -194,6 +194,7 @@ export interface DataClient {
 	browse(opts?: BrowseOptions): Promise<BrowseResponse>;
 	sendEvent(evt: InteractionEvent): Promise<void>;
 	catalogInfo(): Promise<{ readonly count: number }>;
+	dispose(): Promise<void>;
 }
 
 /**
@@ -500,6 +501,9 @@ export function createDataClient(deps: ClientDeps = {}): DataClient {
 		catalogInfo(): Promise<{ readonly count: number }> {
 			return Promise.resolve({ count: requireEngine().ntotal });
 		},
+		dispose(): Promise<void> {
+			return runtime.dispose();
+		},
 	};
 }
 
@@ -554,6 +558,7 @@ let active: DataClient = createDataClient();
  * client.
  */
 export function __setRuntimeForTests(deps: RuntimeDeps & ClientDeps): void {
+	void active.dispose();
 	active = createDataClient(deps);
 }
 

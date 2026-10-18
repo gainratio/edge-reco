@@ -77,7 +77,7 @@ const EXPORT_PATH = join(
 );
 
 const EXPORT_DESCRIPTION =
-	"EdgeReco relevance baseline over the committed amazon-demo bundle (720 synthetic products). " +
+	"EdgeReco relevance baseline over the committed amazon-demo bundle (5040 synthetic products). " +
 	"relevant_ids are ground truth derived from each product's generated breadcrumb path " +
 	"(catalog/preprocessor.py::_split_breadcrumbs) — upstream of BM25, the embeddings and " +
 	"the reranker, so the labels cannot be satisfied by the ranker's own scores. ranked_ids " +
@@ -118,19 +118,24 @@ async function syncedFiles(): Promise<VectorIndexFiles> {
 	) as IndexManifest;
 	const read = (path: string): Promise<Uint8Array> =>
 		materializeFile(store, manifest, path);
-	const [meta, state, embeddings, products] = await Promise.all([
+	const [meta, state, embeddings, products, sqlite] = await Promise.all([
 		read("catalog_meta.json"),
 		read("vector/state.json"),
 		read("vector/embeddings.f32"),
 		read("products.jsonl"),
+		read("catalogue.sqlite"),
 	]);
-	return { meta, state, embeddings, products };
+	return { meta, state, embeddings, products, sqlite };
 }
 
 /** The catalog, read off the verified sync path with no model in the loop. */
 async function catalogProducts(): Promise<ReadonlyArray<Product>> {
 	const engine = await createSearchEngine(await syncedFiles(), stubEmbedder);
-	return engine.catalog();
+	try {
+		return engine.catalog();
+	} finally {
+		await engine.dispose();
+	}
 }
 
 /** The full pipeline: real transformers.js embedder -> FTS5 bm25 + vector -> RRF (SQL) -> rerank. */
@@ -281,38 +286,45 @@ describe.skipIf(SKIP)("relevance export", () => {
 		"ranks the golden set through the real engine and writes the export",
 		async () => {
 			const engine = await realEngine();
-			const products = engine.catalog();
-			const queries: ExportedQuery[] = [];
-			for (const entry of GOLDEN_QUERIES) {
-				const response = await engine.search(entry.query, {
-					limit: RELEVANCE_K,
-				});
-				queries.push({
-					query: entry.query,
-					relevant_ids: relevantIds(products, entry.labelNodes),
-					ranked_ids: response.results.map((r) => r.product.id),
-					segment: entry.segment,
-					label_rationale: entry.rationale,
-				});
+			try {
+				const products = engine.catalog();
+				const queries: ExportedQuery[] = [];
+				for (const entry of GOLDEN_QUERIES) {
+					const response = await engine.search(entry.query, {
+						limit: RELEVANCE_K,
+					});
+					queries.push({
+						query: entry.query,
+						relevant_ids: relevantIds(products, entry.labelNodes),
+						ranked_ids: response.results.map((r) => r.product.id),
+						segment: entry.segment,
+						label_rationale: entry.rationale,
+					});
+				}
+				const payload: RelevanceExport = {
+					description: EXPORT_DESCRIPTION,
+					catalog_id: CATALOG_ID,
+					label_method: LABEL_METHOD,
+					embedder: "real",
+					k: RELEVANCE_K,
+					queries,
+				};
+				// Only rewrite when the ranking actually moved. The committed artifact is
+				// Biome-formatted (short arrays collapsed) while JSON.stringify always
+				// expands them, so an unconditional write would un-format the file on
+				// every run and leave the package's own lint red. Skipping the no-op
+				// write keeps `pnpm test` idempotent AND makes a rewrite meaningful: a
+				// dirty relevance_export.json means the engine's output changed.
+				if (!matchesCommitted(payload)) {
+					writeFileSync(
+						EXPORT_PATH,
+						`${JSON.stringify(payload, null, "\t")}\n`,
+					);
+				}
+				expect(queries).toHaveLength(GOLDEN_QUERIES.length);
+			} finally {
+				await engine.dispose();
 			}
-			const payload: RelevanceExport = {
-				description: EXPORT_DESCRIPTION,
-				catalog_id: CATALOG_ID,
-				label_method: LABEL_METHOD,
-				embedder: "real",
-				k: RELEVANCE_K,
-				queries,
-			};
-			// Only rewrite when the ranking actually moved. The committed artifact is
-			// Biome-formatted (short arrays collapsed) while JSON.stringify always
-			// expands them, so an unconditional write would un-format the file on
-			// every run and leave the package's own lint red. Skipping the no-op
-			// write keeps `pnpm test` idempotent AND makes a rewrite meaningful: a
-			// dirty relevance_export.json means the engine's output changed.
-			if (!matchesCommitted(payload)) {
-				writeFileSync(EXPORT_PATH, `${JSON.stringify(payload, null, "\t")}\n`);
-			}
-			expect(queries).toHaveLength(GOLDEN_QUERIES.length);
 		},
 		TIMEOUT_MS,
 	);
@@ -325,12 +337,16 @@ describe.skipIf(SKIP)("relevance regressions through the real engine", () => {
 		"puts a Stadium Seats product first for 'stadium seat'",
 		async () => {
 			const engine = await realEngine();
-			const response = await engine.search("stadium seat", {
-				limit: RELEVANCE_K,
-			});
-			expect(response.results[0]?.product.subcategories).toContain(
-				"Stadium Seats",
-			);
+			try {
+				const response = await engine.search("stadium seat", {
+					limit: RELEVANCE_K,
+				});
+				expect(response.results[0]?.product.subcategories).toContain(
+					"Stadium Seats",
+				);
+			} finally {
+				await engine.dispose();
+			}
 		},
 		TIMEOUT_MS,
 	);

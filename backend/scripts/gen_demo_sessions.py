@@ -43,9 +43,9 @@ def _shelf(breadcrumbs: str) -> tuple[str, str]:
 
 
 def _ids_by_shelf() -> dict[tuple[str, str], list[str]]:
-    """Group the source catalog's product ids by shelf (sorted, deterministic)."""
+    """Group the source catalog's Pass-0 product ids by shelf (sorted, deterministic)."""
     with SOURCE_CSV.open(newline="", encoding="utf-8") as handle:
-        rows = list(csv.DictReader(handle))
+        rows = list(csv.DictReader(handle))[:720]
     grouped: dict[tuple[str, str], list[str]] = defaultdict(list)
     for row in rows:
         grouped[_shelf(row["breadcrumbs"])].append(row["asin"])
