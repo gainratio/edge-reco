@@ -286,11 +286,7 @@ def publish_bundle(
         require_feature_files,
         sqlite_only=sqlite_only,
     )
-    chunker = (
-        GearCDC(min_size=32768, avg_size=65536, max_size=262144)
-        if sqlite_only
-        else GearCDC()
-    )
+    chunker = GearCDC(min_size=32768, avg_size=65536, max_size=262144) if sqlite_only else GearCDC()
     origin_dir.mkdir(parents=True, exist_ok=True)
     with _publish_lock(origin_dir):
         sequence = _require_increasing(

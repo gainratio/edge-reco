@@ -210,8 +210,6 @@ def test_publish_bundle_sqlite_only_quantizes_int8_and_omits_redundant_files(
     db_file.write_bytes(sqlite_bytes)
     with closing(sqlite3.connect(db_file)) as conn:
         lengths = [
-            row[0]
-            for row in conn.execute("SELECT length(embedding) FROM products").fetchall()
+            row[0] for row in conn.execute("SELECT length(embedding) FROM products").fetchall()
         ]
         assert lengths == [_DIM, _DIM]
-
