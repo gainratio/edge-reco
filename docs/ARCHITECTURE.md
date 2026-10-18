@@ -301,7 +301,7 @@ requires the exact-SHA and canonical-host checks in `.github/workflows/deploy.ym
 
 ```mermaid
 flowchart TB
-  build["Your cloud<br>build + sign the catalog<br>100,000 products → one 50.6 MB bundle"]
+  build["Your cloud<br>build + sign the catalog<br>100,000 products → one 32.6 MB bundle"]
   sync["Download once, then check it<br>Ed25519 + SHA-256<br>any mismatch aborts the load"]
   engine["Search + rank in the tab<br>keywords + meaning → fuse → personalize"]
   recs["Results and recommendations<br>0 backend calls · works offline"]
@@ -324,7 +324,7 @@ publish a new catalog, never to answer a search.
   the hash of its own bytes, so it can be cached forever and cannot be changed without
   detection. It is a `latest` version pointer plus immutable `manifest/<hash>` and
   `chunk/<hash>` objects. A committed 100,000-product bundle lives in
-  `backend/examples/catalog/` (50.6 MB / 48.2 MiB on disk).
+  `backend/examples/catalog/` (32.6 MB / 31.1 MiB on disk).
 - **edge** is a Caddy reverse proxy (a small static web server standing in for a CDN)
   with the cache policy: immutable chunks cached forever, a short-lived pointer.
 - **browser tier**: the Nimbus single-page app syncs the bundle (fetches it, checks its
@@ -357,8 +357,8 @@ edit modifies only the touched SQLite B-tree leaf pages while every surrounding 
 stays identical. A client compares the new manifest with what it already has in OPFS and
 fetches only the pieces that changed, reusing the rest (notably the unaffected SQLite pages
 and vector rows). In the live Nimbus storefront, clicking **⚡ Apply delta** switches from the
-baseline catalog (`sequence: 19`) to the flash-sale delta overlay (`sequence: 20`, `/bundle-delta/`),
-fetches only **2 changed chunks (~32 KB)** while reusing **2,042 cached chunks** from OPFS (99.90%
+baseline catalog (`sequence: 30`) to the flash-sale delta overlay (`sequence: 31`, `/bundle-delta/`),
+fetches only **2 changed chunks (~32 KB)** while reusing **2,059 cached chunks** from OPFS (99.90%
 chunk reuse), and calls `EngineRuntime.syncUpdate()` to hot-swap the
 SQLite database in place — without reloading the page, the 23 MB ONNX model, or the shopper's
 `taste_events`. As [DEPLOY.md](DEPLOY.md) puts it: *"a one-line edit re-publishes one chunk;

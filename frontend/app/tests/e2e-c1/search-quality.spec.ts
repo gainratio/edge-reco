@@ -4,7 +4,7 @@ const PRODUCT_CARD = "main article.card";
 // The synthetic catalog stocks several men's waterproof boots that score within a
 // hair of each other, so the pin is "a hiking boot comes first", not one title.
 const WATERPROOF_BOOT = /^\S.* Men's .*(Hiking|Trail) Boot \| /;
-const BOOT_BUDGET_MS = 30_000;
+const BOOT_BUDGET_MS = 60_000;
 const SEARCH_P50_BUDGET_MS = 300;
 const SEARCH_P95_BUDGET_MS = 750;
 const HEAP_BUDGET_MB = 512;

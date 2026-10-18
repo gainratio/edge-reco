@@ -106,7 +106,7 @@ test("re-sync after first sync fetches only-changed chunks (chunksFetched == 0)"
 	expect(second?.chunksReused).toBe(first?.chunksFetched);
 });
 
-test("delta-sync from /catalog (v1) to /catalog-delta (v2) fetches only the 2 changed chunks and reuses 2,042 cached chunks", async ({
+test("delta-sync from /catalog (v1) to /catalog-delta (v2) fetches only the 2 changed chunks and reuses 2,059 cached chunks", async ({
 	page,
 }) => {
 	const first = await page.evaluate(
@@ -114,7 +114,7 @@ test("delta-sync from /catalog (v1) to /catalog-delta (v2) fetches only the 2 ch
 		[CATALOG, PUBKEY],
 	);
 	expect(first?.version).toBe("v1");
-	expect(first?.chunksFetched).toBe(2044);
+	expect(first?.chunksFetched).toBe(2061);
 	expect(first?.chunksReused).toBe(0);
 
 	const delta = await page.evaluate(
@@ -123,7 +123,7 @@ test("delta-sync from /catalog (v1) to /catalog-delta (v2) fetches only the 2 ch
 	);
 	expect(delta?.version).toBe("v2");
 	expect(delta?.chunksFetched).toBe(2);
-	expect(delta?.chunksReused).toBe(2042);
+	expect(delta?.chunksReused).toBe(2059);
 	expect(delta?.bytesFetched).toBeGreaterThan(0);
 	expect(delta?.bytesFetched).toBeLessThan(60_000);
 });

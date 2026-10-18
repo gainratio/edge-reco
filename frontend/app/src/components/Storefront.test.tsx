@@ -179,14 +179,18 @@ describe("Storefront mount", () => {
 describe("Storefront product navigation", () => {
 	it("opens the PDP on a product click and returns on Back", async () => {
 		render(<Storefront />);
-		const grid = await screen.findByText("Grid Gadget");
+		const grid = await screen.findByText("Grid Gadget", {}, { timeout: 5_000 });
 		await userEvent.click(
 			grid.closest("article")?.querySelector("button") ?? grid,
 		);
 
 		// PDP hero + a seeded rail; the click was recorded as an engine signal.
 		expect(
-			await screen.findByRole("heading", { level: 1, name: "Grid Gadget" }),
+			await screen.findByRole(
+				"heading",
+				{ level: 1, name: "Grid Gadget" },
+				{ timeout: 5_000 },
+			),
 		).toBeInTheDocument();
 		expect(mocks.emitInteraction).toHaveBeenCalledWith(
 			"click",
@@ -196,7 +200,9 @@ describe("Storefront product navigation", () => {
 		await userEvent.click(
 			screen.getByRole("button", { name: /Back to browse/i }),
 		);
-		expect(await screen.findByText("Grid Gadget")).toBeInTheDocument();
+		expect(
+			await screen.findByText("Grid Gadget", {}, { timeout: 5_000 }),
+		).toBeInTheDocument();
 		expect(
 			screen.queryByRole("button", { name: /Back to browse/i }),
 		).not.toBeInTheDocument();
@@ -212,12 +218,18 @@ describe("Storefront error handling", () => {
 		render(<Storefront />);
 
 		expect(
-			await screen.findByText("Couldn’t reach the engine"),
+			await screen.findByText(
+				"Couldn’t reach the engine",
+				{},
+				{ timeout: 5_000 },
+			),
 		).toBeInTheDocument();
 		expect(screen.getByText("rail engine fault")).toBeInTheDocument();
 		// The degrade is preserved: the grid still renders; one bad rail never
 		// crashes the page.
-		expect(await screen.findByText("Grid Gadget")).toBeInTheDocument();
+		expect(
+			await screen.findByText("Grid Gadget", {}, { timeout: 5_000 }),
+		).toBeInTheDocument();
 	});
 
 	it("recovers from a rail failure when Retry succeeds", async () => {

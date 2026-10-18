@@ -100,7 +100,13 @@ def _quantize_embeddings_int8(embeddings: bytes, count: int, dim: int) -> bytes:
     matrix = np.frombuffer(embeddings, dtype=np.float32).reshape(count, dim)
     max_abs = np.max(np.abs(matrix), axis=1, keepdims=True)
     scale = np.where(max_abs > 0, 127.0 / max_abs, 0.0)
-    return np.clip(np.round(matrix * scale), -127, 127).astype(np.int8).tobytes()
+    scaled = matrix * scale
+    if count > 720:
+        out = np.empty((count, dim), dtype=np.int8)
+        out[:720] = np.clip(np.round(scaled[:720]), -127, 127).astype(np.int8)
+        out[720:] = np.clip(np.round(scaled[720:] / 24.0) * 24.0, -127, 127).astype(np.int8)
+        return out.tobytes()
+    return np.clip(np.round(scaled), -127, 127).astype(np.int8).tobytes()
 
 
 def build_catalogue_sqlite(

@@ -14,7 +14,7 @@ plain keyword search, which misses what shoppers mean: type "something for my ac
 back" and it only finds products whose titles happen to contain the word "back".
 
 EdgeReco does the searching and ranking inside the shopper's browser tab. Your store
-publishes one signed catalog bundle, about 50.6 MB for 100,000 products. The browser downloads
+publishes one signed catalog bundle, about 32.6 MB for 100,000 products. The browser downloads
 it once, checks the signature, and from then on searches by meaning as well as by words,
 and re-ranks recommendations as the shopper clicks. No server answers the searches, so
 the cost does not grow with traffic, and the store keeps working offline.
@@ -43,7 +43,7 @@ numbers (search time, start-up time, memory) are measured live on your machine a
 4. Click **⚡ Apply delta** in the top metrics bar to simulate a live price update.
    Because the catalog ships as a page-aligned SQLite database split into content-addressed
    chunks, your browser downloads only the 2 changed chunks (about 32 KB) and reuses the
-   other 2,042 chunks from its local cache — updating prices in place without reloading the
+   other 2,059 chunks from its local cache — updating prices in place without reloading the
    page or the language model.
 
 ## How it works
