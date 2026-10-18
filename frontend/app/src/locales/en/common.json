@@ -1,7 +1,7 @@
 {
 	"footer": {
 		"navLabel": "EdgeReco",
-		"thesis": "by hseshadr is open source — and runs on your device. Search, ranking, and recommendations execute right in this browser tab, with no per-query backend.",
+		"thesis": "by gainratio is open source — and runs on your device. Search, ranking, and recommendations execute right in this browser tab, with no per-query backend.",
 		"links": {
 			"repo": "EdgeReco on GitHub",
 			"substrate": "EdgeProc substrate",
@@ -13,7 +13,7 @@
 		},
 		"moreLabel": "More from the same maintainer",
 		"moreLead": "Built the same way — the heavy work runs in your browser, not on a server:",
-		"demoBefore": "Nimbus is a fictional demo store built to showcase",
+		"demoBefore": "This fictional demo store is built to showcase",
 		"demoAfter": "— its entire search-and-recommend brain runs in this browser tab.",
 		"attribution": "Product data: {{statement}}"
 	}

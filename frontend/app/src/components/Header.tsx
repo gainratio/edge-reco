@@ -23,7 +23,7 @@ export function Header({
 			<div className="nimbus-header__bar">
 				<div className="wordmark">
 					<span className="wordmark__name">
-						Nimbus<span className="wordmark__dot">.</span>
+						EdgeReco<span className="wordmark__dot">.</span>
 					</span>
 					<span className="wordmark__tag">{t("brand.tagline")}</span>
 				</div>

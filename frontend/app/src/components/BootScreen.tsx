@@ -66,7 +66,7 @@ export function BootScreen({
 			<div className="boot__card">
 				<div className="wordmark boot__mark">
 					<span className="wordmark__name">
-						Nimbus<span className="wordmark__dot">.</span>
+						EdgeReco<span className="wordmark__dot">.</span>
 					</span>
 					<span className="wordmark__tag">{t("boot.tagline")}</span>
 				</div>
