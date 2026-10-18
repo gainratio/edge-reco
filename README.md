@@ -14,7 +14,7 @@ plain keyword search, which misses what shoppers mean: type "something for my ac
 back" and it only finds products whose titles happen to contain the word "back".
 
 EdgeReco does the searching and ranking inside the shopper's browser tab. Your store
-publishes one signed catalog file, about 1.8 MB for 720 products. The browser downloads
+publishes one signed catalog bundle, about 17.0 MB for 5,040 products. The browser downloads
 it once, checks the signature, and from then on searches by meaning as well as by words,
 and re-ranks recommendations as the shopper clicks. No server answers the searches, so
 the cost does not grow with traffic, and the store keeps working offline.
@@ -24,12 +24,12 @@ the cost does not grow with traffic, and the store keeps working offline.
 ## Try it
 
 1. Open [edge-reco.com](https://edge-reco.com) and click **Launch the live demo**. This
-   opens Nimbus, a pretend store with 720 made-up products. The first launch downloads the
-   catalog and a small language model (about 46 MB in total), so give it a moment. Later
-   visits start from the copy in your browser.
+   opens Nimbus, a pretend store with 5,040 made-up products across 12 departments. The
+   first launch downloads the catalog and a small language model, so give it a moment.
+   Later visits start from the copy in your browser.
 2. Type `something for my aching back` in the search box and press Enter.
 
-![The Nimbus demo store after searching "something for my aching back": a neck and back massager is the first result, then a stadium seat with back support. The strip under the search box reads 0 backend calls and 720 catalog.](docs/assets/search-aching-back.png)
+![The Nimbus demo store after searching "something for my aching back": a neck and back massager is the first result, then a stadium seat with back support. The strip under the search box reads 0 backend calls and 5,040 catalog.](docs/assets/search-aching-back.png)
 
 A neck and back massager comes first, then a stadium seat with back support. Only three
 products come back, because nothing else in the store is a good match. The strip under
@@ -42,8 +42,8 @@ numbers (search time, start-up time, memory) are measured live on your machine a
    your browser. **Reset taste** clears them.
 4. Click **⚡ Apply delta** in the top metrics bar to simulate a live price update.
    Because the catalog ships as a page-aligned SQLite database split into content-addressed
-   chunks, your browser downloads only the 3 changed chunks (about 18 KB) and reuses the
-   other 809 chunks from its local cache — updating prices in place without reloading the
+   chunks, your browser downloads only the 4 changed chunks (about 42 KB) and reuses the
+   other 1,371 chunks from its local cache — updating prices in place without reloading the
    page or the language model.
 
 ## How it works

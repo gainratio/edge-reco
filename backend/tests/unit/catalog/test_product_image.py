@@ -10,9 +10,12 @@ from defusedxml.minidom import parseString
 from edgereco.catalog.models import Product
 from edgereco.catalog.product_icons import icon_body
 from edgereco.catalog.product_image import (
+    MAX_SIGNED_CARDS,
+    ImageMode,
     generate_product_image,
     image_relpath,
     local_image_url,
+    localize_catalog,
 )
 
 
@@ -93,7 +96,7 @@ def test_card_names_the_product_for_assistive_tech() -> None:
 
 
 def test_card_stays_small() -> None:
-    # 720 of these ship in the signed bundle; the old card averaged ~1.66 KB.
+    # 760 of these ship in the signed bundle; the old card averaged ~1.66 KB.
     svg = generate_product_image(_product())
     assert len(svg.encode("utf-8")) < 1600
 
@@ -122,6 +125,25 @@ def test_rejects_unsafe_ids(bad_id: str) -> None:
         image_relpath(bad_id)
     with pytest.raises(ValueError, match="unsafe product id"):
         local_image_url(bad_id)
+
+
+def test_localize_catalog_pools_cards_past_max_signed_cards() -> None:
+    rows = [
+        _product(id=f"NB-{i:05d}", title=f"Item {i}").model_dump_json()
+        for i in range(1, MAX_SIGNED_CARDS + 5)
+    ]
+    rewritten, cards = localize_catalog("\n".join(rows))
+    assert len(cards) == MAX_SIGNED_CARDS
+    tail = Product.model_validate_json(rewritten.splitlines()[-1])
+    assert tail.image_url is not None
+    assert tail.image_url.startswith("/images/NB-00")
+
+
+def test_localize_catalog_remote_mode_is_noop() -> None:
+    raw = _product(image_url="https://example.com/a.jpg").model_dump_json() + "\n"
+    rewritten, cards = localize_catalog(raw, mode=ImageMode.REMOTE)
+    assert rewritten == raw
+    assert cards == {}
 
 
 def _fill_stops(svg: str) -> list[str]:

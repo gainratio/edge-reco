@@ -14,7 +14,7 @@ import {
 	materializeFile,
 	syncIndex,
 } from "@gainratio/browser";
-import { describe, expect, it } from "vitest";
+import { afterEach, describe, expect, it } from "vitest";
 import parityFixture from "./__fixtures__/strategy_parity.json" with {
 	type: "json",
 };
@@ -28,6 +28,13 @@ const DECODER = new TextDecoder();
 const stubEmbedder: Embedder = {
 	embed: () => Promise.reject(new Error("embedder unused on these paths")),
 };
+const opened: SearchEngine[] = [];
+
+afterEach(async () => {
+	while (opened.length > 0) {
+		await opened.pop()?.dispose();
+	}
+});
 
 interface StrategyCase {
 	readonly strategy: string;
@@ -60,20 +67,23 @@ async function syncedFiles(): Promise<VectorIndexFiles> {
 	) as IndexManifest;
 	const read = (path: string): Promise<Uint8Array> =>
 		materializeFile(store, manifest, path);
-	const [meta, state, embeddings, products] = await Promise.all([
+	const [meta, state, embeddings, products, sqlite] = await Promise.all([
 		read("catalog_meta.json"),
 		read("vector/state.json"),
 		read("vector/embeddings.f32"),
 		read("products.jsonl"),
+		read("catalogue.sqlite"),
 	]);
-	return { meta, state, embeddings, products };
+	return { meta, state, embeddings, products, sqlite };
 }
 
 /** Build the engine over the real bundle, threading its verified strategy config. */
 async function engine(): Promise<SearchEngine> {
 	// createSearchEngine defaults to DEFAULT_RANKING_CONFIG, which equals the
 	// committed bundle's ranking_config.json (asserted in rankingConfig.test.ts).
-	return createSearchEngine(await syncedFiles(), stubEmbedder);
+	const instance = await createSearchEngine(await syncedFiles(), stubEmbedder);
+	opened.push(instance);
+	return instance;
 }
 
 describe("multi-strategy recommend() parity vs Python strategy_parity.json", () => {

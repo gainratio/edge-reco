@@ -160,7 +160,7 @@
     {
       "dot": "rose",
       "title": "Page-aligned Gear-CDC delta sync",
-      "items": ["Immutable 4 KiB SQLite + index chunks are named by SHA-256", "Catalog updates fetch only changed chunks and reuse OPFS cache"]
+      "items": ["5,040-product SQLite + vector bundle split into SHA-256 chunks", "Price updates fetch 4 changed chunks and reuse 1,371 OPFS chunks"]
     },
     {
       "dot": "cyan",

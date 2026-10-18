@@ -7,7 +7,7 @@ import {
 	materializeFile,
 	syncIndex,
 } from "@gainratio/browser";
-import { describe, expect, it } from "vitest";
+import { afterEach, describe, expect, it } from "vitest";
 import type { InteractionEvent, Product } from "./domain";
 import type { Embedder } from "./embedder";
 import { catalogFetch } from "./fixtures";
@@ -20,6 +20,13 @@ const DECODER = new TextDecoder();
 const stubEmbedder: Embedder = {
 	embed: () => Promise.reject(new Error("embedder unused on these paths")),
 };
+const opened: SearchEngine[] = [];
+
+afterEach(async () => {
+	while (opened.length > 0) {
+		await opened.pop()?.dispose();
+	}
+});
 
 async function syncedFiles(): Promise<VectorIndexFiles> {
 	const store = new MemoryCacheStore();
@@ -35,17 +42,20 @@ async function syncedFiles(): Promise<VectorIndexFiles> {
 	) as IndexManifest;
 	const read = (path: string): Promise<Uint8Array> =>
 		materializeFile(store, manifest, path);
-	const [meta, state, embeddings, products] = await Promise.all([
+	const [meta, state, embeddings, products, sqlite] = await Promise.all([
 		read("catalog_meta.json"),
 		read("vector/state.json"),
 		read("vector/embeddings.f32"),
 		read("products.jsonl"),
+		read("catalogue.sqlite"),
 	]);
-	return { meta, state, embeddings, products };
+	return { meta, state, embeddings, products, sqlite };
 }
 
 async function engine(): Promise<SearchEngine> {
-	return createSearchEngine(await syncedFiles(), stubEmbedder);
+	const instance = await createSearchEngine(await syncedFiles(), stubEmbedder);
+	opened.push(instance);
+	return instance;
 }
 
 describe("hybrid engine recommend/browse", () => {

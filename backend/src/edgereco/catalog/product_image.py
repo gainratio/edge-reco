@@ -53,6 +53,11 @@ _ICON_SCALE = 6.5
 #: frame and horizontal rails crop to ~1.8:1 (``object-fit: cover``), so the podium,
 #: tile, icon, and brand badge all sit inside the y=145..455 safe band.
 _ICON_CY = 264
+#: ``@gainratio/browser`` caps signed manifest files at 1,024 (``MAX_SYNC_FILES``).
+#: The first 720 products (Pass 0 across every shelf) plus any new ``(icon, brand)``
+#: pair in later passes mint their own signed SVG card; later products on the same
+#: shelf and brand cycle across those canonical cards.
+MAX_SIGNED_CARDS = 720
 
 
 def _require_safe_id(product_id: str) -> str:
@@ -72,22 +77,34 @@ def local_image_url(product_id: str, extension: str = "svg") -> str:
     return f"/images/{_require_safe_id(product_id)}.{_require_safe_id(extension)}"
 
 
-def _localize_line(line: str, staged: Mapping[str, str]) -> tuple[str, str, bytes | None]:
-    """One catalog line -> (rewritten line, card relpath, card bytes or None).
+def _card_key(product: Product) -> tuple[str, str]:
+    return (icon_for(product).name, product.brand.strip().casefold())
 
-    ``staged`` maps a product id to the extension of a REAL photo the build already
-    localized. For those, the url points at the photo and no bytes are emitted — the
-    file is already on disk and must not be overwritten by a placeholder.
-    """
-    product = Product.model_validate_json(line)
+
+def _resolve_card_id(
+    product: Product,
+    index: int,
+    key: tuple[str, str],
+    seen: int,
+    staged: Mapping[str, str],
+    pools: dict[tuple[str, str], list[str]],
+    cards: dict[str, bytes],
+) -> str:
+    """Pick or mint the card id for ``product`` while keeping manifest entries bounded."""
+    if product.id in staged:
+        return product.id
+    if index < MAX_SIGNED_CARDS or key not in pools:
+        cards[image_relpath(product.id)] = generate_product_image(product).encode("utf-8")
+        pools.setdefault(key, []).append(product.id)
+        return product.id
+    pool = pools[key]
+    return pool[seen % len(pool)]
+
+
+def _rewrite_image_url(line: str, card_id: str, extension: str | None) -> str:
     record = json.loads(line)
-    extension = staged.get(product.id)
-    record["image_url"] = local_image_url(product.id, extension or "svg")
-    rewritten = json.dumps(record, ensure_ascii=False, separators=(",", ":"))
-    if extension is not None:
-        return rewritten, image_relpath(product.id, extension), None
-    svg = generate_product_image(product).encode("utf-8")
-    return rewritten, image_relpath(product.id), svg
+    record["image_url"] = local_image_url(card_id, extension or "svg")
+    return json.dumps(record, ensure_ascii=False, separators=(",", ":"))
 
 
 def localize_catalog(
@@ -127,12 +144,16 @@ def localize_catalog(
 def _localize_records(raw: str, staged: Mapping[str, str]) -> tuple[str, dict[str, bytes]]:
     """Rewrite every non-blank record and collect the cards this call had to render."""
     cards: dict[str, bytes] = {}
+    pools: dict[tuple[str, str], list[str]] = {}
+    counts: dict[tuple[str, str], int] = {}
     lines: list[str] = []
-    for line in filter(str.strip, raw.split("\n")):
-        rewritten, relpath, svg = _localize_line(line, staged)
-        lines.append(rewritten)
-        if svg is not None:
-            cards[relpath] = svg
+    for index, line in enumerate(filter(str.strip, raw.split("\n"))):
+        product = Product.model_validate_json(line)
+        key = _card_key(product)
+        seen = counts.get(key, 0)
+        counts[key] = seen + 1
+        card_id = _resolve_card_id(product, index, key, seen, staged, pools, cards)
+        lines.append(_rewrite_image_url(line, card_id, staged.get(product.id)))
     return "".join(f"{line}\n" for line in lines), cards
 
 

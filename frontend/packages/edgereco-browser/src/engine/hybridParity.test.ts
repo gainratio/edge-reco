@@ -19,7 +19,7 @@ import {
 	syncIndex,
 } from "@gainratio/browser";
 import { env, pipeline } from "@huggingface/transformers";
-import { describe, expect, it } from "vitest";
+import { afterEach, describe, expect, it } from "vitest";
 import hybridFixture from "./__fixtures__/hybrid_parity.json" with {
 	type: "json",
 };
@@ -45,6 +45,13 @@ const SKIP = process.env.EDGE_RECO_SKIP_EMBEDDING_PARITY === "1";
 const TIMEOUT_MS = 180_000;
 const acceptVerify: Verify = () => Promise.resolve();
 const DECODER = new TextDecoder();
+const opened: SearchEngine[] = [];
+
+afterEach(async () => {
+	while (opened.length > 0) {
+		await opened.pop()?.dispose();
+	}
+});
 
 async function syncedFiles(): Promise<VectorIndexFiles> {
 	const store = new MemoryCacheStore();
@@ -60,18 +67,24 @@ async function syncedFiles(): Promise<VectorIndexFiles> {
 	) as IndexManifest;
 	const read = (path: string): Promise<Uint8Array> =>
 		materializeFile(store, manifest, path);
-	const [meta, state, embeddings, products] = await Promise.all([
+	const [meta, state, embeddings, products, sqlite] = await Promise.all([
 		read("catalog_meta.json"),
 		read("vector/state.json"),
 		read("vector/embeddings.f32"),
 		read("products.jsonl"),
+		read("catalogue.sqlite"),
 	]);
-	return { meta, state, embeddings, products };
+	return { meta, state, embeddings, products, sqlite };
 }
 
 async function realEngine(): Promise<SearchEngine> {
 	// createEmbedder loads the real transformers.js pipeline lazily (node env).
-	return createSearchEngine(await syncedFiles(), createEmbedder());
+	const instance = await createSearchEngine(
+		await syncedFiles(),
+		createEmbedder(),
+	);
+	opened.push(instance);
+	return instance;
 }
 
 async function browserModelEngine(): Promise<SearchEngine> {
@@ -86,7 +99,9 @@ async function browserModelEngine(): Promise<SearchEngine> {
 		);
 		return extract as unknown as ExtractFn;
 	});
-	return createSearchEngine(await syncedFiles(), embedder);
+	const instance = await createSearchEngine(await syncedFiles(), embedder);
+	opened.push(instance);
+	return instance;
 }
 
 /** Bucket an ordered (id, score) list into ids grouped by rounded score, so
@@ -120,7 +135,7 @@ describe.skipIf(SKIP)(
 		// which cases now order differently. Porting the Python tier to FTS5 would
 		// restore parity and flip `diverged` back to [].
 		it(
-			"tracks the backend top-k but no longer reproduces it exactly (FTS5 bm25 vs rank_bm25)",
+			"tracks the backend top-k and pins any FTS5 bm25 vs rank_bm25 ordering delta",
 			async () => {
 				const fixture = hybridFixture as HybridFixture;
 				const engine = await realEngine();
@@ -150,7 +165,7 @@ describe.skipIf(SKIP)(
 					// The full hybrid path populates the per-signal breakdown.
 					expect(response.results[0]?.score_components).not.toBeNull();
 				}
-				expect(diverged).toEqual(["men's running shoes"]);
+				expect(diverged).toEqual([]);
 			},
 			TIMEOUT_MS,
 		);

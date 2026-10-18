@@ -35,13 +35,14 @@ async function syncedFiles(): Promise<VectorIndexFiles> {
 	void pointer;
 	const read = (path: string): Promise<Uint8Array> =>
 		materializeFile(store, manifest, path);
-	const [meta, state, embeddings, products] = await Promise.all([
+	const [meta, state, embeddings, products, sqlite] = await Promise.all([
 		read("catalog_meta.json"),
 		read("vector/state.json"),
 		read("vector/embeddings.f32"),
 		read("products.jsonl"),
+		read("catalogue.sqlite"),
 	]);
-	return { meta, state, embeddings, products };
+	return { meta, state, embeddings, products, sqlite };
 }
 
 function encoder(vectors: ReadonlyArray<ReadonlyArray<number>>): {
