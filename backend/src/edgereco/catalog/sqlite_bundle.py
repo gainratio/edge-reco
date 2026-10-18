@@ -156,12 +156,21 @@ def _load_faiss_ids(state_path: Path, expected_count: int) -> list[str]:
     return [str(item) for item in ids]
 
 
-def _resolve_row_tags(product: Product, *, compact: bool) -> list[str]:
-    if not compact:
-        return product.tags
+def _resolve_row_tags(product: Product) -> list[str]:
     if product.tags:
         return [t[:12] for t in product.tags[:1]]
     return [product.category.split()[0].lower()] if product.category else []
+
+
+def _compact_product(product: Product) -> Product:
+    return product.model_copy(
+        update={
+            "title": product.title[:52].strip(),
+            "description": "",
+            "tags": _resolve_row_tags(product),
+            "brand": product.brand[:14].strip(),
+        }
+    )
 
 
 def _product_row(
@@ -173,22 +182,19 @@ def _product_row(
     *,
     compact: bool = False,
 ) -> tuple[int, str, str, str, str, str, str, str, float, float, float, str, bytes]:
-    resolved = product or Product(id=product_id, title="", category="")
+    base = product or Product(id=product_id, title="", category="")
+    resolved = _compact_product(base) if compact else base
     start = row_idx * row_bytes
     vector_blob = embeddings[start : start + row_bytes]
-    title = resolved.title[:52].strip() if compact else resolved.title
-    description = "" if compact else resolved.description
-    tags = _resolve_row_tags(resolved, compact=compact)
-    brand = resolved.brand[:14].strip() if compact else resolved.brand
     return (
         row_idx,
         product_id,
-        title,
-        description,
+        resolved.title,
+        resolved.description,
         resolved.category,
-        " ".join(tags),
-        json.dumps(tags, ensure_ascii=False, separators=(",", ":")),
-        brand,
+        " ".join(resolved.tags),
+        json.dumps(resolved.tags, ensure_ascii=False, separators=(",", ":")),
+        resolved.brand,
         float(resolved.price or 0.0),
         float(resolved.popularity_score),
         float(resolved.freshness_score),

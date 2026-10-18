@@ -81,6 +81,29 @@ def _card_key(product: Product) -> tuple[str, str]:
     return (icon_for(product).name, product.brand.strip().casefold())
 
 
+def _should_mint_card(
+    index: int,
+    key: tuple[str, str],
+    pools: Mapping[tuple[str, str], list[str]],
+    cards: Mapping[str, bytes],
+) -> bool:
+    if len(cards) >= MAX_SIGNED_CARDS:
+        return False
+    return index < MAX_SIGNED_CARDS or key not in pools
+
+
+def _fallback_pool(
+    key: tuple[str, str],
+    pools: Mapping[tuple[str, str], list[str]],
+    icon_pools: Mapping[str, list[str]],
+    all_cards: list[str],
+) -> list[str]:
+    by_key = pools.get(key)
+    if by_key:
+        return by_key
+    return icon_pools.get(key[0], all_cards)
+
+
 def _resolve_card_id(
     product: Product,
     index: int,
@@ -95,13 +118,13 @@ def _resolve_card_id(
     """Pick or mint the card id for ``product`` while keeping manifest entries bounded."""
     if product.id in staged:
         return product.id
-    if len(cards) < MAX_SIGNED_CARDS and (index < MAX_SIGNED_CARDS or key not in pools):
+    if _should_mint_card(index, key, pools, cards):
         cards[image_relpath(product.id)] = generate_product_image(product).encode("utf-8")
         pools.setdefault(key, []).append(product.id)
         icon_pools.setdefault(key[0], []).append(product.id)
         all_cards.append(product.id)
         return product.id
-    pool = pools.get(key) or icon_pools.get(key[0]) or all_cards
+    pool = _fallback_pool(key, pools, icon_pools, all_cards)
     return pool[seen % len(pool)]
 
 
