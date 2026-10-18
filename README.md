@@ -14,7 +14,7 @@ plain keyword search, which misses what shoppers mean: type "something for my ac
 back" and it only finds products whose titles happen to contain the word "back".
 
 EdgeReco does the searching and ranking inside the shopper's browser tab. Your store
-publishes one signed catalog bundle, about 17.0 MB for 5,040 products. The browser downloads
+publishes one signed catalog bundle, about 50.6 MB for 100,000 products. The browser downloads
 it once, checks the signature, and from then on searches by meaning as well as by words,
 and re-ranks recommendations as the shopper clicks. No server answers the searches, so
 the cost does not grow with traffic, and the store keeps working offline.
@@ -24,12 +24,12 @@ the cost does not grow with traffic, and the store keeps working offline.
 ## Try it
 
 1. Open [edge-reco.com](https://edge-reco.com) and click **Launch the live demo**. This
-   opens Nimbus, a pretend store with 5,040 made-up products across 12 departments. The
+   opens Nimbus, a pretend store with 100,000 products across 12 departments. The
    first launch downloads the catalog and a small language model, so give it a moment.
    Later visits start from the copy in your browser.
 2. Type `something for my aching back` in the search box and press Enter.
 
-![The Nimbus demo store after searching "something for my aching back": a neck and back massager is the first result, then a stadium seat with back support. The strip under the search box reads 0 backend calls and 5,040 catalog.](docs/assets/search-aching-back.png)
+![The Nimbus demo store after searching "something for my aching back": a neck and back massager is the first result, then a stadium seat with back support. The strip under the search box reads 0 backend calls and 100,000 catalog.](docs/assets/search-aching-back.png)
 
 A neck and back massager comes first, then a stadium seat with back support. Only three
 products come back, because nothing else in the store is a good match. The strip under
@@ -42,20 +42,21 @@ numbers (search time, start-up time, memory) are measured live on your machine a
    your browser. **Reset taste** clears them.
 4. Click **⚡ Apply delta** in the top metrics bar to simulate a live price update.
    Because the catalog ships as a page-aligned SQLite database split into content-addressed
-   chunks, your browser downloads only the 4 changed chunks (about 42 KB) and reuses the
-   other 1,371 chunks from its local cache — updating prices in place without reloading the
+   chunks, your browser downloads only the 2 changed chunks (about 32 KB) and reuses the
+   other 2,042 chunks from its local cache — updating prices in place without reloading the
    page or the language model.
 
 ## How it works
 
-The store builds its catalog once: the products, a prebuilt SQLite search and vector
-index, and the ranking weights. It signs that bundle with a private key. The shopper's
+The store builds its catalog once: a prebuilt SQLite database (`catalogue.sqlite`) holding
+the products, FTS5 keyword index, and quantized 384-d `sqlite-vector` embeddings, plus the
+ranking weights. It signs that bundle with a private key. The shopper's
 browser downloads the bundle, checks every piece against a public key built into the app,
 and refuses to load anything that does not match. When products or prices change, the
 browser compares the new signed manifest against its cached chunks, downloads only the
 changed SQLite pages, and swaps the catalog in place. After that, each search runs a
-keyword match and a meaning match side by side, merges the two lists, and re-orders the
-result using what this shopper has clicked.
+keyword match and a meaning match side by side inside SQLite, merges the two lists, and
+re-orders the result using what this shopper has clicked.
 
 ## Your data stays on your device
 
@@ -83,11 +84,12 @@ a separate, unrelated project (it hides personal data in AI prompts).
 
 ## What it does not do
 
-- **Big catalogs.** It is built for thousands of products, not millions. Search is an
-  exact scan with no approximate index, and the whole catalog is downloaded.
+- **Multi-million-item catalogs.** It is built for tens to hundreds of thousands of products
+  (the demo ships 100,000), not tens of millions. Search is an exact scan in SQLite with no
+  approximate index, and the whole catalog database is downloaded.
 - **Private catalogs.** Every shopper gets the full catalog file, so anything in it is
   public.
-- **Low-memory phones.** A first visit downloads about 46 MB and needs real memory. It
+- **Low-memory phones.** A first visit downloads about 125 MB and needs real memory. It
   has not been measured on physical phones yet.
 - **A hosted service.** You build the catalog and host the static files yourself.
 - **Merchandising tools.** There is no dashboard, A/B testing or manual boosting. Ranking
@@ -103,7 +105,7 @@ a separate, unrelated project (it hides personal data in AI prompts).
 | Millions of products, merchandising tools, and a vendor who runs it | A hosted search and recommendation service |
 | Shoppers who search by exact product names only | Your store platform's built-in search |
 | A catalog that must stay private | Your own search server behind an API |
-| Thousands of products, flat cost, offline use, nothing to run per search | EdgeReco |
+| Up to ~100,000 products, flat cost, offline use, nothing to run per search | EdgeReco |
 
 ## Run it yourself
 

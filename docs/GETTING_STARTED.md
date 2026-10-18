@@ -45,7 +45,7 @@ Open http://localhost:4173, click **Launch the live demo**, and search for
 1. Vitalune Neck and Back Massager | 4 Heads | 20 Speeds | Quiet Motor
 2. Kestrow Stadium Seat with Back Support | Extra Wide | Armrests | Red
 3. Vitalune Neck and Back Massager | 6 Heads | 20 Speeds | Carry Case
-strip: 41 ms latency · 0 backend calls · 2.5 s cold start · 15.8 MB js heap · 720 catalog
+strip: 41 ms latency · 0 backend calls · 2.5 s cold start · 15.8 MB js heap · 100,000 catalog
 console errors: 0
 ```
 
@@ -70,9 +70,9 @@ From the repo root:
 make gate
 ```
 
-That runs `uv run poe gate` in `backend/` (format, lint, strict types, complexity, 561
+That runs `uv run poe gate` in `backend/` (format, lint, strict types, complexity, 602
 tests with at least 90% coverage; 252 s on our run) and then `pnpm run gate` in
-`frontend/` (lint, types, 552 unit tests with coverage, build, and three Playwright
+`frontend/` (lint, types, unit tests with coverage, build, and three Playwright
 browser suites; 210 s). Allow about 8 minutes. CI runs the same checks through Dagger;
 `dagger check` runs that exact graph locally if you have Dagger installed.
 
@@ -97,12 +97,12 @@ catalog address (`localhost:8921`). If you then run `vite preview`, the app says
 | `backend/src/edgereco/search/` | Python hybrid search: BM25 plus FAISS, merged with RRF. |
 | `backend/src/edgereco/cli.py` | The `edgereco` command line tool. |
 | `backend/tests/` | `unit/`, `bdd/` (steps for the Gherkin files in `backend/features/`), `integration/`, `e2e/`. |
-| `backend/examples/catalog/` | The committed, signed 720-product catalog the demo loads. |
+| `backend/examples/catalog/` | The committed, signed 100,000-product catalog the demo loads. |
 | `backend/scripts/` | Catalog curation and the parity-fixture generators. |
 
 The signed-catalog download and checking in the browser come from
-[`@gainratio/browser`](https://github.com/hseshadr/edgeproc-browser), installed from npm
-(`^0.2.0`, exact version locked in `pnpm-lock.yaml`). The Python side gets the same job from
+[`@gainratio/browser`](https://github.com/gainratio/edgeproc-browser), installed from npm
+(`^0.4.2`, exact version locked in `pnpm-lock.yaml`). The Python side gets the same job from
 [`edge-proc`](https://github.com/gainratio/edge-proc) on PyPI, which in turn uses
 [`edgeproc-core`](https://github.com/gainratio/edgeproc-core). Changes to that plumbing
 belong in those repos.

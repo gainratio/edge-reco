@@ -7,6 +7,7 @@ import {
 	browse,
 	catalog,
 	catalogInfo,
+	productById,
 	rankingProofEvidence,
 	recommendStrategy,
 	replayedSignalCount,
@@ -58,13 +59,17 @@ const PDP_HASH = /^#\/p\/(.+)$/;
  * every reload/deep link with zero server routing config, keeping the app
  * fully backend-free and offline-capable.
  */
-function productFromHash(hash: string): Product | null {
+async function productFromHash(hash: string): Promise<Product | null> {
 	const id = PDP_HASH.exec(hash)?.[1];
 	if (id === undefined) {
 		return null;
 	}
 	const decoded = decodeURIComponent(id);
-	return catalog().find((product) => product.id === decoded) ?? null;
+	const inMem = catalog().find((product) => product.id === decoded);
+	if (inMem !== undefined) {
+		return inMem;
+	}
+	return productById(decoded);
 }
 
 /** True when the current history entry is a PDP entry this app pushed. */
@@ -336,8 +341,8 @@ export function Storefront() {
 			setSyncEpoch((n) => n + 1);
 			await Promise.all([loadGrid(), refreshRails()]);
 			if (view.kind === "product") {
-				const refreshed = catalog().find((p) => p.id === view.product.id);
-				if (refreshed !== undefined) {
+				const refreshed = await productById(view.product.id);
+				if (refreshed !== null) {
 					setView({ kind: "product", product: refreshed });
 					void loadPdpRails(refreshed);
 				}
@@ -416,12 +421,13 @@ export function Storefront() {
 	// No document unload happens, so the live profile (and the rails) survive.
 	useEffect(() => {
 		const onPopState = () => {
-			const product = productFromHash(window.location.hash);
-			if (product === null) {
-				setView({ kind: "browse" });
-			} else {
-				openProduct(product, false);
-			}
+			void productFromHash(window.location.hash).then((product) => {
+				if (product === null) {
+					setView({ kind: "browse" });
+				} else {
+					openProduct(product, false);
+				}
+			});
 		};
 		window.addEventListener("popstate", onPopState);
 		return () => window.removeEventListener("popstate", onPopState);
@@ -436,10 +442,11 @@ export function Storefront() {
 			return;
 		}
 		restoredFromHash.current = true;
-		const product = productFromHash(window.location.hash);
-		if (product !== null) {
-			openProduct(product, false);
-		}
+		void productFromHash(window.location.hash).then((product) => {
+			if (product !== null) {
+				openProduct(product, false);
+			}
+		});
 	}, [openProduct]);
 
 	const onBack = useCallback(() => {

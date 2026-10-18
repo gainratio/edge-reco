@@ -14,8 +14,16 @@
 // EDGERECO_IMAGE_MODE=remote skips the check: that bundle has no local cards.
 
 import { createHash } from "node:crypto";
-import { existsSync, readFileSync } from "node:fs";
+import {
+	existsSync,
+	mkdtempSync,
+	readFileSync,
+	rmSync,
+	writeFileSync,
+} from "node:fs";
+import { tmpdir } from "node:os";
 import { dirname, join, resolve } from "node:path";
+import { DatabaseSync } from "node:sqlite";
 import { fileURLToPath } from "node:url";
 import { zstdDecompressSync } from "node:zlib";
 
@@ -55,13 +63,34 @@ function materialize(catalogDir, entry) {
 }
 
 function readProducts(catalogDir, manifest) {
-	const text = materialize(catalogDir, manifest.get("products.jsonl")).toString(
-		"utf8",
-	);
-	return text
-		.split("\n")
-		.filter((line) => line.trim())
-		.map((line) => JSON.parse(line));
+	const jsonlEntry = manifest.get("products.jsonl");
+	if (jsonlEntry !== undefined) {
+		const text = materialize(catalogDir, jsonlEntry).toString("utf8");
+		return text
+			.split("\n")
+			.filter((line) => line.trim())
+			.map((line) => JSON.parse(line));
+	}
+	const sqliteEntry = manifest.get("catalogue.sqlite");
+	if (sqliteEntry !== undefined) {
+		const blob = materialize(catalogDir, sqliteEntry);
+		const tmpRoot = mkdtempSync(join(tmpdir(), "edgereco-pimg-"));
+		const dbPath = join(tmpRoot, "catalogue.sqlite");
+		try {
+			writeFileSync(dbPath, blob);
+			const db = new DatabaseSync(dbPath, { readOnly: true });
+			try {
+				return db
+					.prepare("SELECT id, image_url FROM products ORDER BY rowid ASC")
+					.all();
+			} finally {
+				db.close();
+			}
+		} finally {
+			rmSync(tmpRoot, { recursive: true, force: true });
+		}
+	}
+	return [];
 }
 
 function problemFor(product, manifest, imagesDir) {

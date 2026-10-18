@@ -146,11 +146,35 @@ export function defaultRuntimeDeps(): RuntimeDeps {
 async function readBundleFiles(engine: EnginePort): Promise<VectorIndexFiles> {
 	const [meta, state, embeddings, products, sqlite] = await Promise.all([
 		engine.readFile(META_PATH),
-		engine.readFile(STATE_PATH),
-		engine.readFile(EMBEDDINGS_PATH),
-		engine.readFile(PRODUCTS_PATH),
+		readOptionalBundleFile(engine, STATE_PATH),
+		readOptionalBundleFile(engine, EMBEDDINGS_PATH),
+		readOptionalBundleFile(engine, PRODUCTS_PATH),
 		readOptionalBundleFile(engine, SQLITE_PATH),
 	]);
+	if (
+		sqlite !== undefined &&
+		(state === undefined || embeddings === undefined || products === undefined)
+	) {
+		return {
+			meta,
+			state: new Uint8Array(0),
+			embeddings: new Uint8Array(0),
+			products: new Uint8Array(0),
+			sqlite,
+		};
+	}
+	if (state === undefined) {
+		await engine.readFile(STATE_PATH);
+		throw new Error(`file ${STATE_PATH} not in manifest`);
+	}
+	if (embeddings === undefined) {
+		await engine.readFile(EMBEDDINGS_PATH);
+		throw new Error(`file ${EMBEDDINGS_PATH} not in manifest`);
+	}
+	if (products === undefined) {
+		await engine.readFile(PRODUCTS_PATH);
+		throw new Error(`file ${PRODUCTS_PATH} not in manifest`);
+	}
 	return {
 		meta,
 		state,

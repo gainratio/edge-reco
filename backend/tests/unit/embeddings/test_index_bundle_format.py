@@ -31,7 +31,17 @@ import zstandard as zstd
 import edgereco.embeddings.index as index_module
 from edgereco.embeddings.index import EMBEDDINGS_FILE, VectorIndex
 
-_CATALOG = Path(__file__).resolve().parents[3] / "examples" / "catalog"
+_CATALOG = (
+    Path(__file__).resolve().parents[4]
+    / "frontend"
+    / "packages"
+    / "edgereco-browser"
+    / "src"
+    / "engine"
+    / "__fixtures__"
+    / "bundle"
+    / "catalog"
+)
 _VECTOR_FILES = ("vector/index.faiss", "vector/state.json", "vector/embeddings.f32")
 
 

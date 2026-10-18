@@ -114,6 +114,12 @@ export interface SearchEngine {
 	browse(opts?: BrowseOptions): BrowseResponse;
 	/** Async SQL-backed catalog browse over the SQLite `products` table. */
 	browseSql?(opts?: BrowseOptions): Promise<BrowseResponse>;
+	/** Look up a single product by ID from the in-memory catalog or SQLite. */
+	productById?(id: string): Promise<Product | undefined>;
+	/** Look up multiple products by ID from the in-memory catalog or SQLite. */
+	productsByIds?(
+		ids: ReadonlyArray<string>,
+	): Promise<ReadonlyMap<string, Product>>;
 	/**
 	 * Hot-swap the active catalog, ranking config, co-occurrence matrix, and
 	 * ranking proof in place behind the SQLite swap gate (`swapTimeoutMs`).
@@ -147,13 +153,14 @@ export interface SearchEngine {
 	dispose(): Promise<void>;
 }
 
-function hydrateFused(
+async function hydrateFused(
 	index: VectorIndex,
 	fused: ReadonlyArray<{ readonly id: string; readonly score: number }>,
-): SearchResult[] {
+): Promise<SearchResult[]> {
+	const byId = await index.productsByIds(fused.map((row) => row.id));
 	const results: SearchResult[] = [];
 	for (const { id, score } of fused) {
-		const product = index.product(id);
+		const product = byId.get(id) ?? index.product(id);
 		if (product !== undefined) {
 			results.push({ product, score, score_components: null });
 		}
@@ -190,6 +197,21 @@ class HybridSearchEngine implements SearchEngine {
 
 	public catalog(): ReadonlyArray<Product> {
 		return this.#catalog;
+	}
+
+	public async productById(id: string): Promise<Product | undefined> {
+		const cached = this.#index.product(id);
+		if (cached !== undefined) {
+			return cached;
+		}
+		const map = await this.#index.productsByIds([id]);
+		return map.get(id);
+	}
+
+	public productsByIds(
+		ids: ReadonlyArray<string>,
+	): Promise<ReadonlyMap<string, Product>> {
+		return this.#index.productsByIds(ids);
 	}
 
 	public strategies(): Record<string, Strategy> {
@@ -231,7 +253,7 @@ class HybridSearchEngine implements SearchEngine {
 		const queryVec = await this.#embedder.embed(query);
 		const fused = await this.#index.hybrid(query, queryVec, k);
 
-		const fusedResults = hydrateFused(
+		const fusedResults = await hydrateFused(
 			this.#index,
 			fused.map((row) => ({ id: row.id, score: row.fused })),
 		);
@@ -287,7 +309,7 @@ class HybridSearchEngine implements SearchEngine {
 		limit: number,
 	): Promise<ReadonlyArray<SearchResult>> {
 		if (strategy.candidate_policy === "co_occurrence") {
-			const { candidates, cooccurrence } = this.#cooccurrenceCandidates(
+			const { candidates, cooccurrence } = await this.#cooccurrenceCandidates(
 				strategy,
 				seed,
 			);
@@ -352,6 +374,28 @@ class HybridSearchEngine implements SearchEngine {
 		readonly similarity: ReadonlyMap<string, number>;
 	}> {
 		const empty = new Map<string, number>();
+		if (strategy.candidate_policy === "vector_similarity") {
+			return this.#vectorCandidates(seed, limit);
+		}
+		if (this.#catalog.length === 0) {
+			const policy =
+				strategy.candidate_policy === "popularity" ||
+				strategy.candidate_policy === "freshness"
+					? strategy.candidate_policy
+					: "affinity_first";
+			const sqlPool = this.#index.candidatePoolSql(
+				policy,
+				limit,
+				profile,
+				strategy.weights,
+			);
+			if (sqlPool !== null) {
+				return {
+					candidates: await sqlPool,
+					similarity: empty,
+				};
+			}
+		}
 		switch (strategy.candidate_policy) {
 			case "popularity":
 				return {
@@ -363,8 +407,6 @@ class HybridSearchEngine implements SearchEngine {
 					candidates: freshnessPool(this.#catalog, limit),
 					similarity: empty,
 				};
-			case "vector_similarity":
-				return this.#vectorCandidates(seed, limit);
 			default:
 				return {
 					candidates: selectCandidatePool(
@@ -390,10 +432,11 @@ class HybridSearchEngine implements SearchEngine {
 			throw new Error("vector_similarity strategy requires a seed product id");
 		}
 		const hits = await this.#index.nearest(seed, limit * 5);
+		const byId = await this.#index.productsByIds(hits.map((h) => h.id));
 		const similarity = new Map<string, number>();
 		const candidates: SearchResult[] = [];
 		for (const { id, score } of hits) {
-			const product = this.#index.product(id);
+			const product = byId.get(id) ?? this.#index.product(id);
 			if (product !== undefined) {
 				similarity.set(id, score);
 				candidates.push({ product, score, score_components: null });
@@ -409,13 +452,13 @@ class HybridSearchEngine implements SearchEngine {
 	 * together" cut); each neighbour carries its co-occurrence score as the scorer's
 	 * cooccurrence signal. An unknown/cold seed yields an empty pool (rail hidden).
 	 */
-	#cooccurrenceCandidates(
+	async #cooccurrenceCandidates(
 		strategy: Strategy,
 		seed: string | undefined,
-	): {
+	): Promise<{
 		readonly candidates: SearchResult[];
 		readonly cooccurrence: ReadonlyMap<string, number>;
-	} {
+	}> {
 		if (seed === undefined) {
 			throw new Error("co_occurrence strategy requires a seed product id");
 		}
@@ -424,10 +467,11 @@ class HybridSearchEngine implements SearchEngine {
 		if (cap !== null && cap !== undefined) {
 			neighbors = neighbors.slice(0, cap);
 		}
+		const byId = await this.#index.productsByIds(neighbors.map((n) => n.id));
 		const cooccurrence = new Map<string, number>();
 		const candidates: SearchResult[] = [];
 		for (const { id, score } of neighbors) {
-			const product = this.#index.product(id);
+			const product = byId.get(id) ?? this.#index.product(id);
 			if (product !== undefined) {
 				cooccurrence.set(id, score);
 				candidates.push({ product, score, score_components: null });

@@ -249,6 +249,7 @@ def publish_bundle(
     require_feature_files: bool = False,
     sequence: int | None = None,
     image_mode: ImageMode = ImageMode.LOCAL,
+    sqlite_only: bool = False,
 ) -> None:
     """Write ``catalog_meta.json`` then build the signed origin from the staging dir.
 
@@ -277,7 +278,19 @@ def publish_bundle(
         product_count=product_count,
         schema_version=CURRENT_META_SCHEMA,
     )
-    files = _stage_files(staging_dir, meta, private_key_path, image_mode, require_feature_files)
+    files = _stage_files(
+        staging_dir,
+        meta,
+        private_key_path,
+        image_mode,
+        require_feature_files,
+        sqlite_only=sqlite_only,
+    )
+    chunker = (
+        GearCDC(min_size=32768, avg_size=65536, max_size=262144)
+        if sqlite_only
+        else GearCDC()
+    )
     origin_dir.mkdir(parents=True, exist_ok=True)
     with _publish_lock(origin_dir):
         sequence = _require_increasing(
@@ -289,7 +302,7 @@ def publish_bundle(
         build_bundle(
             files=files,
             store=FilesystemCacheStore(origin_dir),
-            chunker=GearCDC(),
+            chunker=chunker,
             signer=Ed25519Signer.from_private_bytes(private_bytes),
             bundle_id=catalog_id,
             version=version,
@@ -305,6 +318,8 @@ def _stage_files(
     private_key_path: Path,
     image_mode: ImageMode,
     require_feature_files: bool,
+    *,
+    sqlite_only: bool = False,
 ) -> dict[str, bytes]:
     """Write the derived staging files, then read the complete signed file set."""
     _write_json_no_follow(staging_dir / _META_NAME, meta.model_dump_json())
@@ -312,11 +327,13 @@ def _stage_files(
     _ensure_ranking_config(staging_dir, require_present=require_feature_files)
     _ensure_cooccurrence(staging_dir, require_present=require_feature_files)
     _write_ranking_receipt(staging_dir, private_key_path)
-    _maybe_stage_catalogue_sqlite(staging_dir, meta)
-    return _read_bundle_files(staging_dir)
+    _maybe_stage_catalogue_sqlite(staging_dir, meta, quantize_int8=sqlite_only)
+    return _read_bundle_files(staging_dir, sqlite_only=sqlite_only)
 
 
-def _maybe_stage_catalogue_sqlite(staging_dir: Path, meta: CatalogMeta) -> None:
+def _maybe_stage_catalogue_sqlite(
+    staging_dir: Path, meta: CatalogMeta, *, quantize_int8: bool = False
+) -> None:
     """Build canonical ``catalogue.sqlite`` when the staged vector artifacts are complete."""
     sqlite_path = staging_dir / CATALOGUE_SQLITE_NAME
     _refuse_symlink(sqlite_path, staging_dir)
@@ -329,6 +346,7 @@ def _maybe_stage_catalogue_sqlite(staging_dir: Path, meta: CatalogMeta) -> None:
             staging_dir,
             embedding_dim=meta.embedding_dim,
             embedding_count=meta.embedding_count,
+            quantize_int8=quantize_int8,
         )
         _write_bytes_no_follow(sqlite_path, payload)
 
@@ -506,7 +524,7 @@ def _refuse_symlink(path: Path, staging_dir: Path) -> None:
         )
 
 
-def _read_bundle_files(staging_dir: Path) -> dict[str, bytes]:
+def _read_bundle_files(staging_dir: Path, *, sqlite_only: bool = False) -> dict[str, bytes]:
     """Read every bundle file into ``{relpath: bytes}`` (``vector/`` + ``images/`` recursed).
 
     Every entry — the fixed top-level files AND each file under ``vector/`` /
@@ -516,13 +534,12 @@ def _read_bundle_files(staging_dir: Path) -> dict[str, bytes]:
     republish that predates baked-in cards) simply signs no image entries.
     """
     files: dict[str, bytes] = {}
-    for name in (
-        "products.jsonl",
-        _META_NAME,
-        _RANKING_NAME,
-        RANKING_RECEIPT_NAME,
-        _COOCCURRENCE_NAME,
-    ):
+    top_names = (
+        (_META_NAME, _RANKING_NAME, RANKING_RECEIPT_NAME, _COOCCURRENCE_NAME)
+        if sqlite_only
+        else ("products.jsonl", _META_NAME, _RANKING_NAME, RANKING_RECEIPT_NAME, _COOCCURRENCE_NAME)
+    )
+    for name in top_names:
         path = staging_dir / name
         _refuse_symlink(path, staging_dir)
         files[name] = path.read_bytes()
@@ -530,7 +547,8 @@ def _read_bundle_files(staging_dir: Path) -> dict[str, bytes]:
     _refuse_symlink(sqlite_path, staging_dir)
     if sqlite_path.is_file():
         files[CATALOGUE_SQLITE_NAME] = sqlite_path.read_bytes()
-    _read_tree(staging_dir, "vector", files)
+    if not sqlite_only:
+        _read_tree(staging_dir, "vector", files)
     _read_tree(staging_dir, "images", files, skip_extensions=_PHOTO_EXTENSIONS)
     return files
 

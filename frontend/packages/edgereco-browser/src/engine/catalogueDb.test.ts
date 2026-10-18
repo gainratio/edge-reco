@@ -16,6 +16,8 @@ import {
 	SqlSwapTimeoutError,
 } from "./catalogueDb";
 import { openCatalogueSql } from "./catalogueSql";
+import { DEFAULT_RANKING_CONFIG } from "./rankingConfig";
+import { emptyProfile } from "./session";
 
 /** A fresh catalogue database through the real seam (in-process Worker). */
 async function fresh(
@@ -431,6 +433,92 @@ describe("openCatalogueStore", () => {
 			targetDb.importSqlite(new Uint8Array([1, 2, 3])),
 		).rejects.toThrow(/not a SQLite database/);
 		expect(await targetDb.count()).toBe(5);
+		await targetDb.dispose();
+	});
+
+	it("supports INT8 embeddings in importSqlite(), productsByIds(), and candidatePoolSql()", async () => {
+		const sourceSql = await openCatalogueSql();
+		const sourceDb = await CatalogueDb.open(sourceSql, 4);
+		await sourceDb.replace({
+			products: [
+				{
+					id: "p1",
+					title: "Alpha Jacket",
+					category: "apparel",
+					tags: ["winter"],
+					brand: "Arc",
+					price: 199,
+					popularity_score: 0.9,
+					freshness_score: 0.2,
+				},
+				{
+					id: "p2",
+					title: "Beta Boots",
+					category: "footwear",
+					tags: ["hiking"],
+					brand: "Peak",
+					price: 149,
+					popularity_score: 0.4,
+					freshness_score: 0.95,
+				},
+			],
+			vectors: new Float32Array([1, 0, 0, 0, 0, 1, 0, 0]),
+		});
+		// Convert stored embeddings in sourceSql to 4-byte INT8 blobs before exporting.
+		await sourceSql.exec("UPDATE products SET embedding = ? WHERE id = 'p1'", [
+			new Uint8Array(new Int8Array([127, 0, 0, 0]).buffer),
+		]);
+		await sourceSql.exec("UPDATE products SET embedding = ? WHERE id = 'p2'", [
+			new Uint8Array(new Int8Array([0, 127, 0, 0]).buffer),
+		]);
+		if (sourceSql.exportDatabase === undefined) {
+			throw new Error("expected exportDatabase on CatalogueSql");
+		}
+		const sqliteBytes = await sourceSql.exportDatabase();
+		await sourceDb.dispose();
+
+		const targetSql = await openCatalogueSql();
+		const targetDb = await CatalogueDb.open(targetSql, 4);
+		await targetDb.importSqlite(sqliteBytes);
+
+		const hits = await targetDb.vectorSearch(new Float32Array([1, 0, 0, 0]), 2);
+		expect(hits.map((h) => h.id)).toEqual(["p1", "p2"]);
+		expect(hits[0]?.score).toBeCloseTo(1, 2);
+
+		const byIds = await targetDb.productsByIds(["p2", "missing", "p1"]);
+		expect([...byIds.keys()].sort()).toEqual(["p1", "p2"]);
+		expect(byIds.get("p2")?.brand).toBe("Peak");
+
+		const defaultWeights = DEFAULT_RANKING_CONFIG.scoring_weights;
+
+		const popPool = await targetDb.candidatePoolSql(
+			"popularity",
+			1,
+			emptyProfile(),
+			defaultWeights,
+		);
+		expect(popPool[0]?.product.id).toBe("p1");
+
+		const freshPool = await targetDb.candidatePoolSql(
+			"freshness",
+			1,
+			emptyProfile(),
+			defaultWeights,
+		);
+		expect(freshPool[0]?.product.id).toBe("p2");
+
+		const affinityPool = await targetDb.candidatePoolSql(
+			"affinity_first",
+			1,
+			{
+				...emptyProfile(),
+				categoryAffinity: new Map([["footwear", 1.0]]),
+				tagAffinity: new Map([["hiking", 1.0]]),
+				brandAffinity: new Map([["Peak", 1.0]]),
+			},
+			defaultWeights,
+		);
+		expect(affinityPool[0]?.product.id).toBe("p2");
 		await targetDb.dispose();
 	});
 });

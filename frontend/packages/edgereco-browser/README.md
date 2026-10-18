@@ -1,7 +1,7 @@
 # @edgereco/browser
 
 **EdgeReco's browser product engine.** It composes the standalone
-[`@gainratio/browser`](https://github.com/hseshadr/edgeproc-browser) Lego for
+[`@gainratio/browser`](https://github.com/gainratio/edgeproc-browser) Lego for
 signed sync, integrity, OPFS, Worker transport, and vector contracts, then adds
 only EdgeReco's embedding, hybrid search, ranking, and session logic. No
 application backend sits in the request path.

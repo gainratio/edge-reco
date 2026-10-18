@@ -31,7 +31,9 @@ import {
 	type SqlBind,
 	type SqlRow,
 } from "./catalogueSql";
-import type { BrowseResponse, Product } from "./domain";
+import type { BrowseResponse, Product, SearchResult } from "./domain";
+import type { ScoringWeights } from "./rankingConfig";
+import type { SessionProfile } from "./session";
 
 /** Default gate timeout (ms) while an atomic catalogue swap is in flight. */
 export const DEFAULT_SWAP_TIMEOUT_MS = 150;
@@ -160,15 +162,40 @@ const SCHEMA = `
 		content = 'products', content_rowid = 'rowid',
 		tokenize = "unicode61 remove_diacritics 2 tokenchars '-'''"
 	);
+	CREATE TABLE IF NOT EXISTS _sqliteai_vector (
+		tblname TEXT,
+		colname TEXT,
+		key TEXT,
+		value ANY,
+		PRIMARY KEY(tblname, colname, key)
+	);
+`;
+
+const PRODUCT_COLUMNS = `
+	id, title, description, category, tags_json, brand,
+	price, popularity_score, freshness_score, image_url
 `;
 
 const BROWSE_ROWS_SQL = `
-	SELECT id, title, description, category, tags_json, brand,
-		price, popularity_score, freshness_score, image_url
+	SELECT ${PRODUCT_COLUMNS}
 	FROM products
 	WHERE (?1 IS NULL OR category = ?1)
 	ORDER BY rowid ASC
 	LIMIT ?2 OFFSET ?3
+`;
+
+const POPULARITY_POOL_SQL = `
+	SELECT ${PRODUCT_COLUMNS}
+	FROM products
+	ORDER BY popularity_score DESC, rowid ASC
+	LIMIT ?1
+`;
+
+const FRESHNESS_POOL_SQL = `
+	SELECT ${PRODUCT_COLUMNS}
+	FROM products
+	ORDER BY freshness_score DESC, rowid ASC
+	LIMIT ?1
 `;
 
 const BROWSE_TOTAL_SQL = `
@@ -265,6 +292,25 @@ function vectorBlob(vector: Float32Array): Uint8Array {
 	return new Uint8Array(vector.buffer, vector.byteOffset, vector.byteLength);
 }
 
+function quantizeVectorInt8(vector: Float32Array): Uint8Array {
+	let maxAbs = 0;
+	for (let i = 0; i < vector.length; i++) {
+		const abs = Math.abs(vector[i] ?? 0);
+		if (abs > maxAbs) {
+			maxAbs = abs;
+		}
+	}
+	const scale = maxAbs > 0 ? 127 / maxAbs : 0;
+	const out = new Int8Array(vector.length);
+	for (let i = 0; i < vector.length; i++) {
+		out[i] = Math.max(
+			-127,
+			Math.min(127, Math.round((vector[i] ?? 0) * scale)),
+		);
+	}
+	return new Uint8Array(out.buffer, out.byteOffset, out.byteLength);
+}
+
 function hydrateProductRow(row: SqlRow): Product {
 	let tags: string[] = [];
 	if (typeof row.tags_json === "string") {
@@ -295,6 +341,26 @@ function hydrateProductRow(row: SqlRow): Product {
 	};
 }
 
+function affinityScore(
+	product: Product,
+	profile: SessionProfile,
+	weights: ScoringWeights,
+): number {
+	const cat = profile.categoryAffinity.get(product.category) ?? 0;
+	let tag = 0;
+	if (product.tags.length > 0) {
+		const total = product.tags.reduce(
+			(sum, t) => sum + (profile.tagAffinity.get(t) ?? 0),
+			0,
+		);
+		tag = total / product.tags.length;
+	}
+	const brand = product.brand
+		? (profile.brandAffinity.get(product.brand) ?? 0)
+		: 0;
+	return weights.category * cat + weights.tag * tag + weights.brand * brand;
+}
+
 /** The async catalogue surface the search engine uses. */
 export interface CatalogueStore {
 	replace(
@@ -320,6 +386,15 @@ export interface CatalogueStore {
 	): Promise<ReadonlyArray<ScoredId>>;
 	nearest(id: string, k: number): Promise<ReadonlyArray<ScoredId>>;
 	browseSql?(options?: CatalogueBrowseOptions): Promise<BrowseResponse>;
+	productsByIds?(
+		ids: ReadonlyArray<string>,
+	): Promise<ReadonlyMap<string, Product>>;
+	candidatePoolSql?(
+		policy: "popularity" | "freshness" | "affinity_first",
+		limit: number,
+		profile: SessionProfile,
+		weights: ScoringWeights,
+	): Promise<SearchResult[]>;
 	dispose(): Promise<void>;
 }
 
@@ -348,6 +423,7 @@ export class CatalogueDb implements CatalogueStore {
 	readonly #sql: CatalogueSql;
 	readonly #dimension: number;
 	readonly #weights: LexicalWeights;
+	#vectorType: "FLOAT32" | "INT8" | null = null;
 	#activeSwap: {
 		readonly done: Promise<void>;
 		readonly timeoutMs: number;
@@ -357,10 +433,12 @@ export class CatalogueDb implements CatalogueStore {
 		sql: CatalogueSql,
 		dimension: number,
 		weights: LexicalWeights,
+		vectorType: "FLOAT32" | "INT8" | null = null,
 	) {
 		this.#sql = sql;
 		this.#dimension = dimension;
 		this.#weights = weights;
+		this.#vectorType = vectorType;
 	}
 
 	/** Create the schema and register the vector column; closes `sql` on failure. */
@@ -385,11 +463,30 @@ export class CatalogueDb implements CatalogueStore {
 				);
 			}
 			await sql.exec(SCHEMA);
-			await sql.query(
-				"SELECT vector_init('products', 'embedding', ?) AS initialized",
-				[`dimension=${dimension},type=FLOAT32,distance=COSINE`],
+			await sql.exec(
+				"CREATE TABLE IF NOT EXISTS _sqliteai_vector (tblname TEXT, colname TEXT, key TEXT, value ANY, PRIMARY KEY(tblname, colname, key))",
 			);
-			return new CatalogueDb(sql, dimension, weights);
+			const f32Bytes = dimension * Float32Array.BYTES_PER_ELEMENT;
+			const int8Bytes = dimension;
+			const [sample] = await sql.query(
+				"SELECT length(embedding) AS len FROM products LIMIT 1",
+			);
+			if (sample !== undefined) {
+				const sampleLen = Number(sample.len ?? f32Bytes);
+				const vectorType =
+					sampleLen === int8Bytes && int8Bytes !== f32Bytes
+						? "INT8"
+						: "FLOAT32";
+				await sql.exec(
+					"DELETE FROM _sqliteai_vector WHERE tblname = 'products' AND colname = 'embedding'",
+				);
+				await sql.query(
+					"SELECT vector_init('products', 'embedding', ?) AS initialized",
+					[`dimension=${dimension},type=${vectorType},distance=COSINE`],
+				);
+				return new CatalogueDb(sql, dimension, weights, vectorType);
+			}
+			return new CatalogueDb(sql, dimension, weights, null);
 		} catch (error) {
 			await sql.close();
 			throw error;
@@ -431,6 +528,7 @@ export class CatalogueDb implements CatalogueStore {
 		]);
 		const timeoutMs = options?.swapTimeoutMs ?? DEFAULT_SWAP_TIMEOUT_MS;
 		await this.#withSwapGate(timeoutMs, async () => {
+			await this.#ensureVectorInit("FLOAT32");
 			await this.#sql.transaction([
 				{ sql: "DELETE FROM products" },
 				{
@@ -457,22 +555,39 @@ export class CatalogueDb implements CatalogueStore {
 			throw new Error("SQL connection does not support importDatabase");
 		}
 		const timeoutMs = options?.swapTimeoutMs ?? DEFAULT_SWAP_TIMEOUT_MS;
-		const expectedBytes = this.#dimension * Float32Array.BYTES_PER_ELEMENT;
+		const f32Bytes = this.#dimension * Float32Array.BYTES_PER_ELEMENT;
+		const int8Bytes = this.#dimension;
 		await this.#withSwapGate(timeoutMs, async () => {
-			await importDatabase.call(this.#sql, bytes, {
-				virtualTableModules: ["fts5"],
-				swapTimeoutMs: timeoutMs,
-				expectedSchema: {
-					checks: [
-						"SELECT count(*) = 1 FROM sqlite_schema WHERE type = 'table' AND name = 'products'",
-						"SELECT count(*) = 1 FROM sqlite_schema WHERE type = 'table' AND name = 'products_fts'",
-						`SELECT count(*) = 0 FROM products WHERE length(embedding) <> ${expectedBytes}`,
-					],
-				},
-			});
+			await this.#sql.exec("PRAGMA cache_size = -4096; PRAGMA shrink_memory;");
+			try {
+				await importDatabase.call(this.#sql, bytes, {
+					virtualTableModules: ["fts5"],
+					swapTimeoutMs: timeoutMs,
+					expectedSchema: {
+						checks: [
+							"SELECT count(*) = 1 FROM sqlite_schema WHERE type = 'table' AND name = 'products'",
+							"SELECT count(*) = 1 FROM sqlite_schema WHERE type = 'table' AND name = 'products_fts'",
+							`SELECT count(*) = 0 FROM (SELECT length(embedding) AS len FROM products LIMIT 64) WHERE len NOT IN (${f32Bytes}, ${int8Bytes})`,
+						],
+					},
+				});
+			} finally {
+				await this.#sql.exec("PRAGMA cache_size = -65536;");
+			}
+			await this.#sql.exec(
+				"CREATE TABLE IF NOT EXISTS _sqliteai_vector (tblname TEXT, colname TEXT, key TEXT, value ANY, PRIMARY KEY(tblname, colname, key)); DELETE FROM _sqliteai_vector WHERE tblname = 'products' AND colname = 'embedding';",
+			);
+			const [sample] = await this.#sql.query(
+				"SELECT length(embedding) AS len FROM products LIMIT 1",
+			);
+			const sampleLen = Number(sample?.len ?? f32Bytes);
+			this.#vectorType =
+				sampleLen === int8Bytes && int8Bytes !== f32Bytes ? "INT8" : "FLOAT32";
 			await this.#sql.query(
 				"SELECT vector_init('products', 'embedding', ?) AS initialized",
-				[`dimension=${this.#dimension},type=FLOAT32,distance=COSINE`],
+				[
+					`dimension=${this.#dimension},type=${this.#vectorType},distance=COSINE`,
+				],
 			);
 		});
 	}
@@ -482,6 +597,147 @@ export class CatalogueDb implements CatalogueStore {
 		return this.#readThroughGate(async () => {
 			const [row] = await this.#sql.query("SELECT count(*) AS n FROM products");
 			return Number(row?.n ?? 0);
+		});
+	}
+
+	/** Hydrate specific products by ID from the SQLite `products` table. */
+	public async productsByIds(
+		ids: ReadonlyArray<string>,
+	): Promise<ReadonlyMap<string, Product>> {
+		if (ids.length === 0) {
+			return new Map();
+		}
+		return this.#readThroughGate(async () => {
+			const unique = [...new Set(ids)];
+			const placeholders = unique.map((_, i) => `?${i + 1}`).join(", ");
+			const rows = await this.#sql.query(
+				`SELECT ${PRODUCT_COLUMNS} FROM products WHERE id IN (${placeholders})`,
+				unique,
+			);
+			const out = new Map<string, Product>();
+			for (const row of rows) {
+				const product = hydrateProductRow(row);
+				out.set(product.id, product);
+			}
+			return out;
+		});
+	}
+
+	/**
+	 * SQL-backed candidate pool selection for `popularity`, `freshness`, and
+	 * `affinity_first` recommendation policies over large SQLite-backed catalogs.
+	 */
+	public async candidatePoolSql(
+		policy: "popularity" | "freshness" | "affinity_first",
+		limit: number,
+		profile: SessionProfile,
+		weights: ScoringWeights,
+	): Promise<SearchResult[]> {
+		return this.#readThroughGate(async () => {
+			const size = Math.max(1, limit * 5);
+			if (policy === "popularity") {
+				const rows = await this.#sql.query(POPULARITY_POOL_SQL, [size]);
+				return rows.map((row) => {
+					const product = hydrateProductRow(row);
+					return {
+						product,
+						score: product.popularity_score,
+						score_components: null,
+					};
+				});
+			}
+			if (policy === "freshness") {
+				const rows = await this.#sql.query(FRESHNESS_POOL_SQL, [size]);
+				return rows.map((row) => {
+					const product = hydrateProductRow(row);
+					return {
+						product,
+						score: product.freshness_score,
+						score_components: null,
+					};
+				});
+			}
+			const cats =
+				weights.category > 0
+					? [...profile.categoryAffinity.entries()]
+							.filter(([, v]) => v > 0)
+							.map(([k]) => k)
+					: [];
+			const brands =
+				weights.brand > 0
+					? [...profile.brandAffinity.entries()]
+							.filter(([, v]) => v > 0)
+							.map(([k]) => k)
+					: [];
+			const tags =
+				weights.tag > 0
+					? [...profile.tagAffinity.entries()]
+							.filter(([, v]) => v > 0)
+							.map(([k]) => k)
+					: [];
+			if (cats.length === 0 && brands.length === 0 && tags.length === 0) {
+				const rows = await this.#sql.query(POPULARITY_POOL_SQL, [size]);
+				return rows.map((row) => {
+					const product = hydrateProductRow(row);
+					return {
+						product,
+						score: product.popularity_score,
+						score_components: null,
+					};
+				});
+			}
+			const clauses: string[] = [];
+			const bind: (string | number)[] = [];
+			if (cats.length > 0) {
+				const ph = cats.map((_, i) => `?${bind.length + i + 1}`).join(", ");
+				clauses.push(`category IN (${ph})`);
+				bind.push(...cats);
+			}
+			if (brands.length > 0) {
+				const ph = brands.map((_, i) => `?${bind.length + i + 1}`).join(", ");
+				clauses.push(`brand IN (${ph})`);
+				bind.push(...brands);
+			}
+			if (tags.length > 0) {
+				const ftsExpr = tags
+					.map((t) => `tags:"${t.replaceAll('"', '""')}"`)
+					.join(" OR ");
+				clauses.push(
+					`rowid IN (SELECT rowid FROM products_fts WHERE products_fts MATCH ?${bind.length + 1})`,
+				);
+				bind.push(ftsExpr);
+			}
+			const matchCap = Math.max(size * 6, 300);
+			bind.push(matchCap);
+			const matchSql = `
+				SELECT ${PRODUCT_COLUMNS}
+				FROM products
+				WHERE ${clauses.join(" OR ")}
+				ORDER BY popularity_score DESC, rowid ASC
+				LIMIT ?${bind.length}
+			`;
+			const matchRows = await this.#sql.query(matchSql, bind);
+			const matches = matchRows
+				.map(hydrateProductRow)
+				.filter((p) => affinityScore(p, profile, weights) > 0);
+			let pool: Product[] = matches;
+			if (matches.length < limit) {
+				const popRows = await this.#sql.query(POPULARITY_POOL_SQL, [size]);
+				const seen = new Set(matches.map((p) => p.id));
+				pool = [...matches];
+				for (const row of popRows) {
+					const p = hydrateProductRow(row);
+					if (!seen.has(p.id)) {
+						seen.add(p.id);
+						pool.push(p);
+					}
+				}
+			}
+			return pool.map((product) => ({
+				product,
+				score: product.popularity_score,
+				score_components: null,
+			}));
 		});
 	}
 
@@ -520,6 +776,9 @@ export class CatalogueDb implements CatalogueStore {
 	): Promise<ReadonlyArray<HybridRow>> {
 		this.#assertVector(vector);
 		return this.#readThroughGate(async () => {
+			if (this.#vectorType === null) {
+				await this.#ensureVectorInit("FLOAT32");
+			}
 			const w = this.#weights;
 			const rows = await this.#sql.query(HYBRID_SQL, [
 				w.title,
@@ -528,7 +787,7 @@ export class CatalogueDb implements CatalogueStore {
 				w.brand,
 				matchExpression(query) ?? MATCH_NOTHING,
 				Math.max(0, k),
-				vectorBlob(vector),
+				this.#encodeQueryVector(vector),
 				RRF_K,
 			]);
 			return rows.map((row) => ({
@@ -548,9 +807,15 @@ export class CatalogueDb implements CatalogueStore {
 		k: number,
 	): Promise<ReadonlyArray<ScoredId>> {
 		this.#assertVector(vector);
-		return this.#readThroughGate(() =>
-			this.#scored(VECTOR_SQL, [vectorBlob(vector), Math.max(0, k)]),
-		);
+		return this.#readThroughGate(async () => {
+			if (this.#vectorType === null) {
+				await this.#ensureVectorInit("FLOAT32");
+			}
+			return this.#scored(VECTOR_SQL, [
+				this.#encodeQueryVector(vector),
+				Math.max(0, k),
+			]);
+		});
 	}
 
 	/** Top-k neighbours of a stored product, the product itself excluded. */
@@ -559,6 +824,9 @@ export class CatalogueDb implements CatalogueStore {
 		k: number,
 	): Promise<ReadonlyArray<ScoredId>> {
 		return this.#readThroughGate(async () => {
+			if (this.#vectorType === null) {
+				await this.#ensureVectorInit("FLOAT32");
+			}
 			const known = await this.#sql.query(
 				"SELECT 1 AS known FROM products WHERE id = ?",
 				[id],
@@ -572,6 +840,20 @@ export class CatalogueDb implements CatalogueStore {
 
 	public dispose(): Promise<void> {
 		return this.#sql.close();
+	}
+
+	async #ensureVectorInit(targetType: "FLOAT32" | "INT8"): Promise<void> {
+		if (this.#vectorType === targetType) {
+			return;
+		}
+		await this.#sql.exec(
+			"CREATE TABLE IF NOT EXISTS _sqliteai_vector (tblname TEXT, colname TEXT, key TEXT, value ANY, PRIMARY KEY(tblname, colname, key)); DELETE FROM _sqliteai_vector WHERE tblname = 'products' AND colname = 'embedding';",
+		);
+		await this.#sql.query(
+			"SELECT vector_init('products', 'embedding', ?) AS initialized",
+			[`dimension=${this.#dimension},type=${targetType},distance=COSINE`],
+		);
+		this.#vectorType = targetType;
 	}
 
 	async #withSwapGate<T>(
@@ -610,6 +892,12 @@ export class CatalogueDb implements CatalogueStore {
 			id: String(row.id),
 			score: Number(row.score),
 		}));
+	}
+
+	#encodeQueryVector(vector: Float32Array): Uint8Array {
+		return this.#vectorType === "INT8"
+			? quantizeVectorInt8(vector)
+			: vectorBlob(vector);
 	}
 
 	#assertVector(vector: Float32Array): void {

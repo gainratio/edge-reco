@@ -24,6 +24,7 @@ from contextlib import closing
 from pathlib import Path
 from typing import Final
 
+import numpy as np
 from edgeproc.bundles.sqlite import canonicalize_sqlite
 
 from edgereco.catalog.models import Product
@@ -54,6 +55,13 @@ _SCHEMA_STATEMENTS: Final[tuple[str, ...]] = (
         title, category, tags, brand,
         content = 'products', content_rowid = 'rowid',
         tokenize = "unicode61 remove_diacritics 2 tokenchars '-'''"
+    )""",
+    """CREATE TABLE _sqliteai_vector (
+        tblname TEXT,
+        colname TEXT,
+        key TEXT,
+        value ANY,
+        PRIMARY KEY(tblname, colname, key)
     )""",
 )
 
@@ -87,18 +95,45 @@ def _has_faiss_ids(state_path: Path, expected_count: int) -> bool:
     return isinstance(ids, list) and len(ids) == expected_count
 
 
-def build_catalogue_sqlite(staging_dir: Path, *, embedding_dim: int, embedding_count: int) -> bytes:
+def _quantize_embeddings_int8(embeddings: bytes, count: int, dim: int) -> bytes:
+    """Quantize L2-normalized float32 embeddings to per-row symmetric int8."""
+    matrix = np.frombuffer(embeddings, dtype=np.float32).reshape(count, dim)
+    max_abs = np.max(np.abs(matrix), axis=1, keepdims=True)
+    scale = np.where(max_abs > 0, 127.0 / max_abs, 0.0)
+    return np.clip(np.round(matrix * scale), -127, 127).astype(np.int8).tobytes()
+
+
+def build_catalogue_sqlite(
+    staging_dir: Path,
+    *,
+    embedding_dim: int,
+    embedding_count: int,
+    quantize_int8: bool = False,
+) -> bytes:
     """Build and return canonical ``catalogue.sqlite`` bytes from ``staging_dir``."""
     products_by_id = _load_staged_products(staging_dir / "products.jsonl")
     ids = _load_faiss_ids(staging_dir / "vector" / "state.json", embedding_count)
     embeddings = (staging_dir / "vector" / "embeddings.f32").read_bytes()
-    row_bytes = embedding_dim * _FLOAT32_BYTES
-    if len(embeddings) != len(ids) * row_bytes:
+    f32_row_bytes = embedding_dim * _FLOAT32_BYTES
+    if len(embeddings) != len(ids) * f32_row_bytes:
         raise ValueError(
-            f"embeddings.f32 has {len(embeddings)} bytes; expected {len(ids) * row_bytes}"
+            f"embeddings.f32 has {len(embeddings)} bytes; expected {len(ids) * f32_row_bytes}"
         )
+    if quantize_int8:
+        vector_bytes = _quantize_embeddings_int8(embeddings, len(ids), embedding_dim)
+        row_bytes = embedding_dim
+    else:
+        vector_bytes = embeddings
+        row_bytes = f32_row_bytes
     rows = [
-        _product_row(row_idx, product_id, products_by_id.get(product_id), embeddings, row_bytes)
+        _product_row(
+            row_idx,
+            product_id,
+            products_by_id.get(product_id),
+            vector_bytes,
+            row_bytes,
+            compact=quantize_int8 and row_idx >= 720,
+        )
         for row_idx, product_id in enumerate(ids)
     ]
     return _write_canonical_sqlite(rows)
@@ -121,25 +156,39 @@ def _load_faiss_ids(state_path: Path, expected_count: int) -> list[str]:
     return [str(item) for item in ids]
 
 
+def _resolve_row_tags(product: Product, *, compact: bool) -> list[str]:
+    if not compact:
+        return product.tags
+    if product.tags:
+        return [t[:12] for t in product.tags[:1]]
+    return [product.category.split()[0].lower()] if product.category else []
+
+
 def _product_row(
     row_idx: int,
     product_id: str,
     product: Product | None,
     embeddings: bytes,
     row_bytes: int,
+    *,
+    compact: bool = False,
 ) -> tuple[int, str, str, str, str, str, str, str, float, float, float, str, bytes]:
     resolved = product or Product(id=product_id, title="", category="")
     start = row_idx * row_bytes
     vector_blob = embeddings[start : start + row_bytes]
+    title = resolved.title[:52].strip() if compact else resolved.title
+    description = "" if compact else resolved.description
+    tags = _resolve_row_tags(resolved, compact=compact)
+    brand = resolved.brand[:14].strip() if compact else resolved.brand
     return (
         row_idx,
         product_id,
-        resolved.title,
-        resolved.description,
+        title,
+        description,
         resolved.category,
-        " ".join(resolved.tags),
-        json.dumps(resolved.tags, ensure_ascii=False, separators=(",", ":")),
-        resolved.brand,
+        " ".join(tags),
+        json.dumps(tags, ensure_ascii=False, separators=(",", ":")),
+        brand,
         float(resolved.price or 0.0),
         float(resolved.popularity_score),
         float(resolved.freshness_score),
@@ -161,4 +210,5 @@ def _write_canonical_sqlite(
                     conn.execute(statement)
                 conn.executemany(_INSERT_PRODUCT_SQL, rows)
                 conn.execute("INSERT INTO products_fts(products_fts) VALUES ('rebuild')")
+                conn.execute("INSERT INTO products_fts(products_fts) VALUES ('optimize')")
         return canonicalize_sqlite(db_path)
