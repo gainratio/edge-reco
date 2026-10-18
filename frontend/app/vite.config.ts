@@ -19,17 +19,61 @@ import { previewCsp } from "./src/previewHeaders";
 // embedder's `wasmPaths = "/ort/"` works on the dev server too, so even local
 // dev never touches the jsDelivr CDN (house standard §8.1b).
 function serveOrtRuntimeRawInDev(): Plugin {
-	const publicDir = join(dirname(fileURLToPath(import.meta.url)), "public");
+	const appDir = dirname(fileURLToPath(import.meta.url));
+	const publicDir = join(appDir, "public");
+	const catalogDir = join(appDir, "..", "..", "backend", "examples", "catalog");
+	const catalogDeltaDir = join(
+		appDir,
+		"..",
+		"..",
+		"backend",
+		"examples",
+		"catalog-delta",
+	);
 	const mime: Record<string, string> = {
 		".mjs": "text/javascript",
 		".wasm": "application/wasm",
 	};
+	const serveBundleRequest = (
+		urlPath: string,
+		res: {
+			setHeader: (k: string, v: string) => void;
+			end: (b: Buffer) => void;
+		},
+		next: () => void,
+	): boolean => {
+		if (urlPath.startsWith("/bundle-delta/")) {
+			const rel = urlPath.slice("/bundle-delta/".length);
+			readFile(join(catalogDeltaDir, rel))
+				.catch(() => readFile(join(catalogDir, rel)))
+				.then(
+					(bytes) => {
+						res.setHeader("Content-Type", "application/octet-stream");
+						res.end(bytes);
+					},
+					() => next(),
+				);
+			return true;
+		}
+		if (urlPath.startsWith("/bundle/")) {
+			const rel = urlPath.slice("/bundle/".length);
+			readFile(join(catalogDir, rel)).then(
+				(bytes) => {
+					res.setHeader("Content-Type", "application/octet-stream");
+					res.end(bytes);
+				},
+				() => next(),
+			);
+			return true;
+		}
+		return false;
+	};
 	return {
 		name: "edgereco:serve-ort-runtime-raw",
-		apply: "serve",
 		configureServer(server) {
 			server.middlewares.use((req, res, next) => {
 				const path = (req.url ?? "").split("?")[0];
+				if (serveBundleRequest(path, res, next)) return;
 				const ext = Object.keys(mime).find((e) => path.endsWith(e));
 				if (!path.startsWith("/ort/") || ext === undefined) {
 					next();
@@ -42,6 +86,13 @@ function serveOrtRuntimeRawInDev(): Plugin {
 					},
 					() => next(),
 				);
+			});
+		},
+		configurePreviewServer(server) {
+			server.middlewares.use((req, res, next) => {
+				const path = (req.url ?? "").split("?")[0];
+				if (serveBundleRequest(path, res, next)) return;
+				next();
 			});
 		},
 	};

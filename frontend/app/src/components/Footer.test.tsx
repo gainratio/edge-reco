@@ -5,10 +5,10 @@ import { Footer } from "./Footer";
 afterEach(cleanup);
 
 describe("Footer", () => {
-	it("states plainly that Nimbus is a fictional demo store", () => {
+	it("states plainly that the storefront is a fictional demo store", () => {
 		render(<Footer />);
 		expect(
-			screen.getByText(/Nimbus is a fictional demo store/i),
+			screen.getByText(/This fictional demo store is built to showcase/i),
 		).toBeInTheDocument();
 	});
 

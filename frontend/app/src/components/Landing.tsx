@@ -59,43 +59,170 @@ export function Landing({ onLaunch }: LandingProps) {
 		<main className="landing">
 			<div className="landing__wrap">
 				<header className="landing__hero">
-					<div className="landing__eyebrow">{t("eyebrow")}</div>
-					<div className="wordmark">
-						<span className="wordmark__name">EdgeReco</span>
+					<div className="landing__hero-grid">
+						<div className="landing__hero-copy">
+							<div className="landing__eyebrow">{t("eyebrow")}</div>
+							<div className="wordmark landing__brand">
+								<span className="wordmark__name">
+									EdgeReco<span className="wordmark__dot">.</span>
+								</span>
+								<span className="wordmark__tag">
+									On-Device SQLite + Hybrid Vector Engine
+								</span>
+							</div>
+
+							<h1 className="section-head__title landing__title">
+								{t("hero.titleLead")} <em>{t("hero.titleAccent")}</em>
+								{t("hero.titleTrail")}
+							</h1>
+
+							<p className="landing__kicker">{t("hero.kicker")}</p>
+
+							<p className="landing__lede">{t("hero.lede")}</p>
+
+							<div className="landing__cta">
+								<button
+									type="button"
+									className="landing__btn landing__btn--primary"
+									onClick={onLaunch}
+								>
+									{t("cta.launch")}
+								</button>
+								<a
+									className="landing__btn landing__btn--ghost"
+									href="https://github.com/gainratio/edge-reco"
+									target="_blank"
+									rel="noreferrer"
+								>
+									{t("cta.source")}
+								</a>
+							</div>
+							<p className="landing__demo-note">
+								{t("demoNote", { products: CATALOG_PRODUCTS })}
+							</p>
+							<p className="landing__footnote">
+								{t("footnote", {
+									bundle: BUNDLE_SIZE,
+									model: MODEL_DOWNLOAD,
+								})}
+							</p>
+						</div>
+
+						<aside className="landing__specimen" aria-hidden="true">
+							<div className="landing__specimen-chrome">
+								<div className="landing__specimen-dots">
+									<span />
+									<span />
+									<span />
+								</div>
+								<span className="landing__specimen-file">
+									catalogue.sqlite · OPFS
+								</span>
+								<span className="landing__specimen-seal">
+									Ed25519 VERIFIED ✓
+								</span>
+							</div>
+
+							<div className="landing__specimen-body">
+								<div className="landing__specimen-search">
+									<span className="landing__specimen-search-icon">⌕</span>
+									<span className="landing__specimen-search-query">
+										waterproof alpine shell
+									</span>
+									<span className="landing__specimen-search-ms">
+										15 ms · 0 RPCs
+									</span>
+								</div>
+
+								<div className="landing__specimen-signals">
+									<div className="landing__specimen-signal">
+										<div className="landing__specimen-signal-row">
+											<span>FTS5 BM25 lexical index</span>
+											<span>w = 0.48</span>
+										</div>
+										<div className="landing__specimen-bar">
+											<span style={{ width: "86%" }} />
+										</div>
+									</div>
+									<div className="landing__specimen-signal">
+										<div className="landing__specimen-signal-row">
+											<span>384-d INT8 cosine scan (WASM)</span>
+											<span>w = 0.52</span>
+										</div>
+										<div className="landing__specimen-bar landing__specimen-bar--hot">
+											<span style={{ width: "94%" }} />
+										</div>
+									</div>
+								</div>
+
+								<div className="landing__specimen-section-head">
+									<span>Reciprocal Rank Fusion + MMR (λ = 0.7)</span>
+									<span>Top 3 / 100k</span>
+								</div>
+
+								<div className="landing__specimen-cards">
+									<div className="landing__specimen-card landing__specimen-card--top">
+										<div className="landing__specimen-swatch landing__specimen-swatch--rust">
+											<span>01</span>
+										</div>
+										<div className="landing__specimen-meta">
+											<div className="landing__specimen-cat">
+												OUTDOOR · GORE-TEX 3L
+											</div>
+											<div className="landing__specimen-name">
+												Ridgecrest Storm Anorak
+											</div>
+										</div>
+										<div className="landing__specimen-right">
+											<span className="landing__specimen-price">$248</span>
+											<span className="landing__specimen-score">0.984 RRF</span>
+										</div>
+									</div>
+
+									<div className="landing__specimen-card">
+										<div className="landing__specimen-swatch landing__specimen-swatch--slate">
+											<span>02</span>
+										</div>
+										<div className="landing__specimen-meta">
+											<div className="landing__specimen-cat">
+												ALPINE · RIPSTOP SHELL
+											</div>
+											<div className="landing__specimen-name">
+												Kestrel Ultralight Parka
+											</div>
+										</div>
+										<div className="landing__specimen-right">
+											<span className="landing__specimen-price">$215</span>
+											<span className="landing__specimen-score">0.951 RRF</span>
+										</div>
+									</div>
+
+									<div className="landing__specimen-card">
+										<div className="landing__specimen-swatch landing__specimen-swatch--ochre">
+											<span>03</span>
+										</div>
+										<div className="landing__specimen-meta">
+											<div className="landing__specimen-cat">
+												TRAIL · H2NO HARDSHELL
+											</div>
+											<div className="landing__specimen-name">
+												Solstice Packable Trench
+											</div>
+										</div>
+										<div className="landing__specimen-right">
+											<span className="landing__specimen-price">$189</span>
+											<span className="landing__specimen-score">0.928 RRF</span>
+										</div>
+									</div>
+								</div>
+
+								<div className="landing__specimen-foot">
+									<span>⚡ Gear-CDC delta patch: 2 chunks · 45 KB</span>
+									<span>99.9% chunks reused</span>
+								</div>
+							</div>
+						</aside>
 					</div>
-
-					<h1 className="section-head__title landing__title">
-						{t("hero.titleLead")} <em>{t("hero.titleAccent")}</em>
-						{t("hero.titleTrail")}
-					</h1>
-
-					<p className="landing__kicker">{t("hero.kicker")}</p>
-
-					<p className="landing__lede">{t("hero.lede")}</p>
-
-					<div className="landing__cta">
-						<button
-							type="button"
-							className="landing__btn landing__btn--primary"
-							onClick={onLaunch}
-						>
-							{t("cta.launch")}
-						</button>
-						<a
-							className="landing__btn landing__btn--ghost"
-							href="https://github.com/gainratio/edge-reco"
-							target="_blank"
-							rel="noreferrer"
-						>
-							{t("cta.source")}
-						</a>
-					</div>
-					<p className="landing__demo-note">
-						{t("demoNote", { products: CATALOG_PRODUCTS })}
-					</p>
-					<p className="landing__footnote">
-						{t("footnote", { bundle: BUNDLE_SIZE, model: MODEL_DOWNLOAD })}
-					</p>
 				</header>
 
 				<section className="landing__band" aria-label={t("band.ariaLabel")}>
