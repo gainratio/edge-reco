@@ -40,7 +40,7 @@ from edgereco.search.vector import VectorSearcher
 
 BACKEND_ROOT = Path(__file__).resolve().parent.parent
 REPO_ROOT = BACKEND_ROOT.parent
-CATALOG = BACKEND_ROOT / "examples" / "catalog"
+CATALOG = REPO_ROOT / "frontend/packages/edgereco-browser/src/engine/__fixtures__/bundle/catalog"
 FIXTURE = (
     REPO_ROOT / "frontend/packages/edgereco-browser/src/engine/__fixtures__/hybrid_parity.json"
 )
