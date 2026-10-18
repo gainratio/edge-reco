@@ -45,6 +45,12 @@ export interface CatalogueSwapOptions {
 	 * Default 150 ms.
 	 */
 	readonly swapTimeoutMs?: number;
+	/**
+	 * Optional bundle revision identity (`catalog_id:version:embedding_count`)
+	 * persisted in SQLite so warm reloads over OPFS can activate the existing
+	 * database in place without re-reading or re-importing `catalogue.sqlite`.
+	 */
+	readonly revisionKey?: string;
 }
 
 /**
@@ -375,6 +381,15 @@ export interface CatalogueStore {
 		bytes: Uint8Array,
 		options?: CatalogueSwapOptions,
 	): Promise<void>;
+	/**
+	 * Fast path for warm reloads over a durable OPFS database: if the database
+	 * already holds `revisionKey` with `expectedCount` products, re-registers
+	 * `sqlite-vector` in place and returns `true` without re-importing.
+	 */
+	activateRevision?(
+		revisionKey: string,
+		expectedCount: number,
+	): Promise<boolean>;
 	hybrid(
 		query: string,
 		vector: Float32Array,
@@ -521,6 +536,40 @@ export class CatalogueDb implements CatalogueStore {
 	}
 
 	/**
+	 * Fast path for warm reloads over OPFS: if the persisted SQLite database
+	 * already holds `revisionKey` with `expectedCount` products, re-registers
+	 * `sqlite-vector` in place and returns `true` without re-importing.
+	 */
+	public async activateRevision(
+		revisionKey: string,
+		expectedCount: number,
+	): Promise<boolean> {
+		if (revisionKey.length === 0 || expectedCount <= 0) {
+			return false;
+		}
+		return this.#withSwapGate(DEFAULT_SWAP_TIMEOUT_MS, async () => {
+			const [row] = await this.#sql.query(
+				`SELECT
+					(SELECT value FROM _sqliteai_vector WHERE tblname = '_edgereco' AND colname = 'bundle' AND key = 'revision') AS rev,
+					(SELECT count(*) FROM products) AS n,
+					(SELECT length(embedding) FROM products LIMIT 1) AS len`,
+			);
+			if (
+				row === undefined ||
+				String(row.rev ?? "") !== revisionKey ||
+				Number(row.n ?? 0) !== expectedCount
+			) {
+				return false;
+			}
+			const int8Bytes = this.#dimension;
+			const targetType = Number(row.len) === int8Bytes ? "INT8" : "FLOAT32";
+			this.#vectorType = null;
+			await this.#ensureVectorInit(targetType);
+			return true;
+		});
+	}
+
+	/**
 	 * Atomically validate and swap in a canonical pre-built `catalogue.sqlite`
 	 * database image (including its pre-populated `products_fts` FTS5 shadow
 	 * tables and `embedding` BLOBs), then re-register `sqlite-vector` on
@@ -538,6 +587,11 @@ export class CatalogueDb implements CatalogueStore {
 		const f32Bytes = this.#dimension * Float32Array.BYTES_PER_ELEMENT;
 		const int8Bytes = this.#dimension;
 		await this.#withSwapGate(timeoutMs, async () => {
+			if (bytes.byteLength > 1_000_000) {
+				await this.#sql.exec(
+					"DROP TABLE IF EXISTS products_fts; DROP TABLE IF EXISTS products; DELETE FROM _sqliteai_vector; VACUUM;",
+				);
+			}
 			await this.#sql.exec("PRAGMA cache_size = -4096; PRAGMA shrink_memory;");
 			try {
 				await importDatabase.call(this.#sql, bytes, {
@@ -560,6 +614,15 @@ export class CatalogueDb implements CatalogueStore {
 			const targetType = Number(sample?.len) === int8Bytes ? "INT8" : "FLOAT32";
 			this.#vectorType = null;
 			await this.#ensureVectorInit(targetType);
+			if (
+				options?.revisionKey !== undefined &&
+				options.revisionKey.length > 0
+			) {
+				await this.#sql.query(
+					"INSERT OR REPLACE INTO _sqliteai_vector (tblname, colname, key, value) VALUES ('_edgereco', 'bundle', 'revision', ?)",
+					[options.revisionKey],
+				);
+			}
 		});
 	}
 

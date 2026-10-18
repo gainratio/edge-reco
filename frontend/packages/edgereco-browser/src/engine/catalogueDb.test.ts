@@ -531,6 +531,12 @@ describe("openCatalogueStore", () => {
 			defaultWeights,
 		);
 		expect(affinityPool.map((r) => r.product.id)).toEqual(["p2", "p1"]);
+		expect(await targetDb.activateRevision("", 2)).toBe(false);
+		expect(await targetDb.activateRevision("rev-1", 2)).toBe(false);
+		await targetDb.importSqlite(sqliteBytes, { revisionKey: "rev-1" });
+		expect(await targetDb.activateRevision("rev-1", 2)).toBe(true);
+		expect(await targetDb.activateRevision("rev-2", 2)).toBe(false);
+		expect(await targetDb.activateRevision("rev-1", 99)).toBe(false);
 		await targetDb.dispose();
 
 		const metaBytes = new TextEncoder().encode(

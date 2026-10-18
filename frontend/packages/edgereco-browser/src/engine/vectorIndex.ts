@@ -33,6 +33,10 @@ export interface VectorIndexFiles {
 	readonly products: Uint8Array;
 	/** catalogue.sqlite — canonical pre-built SQLite database. */
 	readonly sqlite?: Uint8Array;
+	/** Optional bundle revision key (`manifestHash` or `catalog_id:version:count`). */
+	readonly revisionKey?: string;
+	/** True when the pre-opened CatalogueStore already activated `revisionKey` on OPFS. */
+	readonly sqliteAlreadyActive?: boolean;
 }
 
 /** A scored retrieval hit: a product id and its cosine similarity to the query. */
@@ -42,6 +46,8 @@ export interface VectorHit {
 }
 
 interface CatalogMeta {
+	readonly catalog_id?: string;
+	readonly version?: string;
 	readonly embedding_count: number;
 	readonly embedding_dim: number;
 }
@@ -341,7 +347,10 @@ export class VectorIndex {
 	): Promise<void> {
 		const parsed = parseBundleRevision(files, this.#dim);
 		if (files.sqlite !== undefined && this.#store.importSqlite !== undefined) {
-			await this.#store.importSqlite(files.sqlite, options);
+			await this.#store.importSqlite(files.sqlite, {
+				...options,
+				revisionKey: options?.revisionKey ?? parsed.revisionKey,
+			});
 		} else {
 			await this.#store.replace(
 				{
@@ -422,6 +431,7 @@ function parseBundleRevision(
 	readonly ids: ReadonlyArray<string>;
 	readonly matrix: Float32Array;
 	readonly products: ReadonlyMap<string, Product>;
+	readonly revisionKey: string;
 } {
 	const meta = parseCatalogMeta(files.meta);
 	const dim = meta.embedding_dim;
@@ -430,8 +440,11 @@ function parseBundleRevision(
 			`catalog_meta embedding_dim ${dim} != active index dimension ${expectedDim}`,
 		);
 	}
+	const revisionKey =
+		files.revisionKey ??
+		`${String(meta.catalog_id ?? "catalog")}:${String(meta.version ?? "v1")}:${meta.embedding_count}`;
 	if (
-		files.sqlite !== undefined &&
+		(files.sqlite !== undefined || files.sqliteAlreadyActive === true) &&
 		files.state.byteLength === 0 &&
 		files.embeddings.byteLength === 0 &&
 		files.products.byteLength === 0
@@ -442,6 +455,7 @@ function parseBundleRevision(
 			ids: [],
 			matrix: new Float32Array(0),
 			products: new Map(),
+			revisionKey,
 		};
 	}
 	const state = parseVectorState(files.state);
@@ -453,7 +467,7 @@ function parseBundleRevision(
 	}
 	const matrix = asMatrix(files.embeddings, ntotal, dim);
 	const products = parseProducts(files.products);
-	return { dim, ntotal, ids: state.faiss_ids, matrix, products };
+	return { dim, ntotal, ids: state.faiss_ids, matrix, products, revisionKey };
 }
 
 /**
@@ -468,11 +482,20 @@ export async function loadVectorIndex(
 	files: VectorIndexFiles,
 	factory: CatalogueStoreFactory = openCatalogueStore,
 ): Promise<VectorIndex> {
-	const { dim, ntotal, ids, matrix, products } = parseBundleRevision(files);
+	const { dim, ntotal, ids, matrix, products, revisionKey } =
+		parseBundleRevision(files);
 	const store = await openCatalogue(factory, dim);
 	try {
+		if (files.sqliteAlreadyActive === true) {
+			return new VectorIndex(store, ids, products, dim, ntotal);
+		}
 		if (files.sqlite !== undefined && store.importSqlite !== undefined) {
-			await store.importSqlite(files.sqlite);
+			if (
+				store.activateRevision === undefined ||
+				!(await store.activateRevision(revisionKey, ntotal))
+			) {
+				await store.importSqlite(files.sqlite, { revisionKey });
+			}
 		} else {
 			// The database is durable across catalogue revisions; replace() swaps the
 			// whole revision (products, FTS5 index, vectors) in ONE transaction, so a
