@@ -17,6 +17,7 @@ import {
 } from "./catalogueDb";
 import { openCatalogueSql } from "./catalogueSql";
 import { DEFAULT_RANKING_CONFIG } from "./rankingConfig";
+import { createSearchEngine } from "./searchEngine";
 import { emptyProfile } from "./session";
 
 /** A fresh catalogue database through the real seam (in-process Worker). */
@@ -489,6 +490,9 @@ describe("openCatalogueStore", () => {
 		expect([...byIds.keys()].sort()).toEqual(["p1", "p2"]);
 		expect(byIds.get("p2")?.brand).toBe("Peak");
 
+		const emptyIds = await targetDb.productsByIds([]);
+		expect(emptyIds.size).toBe(0);
+
 		const defaultWeights = DEFAULT_RANKING_CONFIG.scoring_weights;
 
 		const popPool = await targetDb.candidatePoolSql(
@@ -507,9 +511,17 @@ describe("openCatalogueStore", () => {
 		);
 		expect(freshPool[0]?.product.id).toBe("p2");
 
+		const coldAffinityPool = await targetDb.candidatePoolSql(
+			"affinity_first",
+			2,
+			emptyProfile(),
+			defaultWeights,
+		);
+		expect(coldAffinityPool.map((r) => r.product.id)).toEqual(["p1", "p2"]);
+
 		const affinityPool = await targetDb.candidatePoolSql(
 			"affinity_first",
-			1,
+			5,
 			{
 				...emptyProfile(),
 				categoryAffinity: new Map([["footwear", 1.0]]),
@@ -518,7 +530,74 @@ describe("openCatalogueStore", () => {
 			},
 			defaultWeights,
 		);
-		expect(affinityPool[0]?.product.id).toBe("p2");
+		expect(affinityPool.map((r) => r.product.id)).toEqual(["p2", "p1"]);
 		await targetDb.dispose();
+
+		const metaBytes = new TextEncoder().encode(
+			JSON.stringify({
+				catalog_id: "test-cat",
+				version: "v1",
+				embedding_model: "test-model",
+				embedding_dim: 4,
+				embedding_count: 2,
+				product_count: 2,
+			}),
+		);
+		const engine = await createSearchEngine(
+			{
+				meta: metaBytes,
+				state: new Uint8Array(0),
+				embeddings: new Uint8Array(0),
+				products: new Uint8Array(0),
+				sqlite: sqliteBytes,
+			},
+			{
+				embed: async () => new Float32Array([1, 0, 0, 0]),
+			},
+			DEFAULT_RANKING_CONFIG,
+			{ schema_version: 1, neighbors: { p1: [{ id: "p2", score: 0.8 }] } },
+		);
+		expect(engine.ntotal).toBe(2);
+		expect(engine.catalog()).toEqual([]);
+		expect((await engine.productById?.("p1"))?.title).toBe("Alpha Jacket");
+		expect(await engine.productById?.("missing")).toBeUndefined();
+		expect((await engine.productsByIds?.(["p2"]))?.get("p2")?.title).toBe(
+			"Beta Boots",
+		);
+		const searchRes = await engine.search("Alpha Jacket");
+		expect(searchRes.results[0]?.product.id).toBe("p1");
+		const forYouRes = await engine.recommend({ strategy: "for_you", limit: 2 });
+		expect(forYouRes.results.length).toBe(2);
+		const trendingRes = await engine.recommend({
+			strategy: "trending",
+			limit: 1,
+		});
+		expect(trendingRes.results[0]?.product.id).toBe("p1");
+		const newRes = await engine.recommend({
+			strategy: "new_arrivals",
+			limit: 1,
+		});
+		expect(newRes.results[0]?.product.id).toBe("p2");
+		const simRes = await engine.similar("p1", { limit: 1 });
+		expect(simRes.results[0]?.product.id).toBe("p2");
+		const coocRes = await engine.recommend({
+			strategy: "also_bought",
+			seed: "p1",
+			limit: 1,
+		});
+		expect(coocRes.results[0]?.product.id).toBe("p2");
+		const browseAll = await engine.browseSql?.({ limit: 1, offset: 0 });
+		expect(browseAll?.total).toBe(2);
+		expect(browseAll?.categories).toEqual(["apparel", "footwear"]);
+		const browseCat = await engine.browseSql?.({ category: "footwear" });
+		expect(browseCat?.total).toBe(1);
+		await engine.reload?.({
+			meta: metaBytes,
+			state: new Uint8Array(0),
+			embeddings: new Uint8Array(0),
+			products: new Uint8Array(0),
+			sqlite: sqliteBytes,
+		});
+		await engine.dispose();
 	});
 });

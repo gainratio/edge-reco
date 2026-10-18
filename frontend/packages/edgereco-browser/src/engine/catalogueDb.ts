@@ -466,26 +466,6 @@ export class CatalogueDb implements CatalogueStore {
 			await sql.exec(
 				"CREATE TABLE IF NOT EXISTS _sqliteai_vector (tblname TEXT, colname TEXT, key TEXT, value ANY, PRIMARY KEY(tblname, colname, key))",
 			);
-			const f32Bytes = dimension * Float32Array.BYTES_PER_ELEMENT;
-			const int8Bytes = dimension;
-			const [sample] = await sql.query(
-				"SELECT length(embedding) AS len FROM products LIMIT 1",
-			);
-			if (sample !== undefined) {
-				const sampleLen = Number(sample.len ?? f32Bytes);
-				const vectorType =
-					sampleLen === int8Bytes && int8Bytes !== f32Bytes
-						? "INT8"
-						: "FLOAT32";
-				await sql.exec(
-					"DELETE FROM _sqliteai_vector WHERE tblname = 'products' AND colname = 'embedding'",
-				);
-				await sql.query(
-					"SELECT vector_init('products', 'embedding', ?) AS initialized",
-					[`dimension=${dimension},type=${vectorType},distance=COSINE`],
-				);
-				return new CatalogueDb(sql, dimension, weights, vectorType);
-			}
 			return new CatalogueDb(sql, dimension, weights, null);
 		} catch (error) {
 			await sql.close();
@@ -574,21 +554,12 @@ export class CatalogueDb implements CatalogueStore {
 			} finally {
 				await this.#sql.exec("PRAGMA cache_size = -65536;");
 			}
-			await this.#sql.exec(
-				"CREATE TABLE IF NOT EXISTS _sqliteai_vector (tblname TEXT, colname TEXT, key TEXT, value ANY, PRIMARY KEY(tblname, colname, key)); DELETE FROM _sqliteai_vector WHERE tblname = 'products' AND colname = 'embedding';",
-			);
 			const [sample] = await this.#sql.query(
 				"SELECT length(embedding) AS len FROM products LIMIT 1",
 			);
-			const sampleLen = Number(sample?.len ?? f32Bytes);
-			this.#vectorType =
-				sampleLen === int8Bytes && int8Bytes !== f32Bytes ? "INT8" : "FLOAT32";
-			await this.#sql.query(
-				"SELECT vector_init('products', 'embedding', ?) AS initialized",
-				[
-					`dimension=${this.#dimension},type=${this.#vectorType},distance=COSINE`,
-				],
-			);
+			const targetType = Number(sample?.len) === int8Bytes ? "INT8" : "FLOAT32";
+			this.#vectorType = null;
+			await this.#ensureVectorInit(targetType);
 		});
 	}
 
