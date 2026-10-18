@@ -357,4 +357,42 @@ describe("EngineRuntime.clearBundleCache — explicit user recovery only", () =>
 		expect(clear).toHaveBeenCalledOnce();
 		expect(clearing.terminated).toBe(true);
 	});
+
+	it("skips materializing catalogue.sqlite on a warm OPFS reload when activateRevision succeeds", async () => {
+		const metaBytes = new TextEncoder().encode(
+			JSON.stringify({
+				catalog_id: "amazon-demo",
+				version: "v1",
+				embedding_dim: 4,
+				embedding_count: 100,
+			}),
+		);
+		const readSqlite = vi.fn();
+		const port = enginePort({
+			readFile: async (path: string) => {
+				if (path === "catalog_meta.json") {
+					return metaBytes;
+				}
+				if (path === "catalogue.sqlite") {
+					readSqlite();
+					return new Uint8Array([1, 2, 3]);
+				}
+				throw new Error(`file ${path} not in manifest`);
+			},
+		});
+		const store = await openCatalogueStore({ dimension: 4 });
+		store.activateRevision = vi.fn(async () => true);
+		const runtime = new EngineRuntime({
+			spawnEngine: () => port,
+			makeEmbedder: () => ({
+				embed: async () => new Float32Array([1, 0, 0, 0]),
+			}),
+			makeCatalogue: async () => store,
+		});
+		const engine = await runtime.bootstrap(config);
+		expect(engine.ntotal).toBe(100);
+		expect(store.activateRevision).toHaveBeenCalledWith("a".repeat(64), 100);
+		expect(readSqlite).not.toHaveBeenCalled();
+		await runtime.dispose();
+	});
 });

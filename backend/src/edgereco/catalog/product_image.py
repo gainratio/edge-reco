@@ -81,6 +81,29 @@ def _card_key(product: Product) -> tuple[str, str]:
     return (icon_for(product).name, product.brand.strip().casefold())
 
 
+def _should_mint_card(
+    index: int,
+    key: tuple[str, str],
+    pools: Mapping[tuple[str, str], list[str]],
+    cards: Mapping[str, bytes],
+) -> bool:
+    if len(cards) >= MAX_SIGNED_CARDS:
+        return False
+    return index < MAX_SIGNED_CARDS or key not in pools
+
+
+def _fallback_pool(
+    key: tuple[str, str],
+    pools: Mapping[tuple[str, str], list[str]],
+    icon_pools: Mapping[str, list[str]],
+    all_cards: list[str],
+) -> list[str]:
+    by_key = pools.get(key)
+    if by_key:
+        return by_key
+    return icon_pools.get(key[0], all_cards)
+
+
 def _resolve_card_id(
     product: Product,
     index: int,
@@ -88,16 +111,20 @@ def _resolve_card_id(
     seen: int,
     staged: Mapping[str, str],
     pools: dict[tuple[str, str], list[str]],
+    icon_pools: dict[str, list[str]],
+    all_cards: list[str],
     cards: dict[str, bytes],
 ) -> str:
     """Pick or mint the card id for ``product`` while keeping manifest entries bounded."""
     if product.id in staged:
         return product.id
-    if index < MAX_SIGNED_CARDS or key not in pools:
+    if _should_mint_card(index, key, pools, cards):
         cards[image_relpath(product.id)] = generate_product_image(product).encode("utf-8")
         pools.setdefault(key, []).append(product.id)
+        icon_pools.setdefault(key[0], []).append(product.id)
+        all_cards.append(product.id)
         return product.id
-    pool = pools[key]
+    pool = _fallback_pool(key, pools, icon_pools, all_cards)
     return pool[seen % len(pool)]
 
 
@@ -145,6 +172,8 @@ def _localize_records(raw: str, staged: Mapping[str, str]) -> tuple[str, dict[st
     """Rewrite every non-blank record and collect the cards this call had to render."""
     cards: dict[str, bytes] = {}
     pools: dict[tuple[str, str], list[str]] = {}
+    icon_pools: dict[str, list[str]] = {}
+    all_cards: list[str] = []
     counts: dict[tuple[str, str], int] = {}
     lines: list[str] = []
     for index, line in enumerate(filter(str.strip, raw.split("\n"))):
@@ -152,7 +181,9 @@ def _localize_records(raw: str, staged: Mapping[str, str]) -> tuple[str, dict[st
         key = _card_key(product)
         seen = counts.get(key, 0)
         counts[key] = seen + 1
-        card_id = _resolve_card_id(product, index, key, seen, staged, pools, cards)
+        card_id = _resolve_card_id(
+            product, index, key, seen, staged, pools, icon_pools, all_cards, cards
+        )
         lines.append(_rewrite_image_url(line, card_id, staged.get(product.id)))
     return "".join(f"{line}\n" for line in lines), cards
 

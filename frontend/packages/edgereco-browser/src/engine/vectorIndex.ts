@@ -15,7 +15,9 @@ import {
 	type HybridRow,
 	openCatalogueStore,
 } from "./catalogueDb";
-import type { BrowseResponse, Product } from "./domain";
+import type { BrowseResponse, Product, SearchResult } from "./domain";
+import type { ScoringWeights } from "./rankingConfig";
+import type { SessionProfile } from "./session";
 
 const DECODER = new TextDecoder();
 
@@ -23,14 +25,18 @@ const DECODER = new TextDecoder();
 export interface VectorIndexFiles {
 	/** catalog_meta.json — carries embedding_count / embedding_dim. */
 	readonly meta: Uint8Array;
-	/** vector/state.json — carries the faiss_ids row->id map. */
+	/** vector/state.json — carries the faiss_ids row->id map (empty in SQLite-only bundles). */
 	readonly state: Uint8Array;
-	/** vector/embeddings.f32 — row-major L2-normalized float32, ntotal x dim. */
+	/** vector/embeddings.f32 — row-major L2-normalized float32, ntotal x dim (empty in SQLite-only bundles). */
 	readonly embeddings: Uint8Array;
-	/** products.jsonl — one Product JSON object per line. */
+	/** products.jsonl — one Product JSON object per line (empty in SQLite-only bundles). */
 	readonly products: Uint8Array;
-	/** catalogue.sqlite — optional canonical pre-built SQLite database. */
+	/** catalogue.sqlite — canonical pre-built SQLite database. */
 	readonly sqlite?: Uint8Array;
+	/** Optional bundle revision key (`manifestHash` or `catalog_id:version:count`). */
+	readonly revisionKey?: string;
+	/** True when the pre-opened CatalogueStore already activated `revisionKey` on OPFS. */
+	readonly sqliteAlreadyActive?: boolean;
 }
 
 /** A scored retrieval hit: a product id and its cosine similarity to the query. */
@@ -40,6 +46,8 @@ export interface VectorHit {
 }
 
 interface CatalogMeta {
+	readonly catalog_id?: string;
+	readonly version?: string;
 	readonly embedding_count: number;
 	readonly embedding_dim: number;
 }
@@ -246,6 +254,7 @@ export class VectorIndex {
 	#ids: ReadonlyArray<string>;
 	#known: ReadonlySet<string>;
 	#products: ReadonlyMap<string, Product>;
+	#ntotal: number;
 	readonly #dim: number;
 
 	public constructor(
@@ -253,16 +262,18 @@ export class VectorIndex {
 		ids: ReadonlyArray<string>,
 		products: ReadonlyMap<string, Product>,
 		dim: number,
+		ntotal?: number,
 	) {
 		this.#store = store;
 		this.#ids = ids;
 		this.#known = new Set(ids);
 		this.#products = products;
+		this.#ntotal = ntotal ?? ids.length;
 		this.#dim = dim;
 	}
 
 	public get ntotal(): number {
-		return this.#ids.length;
+		return this.#ntotal;
 	}
 
 	public get dim(): number {
@@ -279,6 +290,38 @@ export class VectorIndex {
 
 	public product(id: string): Product | undefined {
 		return this.#products.get(id);
+	}
+
+	/** Hydrate products by ID from the in-memory map or the SQLite `products` table. */
+	public async productsByIds(
+		ids: ReadonlyArray<string>,
+	): Promise<ReadonlyMap<string, Product>> {
+		if (this.#products.size > 0) {
+			const out = new Map<string, Product>();
+			for (const id of ids) {
+				const product = this.#products.get(id);
+				if (product !== undefined) {
+					out.set(id, product);
+				}
+			}
+			return out;
+		}
+		if (this.#store.productsByIds !== undefined) {
+			return this.#store.productsByIds(ids);
+		}
+		return new Map();
+	}
+
+	/** SQL-backed candidate pool selection when the catalog lives in SQLite. */
+	public candidatePoolSql(
+		policy: "popularity" | "freshness" | "affinity_first",
+		limit: number,
+		profile: SessionProfile,
+		weights: ScoringWeights,
+	): Promise<SearchResult[]> | null {
+		return this.#store.candidatePoolSql !== undefined
+			? this.#store.candidatePoolSql(policy, limit, profile, weights)
+			: null;
 	}
 
 	/** All products, in faiss_ids row order (the catalog order from the bundle). */
@@ -304,7 +347,10 @@ export class VectorIndex {
 	): Promise<void> {
 		const parsed = parseBundleRevision(files, this.#dim);
 		if (files.sqlite !== undefined && this.#store.importSqlite !== undefined) {
-			await this.#store.importSqlite(files.sqlite, options);
+			await this.#store.importSqlite(files.sqlite, {
+				...options,
+				revisionKey: options?.revisionKey ?? parsed.revisionKey,
+			});
 		} else {
 			await this.#store.replace(
 				{
@@ -319,6 +365,7 @@ export class VectorIndex {
 		this.#ids = parsed.ids;
 		this.#known = new Set(parsed.ids);
 		this.#products = parsed.products;
+		this.#ntotal = parsed.ntotal;
 	}
 
 	/**
@@ -364,7 +411,7 @@ export class VectorIndex {
 		productId: string,
 		k: number,
 	): Promise<ReadonlyArray<VectorHit>> {
-		if (!this.#known.has(productId)) {
+		if (this.#known.size > 0 && !this.#known.has(productId)) {
 			return Promise.reject(new Error(`unknown product id: ${productId}`));
 		}
 		return this.#store.nearest(productId, Math.max(0, k));
@@ -380,18 +427,38 @@ function parseBundleRevision(
 	expectedDim?: number,
 ): {
 	readonly dim: number;
+	readonly ntotal: number;
 	readonly ids: ReadonlyArray<string>;
 	readonly matrix: Float32Array;
 	readonly products: ReadonlyMap<string, Product>;
+	readonly revisionKey: string;
 } {
 	const meta = parseCatalogMeta(files.meta);
-	const state = parseVectorState(files.state);
 	const dim = meta.embedding_dim;
 	if (expectedDim !== undefined && dim !== expectedDim) {
 		throw new VectorIndexError(
 			`catalog_meta embedding_dim ${dim} != active index dimension ${expectedDim}`,
 		);
 	}
+	const revisionKey =
+		files.revisionKey ??
+		`${String(meta.catalog_id ?? "catalog")}:${String(meta.version ?? "v1")}:${meta.embedding_count}`;
+	if (
+		(files.sqlite !== undefined || files.sqliteAlreadyActive === true) &&
+		files.state.byteLength === 0 &&
+		files.embeddings.byteLength === 0 &&
+		files.products.byteLength === 0
+	) {
+		return {
+			dim,
+			ntotal: meta.embedding_count,
+			ids: [],
+			matrix: new Float32Array(0),
+			products: new Map(),
+			revisionKey,
+		};
+	}
+	const state = parseVectorState(files.state);
 	const ntotal = state.faiss_ids.length;
 	if (meta.embedding_count !== ntotal) {
 		throw new VectorIndexError(
@@ -400,7 +467,7 @@ function parseBundleRevision(
 	}
 	const matrix = asMatrix(files.embeddings, ntotal, dim);
 	const products = parseProducts(files.products);
-	return { dim, ids: state.faiss_ids, matrix, products };
+	return { dim, ntotal, ids: state.faiss_ids, matrix, products, revisionKey };
 }
 
 /**
@@ -415,11 +482,20 @@ export async function loadVectorIndex(
 	files: VectorIndexFiles,
 	factory: CatalogueStoreFactory = openCatalogueStore,
 ): Promise<VectorIndex> {
-	const { dim, ids, matrix, products } = parseBundleRevision(files);
+	const { dim, ntotal, ids, matrix, products, revisionKey } =
+		parseBundleRevision(files);
 	const store = await openCatalogue(factory, dim);
 	try {
+		if (files.sqliteAlreadyActive === true) {
+			return new VectorIndex(store, ids, products, dim, ntotal);
+		}
 		if (files.sqlite !== undefined && store.importSqlite !== undefined) {
-			await store.importSqlite(files.sqlite);
+			if (
+				store.activateRevision === undefined ||
+				!(await store.activateRevision(revisionKey, ntotal))
+			) {
+				await store.importSqlite(files.sqlite, { revisionKey });
+			}
 		} else {
 			// The database is durable across catalogue revisions; replace() swaps the
 			// whole revision (products, FTS5 index, vectors) in ONE transaction, so a
@@ -430,7 +506,7 @@ export async function loadVectorIndex(
 				vectors: matrix,
 			});
 		}
-		return new VectorIndex(store, ids, products, dim);
+		return new VectorIndex(store, ids, products, dim, ntotal);
 	} catch (error) {
 		await store.dispose();
 		const message = error instanceof Error ? error.message : String(error);

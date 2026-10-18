@@ -25,7 +25,11 @@ import {
 	type SyncResult,
 } from "../gainratio";
 import { deleteBundleFloorDatabase } from "./cacheFloor";
-import type { CatalogueStoreFactory } from "./catalogueDb";
+import {
+	type CatalogueStore,
+	type CatalogueStoreFactory,
+	openCatalogueStore,
+} from "./catalogueDb";
 import { type CooccurrenceMatrix, parseCooccurrence } from "./cooccurrence";
 import { createEmbedder, type Embedder } from "./embedder";
 import { createWorkerEmbedder, spawnEmbedderWorker } from "./embedderClient";
@@ -143,20 +147,140 @@ export function defaultRuntimeDeps(): RuntimeDeps {
 	return defaultDeps;
 }
 
-async function readBundleFiles(engine: EnginePort): Promise<VectorIndexFiles> {
-	const [meta, state, embeddings, products, sqlite] = await Promise.all([
+interface ReadBundleResult {
+	readonly files: VectorIndexFiles;
+	readonly preopenedStore: CatalogueStore | null;
+}
+
+function tryParseMetaCounts(metaBytes: Uint8Array): {
+	readonly dim: number;
+	readonly count: number;
+	readonly rev: string;
+} | null {
+	try {
+		const raw = JSON.parse(new TextDecoder().decode(metaBytes)) as Record<
+			string,
+			unknown
+		>;
+		const dim = raw.embedding_dim;
+		const count = raw.embedding_count;
+		if (
+			typeof dim === "number" &&
+			Number.isInteger(dim) &&
+			dim >= 1 &&
+			typeof count === "number" &&
+			Number.isInteger(count) &&
+			count >= 1
+		) {
+			const rev = `${String(raw.catalog_id ?? "catalog")}:${String(raw.version ?? "v1")}:${count}`;
+			return { dim, count, rev };
+		}
+	} catch {
+		// Fall through to normal validation in loadVectorIndex.
+	}
+	return null;
+}
+
+async function readBundleFiles(
+	engine: EnginePort,
+	options?: {
+		readonly revisionKey?: string;
+		readonly makeCatalogue?: CatalogueStoreFactory;
+	},
+): Promise<ReadBundleResult> {
+	const [meta, state, embeddings, products] = await Promise.all([
 		engine.readFile(META_PATH),
-		engine.readFile(STATE_PATH),
-		engine.readFile(EMBEDDINGS_PATH),
-		engine.readFile(PRODUCTS_PATH),
-		readOptionalBundleFile(engine, SQLITE_PATH),
+		readOptionalBundleFile(engine, STATE_PATH),
+		readOptionalBundleFile(engine, EMBEDDINGS_PATH),
+		readOptionalBundleFile(engine, PRODUCTS_PATH),
 	]);
+	if (
+		state === undefined ||
+		embeddings === undefined ||
+		products === undefined
+	) {
+		const parsedMeta = tryParseMetaCounts(meta);
+		const revisionKey = options?.revisionKey ?? parsedMeta?.rev;
+		let preopenedStore: CatalogueStore | null = null;
+		if (parsedMeta !== null && options?.makeCatalogue !== undefined) {
+			try {
+				preopenedStore = await options.makeCatalogue({
+					dimension: parsedMeta.dim,
+				});
+				if (
+					revisionKey !== undefined &&
+					preopenedStore.activateRevision !== undefined &&
+					(await preopenedStore.activateRevision(revisionKey, parsedMeta.count))
+				) {
+					return {
+						files: {
+							meta,
+							state: new Uint8Array(0),
+							embeddings: new Uint8Array(0),
+							products: new Uint8Array(0),
+							revisionKey,
+							sqliteAlreadyActive: true,
+						},
+						preopenedStore,
+					};
+				}
+			} catch {
+				if (preopenedStore !== null) {
+					await preopenedStore.dispose();
+					preopenedStore = null;
+				}
+			}
+		}
+		try {
+			const sqlite = await readOptionalBundleFile(engine, SQLITE_PATH);
+			if (sqlite !== undefined) {
+				return {
+					files: {
+						meta,
+						state: new Uint8Array(0),
+						embeddings: new Uint8Array(0),
+						products: new Uint8Array(0),
+						sqlite,
+						...(revisionKey !== undefined ? { revisionKey } : {}),
+					},
+					preopenedStore,
+				};
+			}
+		} catch (error) {
+			if (preopenedStore !== null) {
+				await preopenedStore.dispose();
+			}
+			throw error;
+		}
+		if (preopenedStore !== null) {
+			await preopenedStore.dispose();
+		}
+	}
+	const sqlite = await readOptionalBundleFile(engine, SQLITE_PATH);
+	if (state === undefined) {
+		await engine.readFile(STATE_PATH);
+		throw new Error(`file ${STATE_PATH} not in manifest`);
+	}
+	if (embeddings === undefined) {
+		await engine.readFile(EMBEDDINGS_PATH);
+		throw new Error(`file ${EMBEDDINGS_PATH} not in manifest`);
+	}
+	if (products === undefined) {
+		await engine.readFile(PRODUCTS_PATH);
+		throw new Error(`file ${PRODUCTS_PATH} not in manifest`);
+	}
 	return {
-		meta,
-		state,
-		embeddings,
-		products,
-		...(sqlite !== undefined ? { sqlite } : {}),
+		files: {
+			meta,
+			state,
+			embeddings,
+			products,
+			...(sqlite !== undefined ? { sqlite } : {}),
+			...(options?.revisionKey !== undefined
+				? { revisionKey: options.revisionKey }
+				: {}),
+		},
+		preopenedStore: null,
 	};
 }
 
@@ -351,8 +475,8 @@ export class EngineRuntime {
 			}
 			onStage({ kind: "synced", result });
 			onStage({ kind: "reassembling" });
-			const [files, rankingConfig, cooccurrence] = await Promise.all([
-				readBundleFiles(engineClient),
+			const [{ files }, rankingConfig, cooccurrence] = await Promise.all([
+				readBundleFiles(engineClient, { revisionKey: result.manifestHash }),
 				readRankingConfig(engineClient),
 				readCooccurrence(engineClient),
 			]);
@@ -380,6 +504,7 @@ export class EngineRuntime {
 		let engineClient: EnginePort | null = null;
 		let embedder: Embedder | null = null;
 		let searchEngine: SearchEngine | null = null;
+		let preopenedStore: CatalogueStore | null = null;
 		try {
 			engineClient = this.#deps.spawnEngine();
 			this.#enginePort = engineClient;
@@ -394,11 +519,16 @@ export class EngineRuntime {
 			onStage({ kind: "synced", result });
 
 			onStage({ kind: "reassembling" });
-			const [files, rankingConfig, cooccurrence] = await Promise.all([
-				readBundleFiles(engineClient),
+			const [bundleRead, rankingConfig, cooccurrence] = await Promise.all([
+				readBundleFiles(engineClient, {
+					revisionKey: result.manifestHash,
+					makeCatalogue: this.#deps.makeCatalogue ?? openCatalogueStore,
+				}),
 				readRankingConfig(engineClient),
 				readCooccurrence(engineClient),
 			]);
+			const { files } = bundleRead;
+			preopenedStore = bundleRead.preopenedStore;
 			const proofEvidence = await readRankingProofEvidence(
 				engineClient,
 				rankingConfig,
@@ -419,13 +549,21 @@ export class EngineRuntime {
 			await embedder.embed(WARMUP_PROMPT);
 			this.#assertCurrent(generation);
 
+			const catalogueFactory: CatalogueStoreFactory | undefined =
+				preopenedStore !== null
+					? () => {
+							const store = preopenedStore as CatalogueStore;
+							preopenedStore = null;
+							return Promise.resolve(store);
+						}
+					: this.#deps.makeCatalogue;
 			searchEngine = await createSearchEngine(
 				files,
 				embedder,
 				rankingConfig,
 				cooccurrence,
 				proofEvidence,
-				this.#deps.makeCatalogue,
+				catalogueFactory,
 			);
 			this.#assertCurrent(generation);
 			this.#ready = searchEngine;
@@ -433,6 +571,9 @@ export class EngineRuntime {
 			onStage({ kind: "ready" });
 			return searchEngine;
 		} catch (error) {
+			if (preopenedStore !== null) {
+				await preopenedStore.dispose();
+			}
 			if (searchEngine !== null) {
 				if (this.#ready === searchEngine) {
 					this.#ready = null;

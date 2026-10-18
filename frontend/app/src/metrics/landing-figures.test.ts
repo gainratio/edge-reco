@@ -1,6 +1,7 @@
 import { readdirSync, readFileSync, statSync } from "node:fs";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
+import { zstdDecompressSync } from "node:zlib";
 import { describe, expect, it } from "vitest";
 import landingCopy from "../locales/en/landing.json";
 import {
@@ -54,14 +55,36 @@ const strings = (node: unknown): string[] =>
 		? [node]
 		: Object.values(node as Record<string, unknown>).flatMap(strings);
 
-// Guard the representative catalog count against the committed bundle source, so
-// the landing's "720" can't silently rot if the catalog ever changes. This is the
+// Guard the representative catalog count against the committed signed bundle, so
+// the landing's figure can't silently rot if the catalog ever changes. This is the
 // single place the number is asserted true — every landing reference derives from it.
 describe("landing-figures", () => {
-	it("CATALOG_PRODUCTS matches the committed catalog source row count", () => {
-		const csv = join(repoRoot, "backend/examples/source/catalog.csv");
-		const dataRows = readFileSync(csv, "utf8").trim().split("\n").length - 1; // minus header
-		expect(CATALOG_PRODUCTS).toBe(dataRows);
+	it("CATALOG_PRODUCTS matches the committed signed bundle product_count", () => {
+		const catalogDir = join(repoRoot, "backend/examples/catalog");
+		const latest = JSON.parse(
+			readFileSync(join(catalogDir, "latest"), "utf8"),
+		) as { manifest_hash: string };
+		const manifest = JSON.parse(
+			readFileSync(join(catalogDir, "manifest", latest.manifest_hash), "utf8"),
+		) as {
+			files: ReadonlyArray<{
+				path: string;
+				chunks: ReadonlyArray<{ hash: string }>;
+			}>;
+		};
+		const metaEntry = manifest.files.find(
+			(f) => f.path === "catalog_meta.json",
+		);
+		if (!metaEntry) throw new Error("catalog_meta.json missing from manifest");
+		const metaBytes = Buffer.concat(
+			metaEntry.chunks.map((c) =>
+				zstdDecompressSync(readFileSync(join(catalogDir, "chunk", c.hash))),
+			),
+		);
+		const meta = JSON.parse(metaBytes.toString("utf8")) as {
+			product_count: number;
+		};
+		expect(CATALOG_PRODUCTS).toBe(meta.product_count);
 	});
 
 	// Same idea as the count guard above, for the other figure tied to the committed

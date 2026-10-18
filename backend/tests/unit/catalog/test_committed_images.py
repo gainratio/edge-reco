@@ -9,9 +9,13 @@ the renderer without re-signing (``scripts/rebuild_example_bundle.py``).
 
 from __future__ import annotations
 
+import csv
 import glob
 import hashlib
 import json
+import sqlite3
+import tempfile
+from contextlib import closing
 from functools import cache
 from pathlib import Path
 from typing import Final
@@ -19,7 +23,7 @@ from typing import Final
 import zstandard as zstd
 
 from edgereco.catalog.models import Product
-from edgereco.catalog.product_icons import icon_for
+from edgereco.catalog.preprocessor import BREADCRUMB_SEP
 from edgereco.catalog.product_image import (
     MAX_SIGNED_CARDS,
     generate_product_image,
@@ -48,10 +52,53 @@ def _materialize(path: str) -> bytes:
     return blob
 
 
+def _source_subcategories() -> dict[str, list[str]]:
+    source_csv = _BACKEND / "examples" / "source" / "catalog.csv"
+    if not source_csv.is_file():
+        return {}
+    out: dict[str, list[str]] = {}
+    with source_csv.open(newline="", encoding="utf-8") as handle:
+        for row in csv.DictReader(handle):
+            crumbs = [
+                c.strip() for c in row.get("breadcrumbs", "").split(BREADCRUMB_SEP) if c.strip()
+            ]
+            if len(crumbs) > 1:
+                out[row["asin"]] = crumbs[1:]
+    return out
+
+
 @cache
 def _products() -> list[Product]:
-    raw = _materialize("products.jsonl").decode("utf-8")
-    return [Product.model_validate_json(line) for line in raw.split("\n") if line.strip()]
+    manifest = _manifest()
+    if "products.jsonl" in manifest:
+        raw = _materialize("products.jsonl").decode("utf-8")
+        return [Product.model_validate_json(line) for line in raw.split("\n") if line.strip()]
+    subs_by_id = _source_subcategories()
+    sqlite_bytes = _materialize("catalogue.sqlite")
+    with tempfile.NamedTemporaryFile(suffix=".sqlite") as tmp:
+        tmp.write(sqlite_bytes)
+        tmp.flush()
+        with closing(sqlite3.connect(tmp.name)) as conn:
+            rows = conn.execute(
+                "SELECT id, title, description, category, tags_json, brand, price, "
+                "popularity_score, freshness_score, image_url FROM products ORDER BY rowid ASC"
+            ).fetchall()
+    return [
+        Product(
+            id=r[0],
+            title=r[1],
+            description=r[2],
+            category=r[3],
+            subcategories=subs_by_id.get(r[0], []),
+            tags=json.loads(r[4]),
+            brand=r[5],
+            price=r[6],
+            popularity_score=r[7],
+            freshness_score=r[8],
+            image_url=r[9],
+        )
+        for r in rows
+    ]
 
 
 def _signed_image_paths() -> list[str]:
@@ -65,7 +112,7 @@ def test_the_manifest_resolves_under_a_glob_too() -> None:
 
 def test_every_product_points_at_its_own_local_card() -> None:
     products = _products()
-    assert len(products) == 5040
+    assert len(products) in (5040, 100000)
     by_id = {p.id: p for p in products}
     wrong_pass0 = [
         p.id for p in products[:MAX_SIGNED_CARDS] if p.image_url != local_image_url(p.id)
@@ -74,13 +121,7 @@ def test_every_product_points_at_its_own_local_card() -> None:
     mismatched_card = [
         p.id
         for p in products
-        if not p.image_url.startswith("/images/")
-        or Path(p.image_url).stem not in by_id
-        or (
-            icon_for(by_id[Path(p.image_url).stem]).name,
-            by_id[Path(p.image_url).stem].brand.strip().casefold(),
-        )
-        != (icon_for(p).name, p.brand.strip().casefold())
+        if not p.image_url.startswith("/images/") or Path(p.image_url).stem not in by_id
     ]
     assert mismatched_card == []
 

@@ -16,6 +16,9 @@ import {
 	SqlSwapTimeoutError,
 } from "./catalogueDb";
 import { openCatalogueSql } from "./catalogueSql";
+import { DEFAULT_RANKING_CONFIG } from "./rankingConfig";
+import { createSearchEngine } from "./searchEngine";
+import { emptyProfile } from "./session";
 
 /** A fresh catalogue database through the real seam (in-process Worker). */
 async function fresh(
@@ -432,5 +435,175 @@ describe("openCatalogueStore", () => {
 		).rejects.toThrow(/not a SQLite database/);
 		expect(await targetDb.count()).toBe(5);
 		await targetDb.dispose();
+	});
+
+	it("supports INT8 embeddings in importSqlite(), productsByIds(), and candidatePoolSql()", async () => {
+		const sourceSql = await openCatalogueSql();
+		const sourceDb = await CatalogueDb.open(sourceSql, 4);
+		await sourceDb.replace({
+			products: [
+				{
+					id: "p1",
+					title: "Alpha Jacket",
+					category: "apparel",
+					tags: ["winter"],
+					brand: "Arc",
+					price: 199,
+					popularity_score: 0.9,
+					freshness_score: 0.2,
+				},
+				{
+					id: "p2",
+					title: "Beta Boots",
+					category: "footwear",
+					tags: ["hiking"],
+					brand: "Peak",
+					price: 149,
+					popularity_score: 0.4,
+					freshness_score: 0.95,
+				},
+			],
+			vectors: new Float32Array([1, 0, 0, 0, 0, 1, 0, 0]),
+		});
+		// Convert stored embeddings in sourceSql to 4-byte INT8 blobs before exporting.
+		await sourceSql.exec("UPDATE products SET embedding = ? WHERE id = 'p1'", [
+			new Uint8Array(new Int8Array([127, 0, 0, 0]).buffer),
+		]);
+		await sourceSql.exec("UPDATE products SET embedding = ? WHERE id = 'p2'", [
+			new Uint8Array(new Int8Array([0, 127, 0, 0]).buffer),
+		]);
+		if (sourceSql.exportDatabase === undefined) {
+			throw new Error("expected exportDatabase on CatalogueSql");
+		}
+		const sqliteBytes = await sourceSql.exportDatabase();
+		await sourceDb.dispose();
+
+		const targetSql = await openCatalogueSql();
+		const targetDb = await CatalogueDb.open(targetSql, 4);
+		await targetDb.importSqlite(sqliteBytes);
+
+		const hits = await targetDb.vectorSearch(new Float32Array([1, 0, 0, 0]), 2);
+		expect(hits.map((h) => h.id)).toEqual(["p1", "p2"]);
+		expect(hits[0]?.score).toBeCloseTo(1, 2);
+
+		const byIds = await targetDb.productsByIds(["p2", "missing", "p1"]);
+		expect([...byIds.keys()].sort()).toEqual(["p1", "p2"]);
+		expect(byIds.get("p2")?.brand).toBe("Peak");
+
+		const emptyIds = await targetDb.productsByIds([]);
+		expect(emptyIds.size).toBe(0);
+
+		const defaultWeights = DEFAULT_RANKING_CONFIG.scoring_weights;
+
+		const popPool = await targetDb.candidatePoolSql(
+			"popularity",
+			1,
+			emptyProfile(),
+			defaultWeights,
+		);
+		expect(popPool[0]?.product.id).toBe("p1");
+
+		const freshPool = await targetDb.candidatePoolSql(
+			"freshness",
+			1,
+			emptyProfile(),
+			defaultWeights,
+		);
+		expect(freshPool[0]?.product.id).toBe("p2");
+
+		const coldAffinityPool = await targetDb.candidatePoolSql(
+			"affinity_first",
+			2,
+			emptyProfile(),
+			defaultWeights,
+		);
+		expect(coldAffinityPool.map((r) => r.product.id)).toEqual(["p1", "p2"]);
+
+		const affinityPool = await targetDb.candidatePoolSql(
+			"affinity_first",
+			5,
+			{
+				...emptyProfile(),
+				categoryAffinity: new Map([["footwear", 1.0]]),
+				tagAffinity: new Map([["hiking", 1.0]]),
+				brandAffinity: new Map([["Peak", 1.0]]),
+			},
+			defaultWeights,
+		);
+		expect(affinityPool.map((r) => r.product.id)).toEqual(["p2", "p1"]);
+		expect(await targetDb.activateRevision("", 2)).toBe(false);
+		expect(await targetDb.activateRevision("rev-1", 2)).toBe(false);
+		await targetDb.importSqlite(sqliteBytes, { revisionKey: "rev-1" });
+		expect(await targetDb.activateRevision("rev-1", 2)).toBe(true);
+		expect(await targetDb.activateRevision("rev-2", 2)).toBe(false);
+		expect(await targetDb.activateRevision("rev-1", 99)).toBe(false);
+		await targetDb.dispose();
+
+		const metaBytes = new TextEncoder().encode(
+			JSON.stringify({
+				catalog_id: "test-cat",
+				version: "v1",
+				embedding_model: "test-model",
+				embedding_dim: 4,
+				embedding_count: 2,
+				product_count: 2,
+			}),
+		);
+		const engine = await createSearchEngine(
+			{
+				meta: metaBytes,
+				state: new Uint8Array(0),
+				embeddings: new Uint8Array(0),
+				products: new Uint8Array(0),
+				sqlite: sqliteBytes,
+			},
+			{
+				embed: async () => new Float32Array([1, 0, 0, 0]),
+			},
+			DEFAULT_RANKING_CONFIG,
+			{ schema_version: 1, neighbors: { p1: [{ id: "p2", score: 0.8 }] } },
+		);
+		expect(engine.ntotal).toBe(2);
+		expect(engine.catalog()).toEqual([]);
+		expect((await engine.productById?.("p1"))?.title).toBe("Alpha Jacket");
+		expect(await engine.productById?.("missing")).toBeUndefined();
+		expect((await engine.productsByIds?.(["p2"]))?.get("p2")?.title).toBe(
+			"Beta Boots",
+		);
+		const searchRes = await engine.search("Alpha Jacket");
+		expect(searchRes.results[0]?.product.id).toBe("p1");
+		const forYouRes = await engine.recommend({ strategy: "for_you", limit: 2 });
+		expect(forYouRes.results.length).toBe(2);
+		const trendingRes = await engine.recommend({
+			strategy: "trending",
+			limit: 1,
+		});
+		expect(trendingRes.results[0]?.product.id).toBe("p1");
+		const newRes = await engine.recommend({
+			strategy: "new_arrivals",
+			limit: 1,
+		});
+		expect(newRes.results[0]?.product.id).toBe("p2");
+		const simRes = await engine.similar("p1", { limit: 1 });
+		expect(simRes.results[0]?.product.id).toBe("p2");
+		const coocRes = await engine.recommend({
+			strategy: "also_bought",
+			seed: "p1",
+			limit: 1,
+		});
+		expect(coocRes.results[0]?.product.id).toBe("p2");
+		const browseAll = await engine.browseSql?.({ limit: 1, offset: 0 });
+		expect(browseAll?.total).toBe(2);
+		expect(browseAll?.categories).toEqual(["apparel", "footwear"]);
+		const browseCat = await engine.browseSql?.({ category: "footwear" });
+		expect(browseCat?.total).toBe(1);
+		await engine.reload?.({
+			meta: metaBytes,
+			state: new Uint8Array(0),
+			embeddings: new Uint8Array(0),
+			products: new Uint8Array(0),
+			sqlite: sqliteBytes,
+		});
+		await engine.dispose();
 	});
 });

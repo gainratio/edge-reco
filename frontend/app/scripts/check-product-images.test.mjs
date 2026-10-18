@@ -76,7 +76,7 @@ test("the committed bundle and public/images pass: every product has its card", 
 		imagesDir: PUBLIC_IMAGES_DIR,
 	});
 	assert.deepEqual(result.problems, []);
-	assert.equal(result.productCount, 5040);
+	assert.equal(result.productCount, 100000);
 });
 
 test("a product whose card is missing from the static origin is reported", () => {
@@ -166,7 +166,7 @@ test("the CLI exits non-zero and names the product when a card is missing", () =
 test("the CLI exits zero on the committed bundle", () => {
 	const run = spawnSync(process.execPath, [SCRIPT], { encoding: "utf8" });
 	assert.equal(run.status, 0, run.stderr);
-	assert.match(run.stdout, /product images: 5040\/5040 present/);
+	assert.match(run.stdout, /product images: 100000\/100000 present/);
 });
 
 test("the CLI skips in remote image mode, where no local cards exist", () => {

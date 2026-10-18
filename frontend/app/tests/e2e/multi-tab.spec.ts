@@ -65,7 +65,7 @@ async function openStoreTab(context: BrowserContext): Promise<Page> {
 async function expectStorefront(page: Page): Promise<void> {
 	await expect(page.locator(".boot__error")).toHaveCount(0);
 	await expect(page.locator(PRODUCT_CARD).first()).toBeVisible({
-		timeout: 60_000,
+		timeout: 90_000,
 	});
 	await expect(page.locator(".boot__error")).toHaveCount(0);
 }

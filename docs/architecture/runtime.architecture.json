@@ -160,7 +160,7 @@
     {
       "dot": "rose",
       "title": "Page-aligned Gear-CDC delta sync",
-      "items": ["5,040-product SQLite + vector bundle split into SHA-256 chunks", "Price updates fetch 4 changed chunks and reuse 1,371 OPFS chunks"]
+      "items": ["100,000-product SQLite + INT8 vector bundle split into 2,061 SHA-256 chunks", "Price updates fetch 2 changed chunks (~32 KB) and reuse 2,059 OPFS chunks (99.90% reuse)"]
     },
     {
       "dot": "cyan",

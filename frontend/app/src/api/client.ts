@@ -191,6 +191,7 @@ export interface DataClient {
 	strategies(): Record<string, Strategy>;
 	rankingProofEvidence(): RankingProofEvidence;
 	catalog(): ReadonlyArray<Product>;
+	product(id: string): Promise<Product | null>;
 	browse(opts?: BrowseOptions): Promise<BrowseResponse>;
 	sendEvent(evt: InteractionEvent): Promise<void>;
 	catalogInfo(): Promise<{ readonly count: number }>;
@@ -313,6 +314,15 @@ export function createDataClient(deps: ClientDeps = {}): DataClient {
 			// applyInteraction), with the SAME bundle weights. Unknown product
 			// ids (a catalog that moved on) are skipped, matching the fold.
 			const logged = await readTasteEvents();
+			if (
+				productById.size === 0 &&
+				logged.length > 0 &&
+				engine.productsByIds !== undefined
+			) {
+				productById = await engine.productsByIds(
+					logged.map((event) => event.productId),
+				);
+			}
 			profile = buildProfile(
 				logged.map((event) => ({
 					event_type: event.type,
@@ -346,7 +356,12 @@ export function createDataClient(deps: ClientDeps = {}): DataClient {
 			});
 			const engine = runtime.engine();
 			if (updated !== null && engine !== null) {
-				productById = new Map(engine.catalog().map((p) => [p.id, p]));
+				const catalogList = engine.catalog();
+				if (catalogList.length > 0) {
+					productById = new Map(catalogList.map((p) => [p.id, p]));
+				} else if (productById.size > 0 && engine.productsByIds !== undefined) {
+					productById = await engine.productsByIds([...productById.keys()]);
+				}
 				interactionWeights = engine.interactionWeights();
 			}
 			return updated;
@@ -466,24 +481,49 @@ export function createDataClient(deps: ClientDeps = {}): DataClient {
 		catalog(): ReadonlyArray<Product> {
 			return requireEngine().catalog();
 		},
+		async product(id: string): Promise<Product | null> {
+			const engine = requireEngine();
+			const inMem = engine.catalog().find((p) => p.id === id);
+			if (inMem !== undefined) {
+				return inMem;
+			}
+			if (engine.productById !== undefined) {
+				return (await engine.productById(id)) ?? null;
+			}
+			return null;
+		},
 		browse(opts?: BrowseOptions): Promise<BrowseResponse> {
 			const fallback = originFallback?.browse;
 			return withOriginFallback(
-				(engine) =>
-					Promise.resolve(
-						engine.browse({
-							...(opts?.limit !== undefined ? { limit: opts.limit } : {}),
-							...(opts?.offset !== undefined ? { offset: opts.offset } : {}),
-							...(opts?.category !== undefined
-								? { category: opts.category }
-								: {}),
-						}),
-					),
+				(engine) => {
+					const browseOpts = {
+						...(opts?.limit !== undefined ? { limit: opts.limit } : {}),
+						...(opts?.offset !== undefined ? { offset: opts.offset } : {}),
+						...(opts?.category !== undefined
+							? { category: opts.category }
+							: {}),
+					};
+					if (engine.catalog().length === 0 && engine.browseSql !== undefined) {
+						return engine.browseSql(browseOpts);
+					}
+					return Promise.resolve(engine.browse(browseOpts));
+				},
 				fallback !== undefined ? () => fallback(opts) : undefined,
 			);
 		},
 		async sendEvent(evt: InteractionEvent): Promise<void> {
-			const product = productById.get(evt.product_id);
+			let product = productById.get(evt.product_id);
+			if (product === undefined) {
+				const engine = runtime.engine();
+				if (engine?.productById !== undefined) {
+					product = await engine.productById(evt.product_id);
+					if (product !== undefined) {
+						const next = new Map(productById);
+						next.set(product.id, product);
+						productById = next;
+					}
+				}
+			}
 			if (product !== undefined) {
 				profile = applyInteraction(
 					profile,
@@ -630,6 +670,9 @@ export function rankingProofEvidence(): RankingProofEvidence {
 }
 export function catalog(): ReadonlyArray<Product> {
 	return active.catalog();
+}
+export function productById(id: string): Promise<Product | null> {
+	return active.product(id);
 }
 export function browse(opts?: BrowseOptions): Promise<BrowseResponse> {
 	return active.browse(opts);

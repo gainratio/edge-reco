@@ -4,8 +4,8 @@ EdgeReco runs a store's recommendation engine on the shopper's device instead of
 
 Three pieces, composed from a shared browser Lego:
 
-- **`backend/`** — Python build-side. Catalog ingest, embedding, FAISS index build, BM25 build, signed-bundle publish.
-- **[`@gainratio/browser`](https://github.com/hseshadr/edgeproc-browser)** — the standalone browser substrate: signed-bundle sync into OPFS, integrity, Worker transport, and vector adapter contracts.
+- **`backend/`** — Python build-side. Catalog ingest, embedding, SQLite + vector bundle build, signed-bundle publish.
+- **[`@gainratio/browser`](https://github.com/gainratio/edgeproc-browser)** — the standalone browser substrate: signed-bundle sync into OPFS, integrity, Worker transport, and vector adapter contracts.
 - **`frontend/packages/edgereco-browser/`** — `@edgereco/browser`. EdgeReco's transformers.js embedder, hybrid search, ranking, and session logic composed over that substrate.
 - **`frontend/app/`** — the Nimbus React storefront. Thin UI over `@edgereco/browser`; no app server in the request path.
 
@@ -17,17 +17,17 @@ The whole system is four repositories that compose as one stack:
 | --- | --- |
 | [**edge-reco**](https://github.com/gainratio/edge-reco) (this repo) | the product brain — scoring formula, session signals, session-aware reranker, the Nimbus demo storefront. |
 | [**edge-proc**](https://github.com/gainratio/edge-proc) | the reusable local-compute substrate — signed bundle sync, content-addressed OPFS/CAS cache, fail-closed Ed25519 + SHA-256 verification, BM25 ⊕ vector → RRF retrieval. |
-| [**edgeproc-browser**](https://github.com/hseshadr/edgeproc-browser) | the reusable browser substrate — signed sync, OPFS/CAS, Worker transport, integrity, and swappable vector indexes. |
+| [**edgeproc-browser**](https://github.com/gainratio/edgeproc-browser) | the reusable browser substrate — signed sync, OPFS/CAS, Worker transport, integrity, and swappable vector indexes. |
 | [**edgeproc-core**](https://github.com/gainratio/edgeproc-core) | the vector-partitioning protocol edge-proc builds its local vector index on (formerly `shared-libs-python`). On PyPI as [`edgeproc-core`](https://pypi.org/project/edgeproc-core/). |
 
-The backend installs `edge-proc` and `edgeproc-core` from PyPI (`uv.lock` pins the exact releases), and the frontend installs `@gainratio/browser` from npm (`^0.2.0`, locked in `pnpm-lock.yaml`) — see [`GETTING_STARTED.md`](GETTING_STARTED.md). You only clone edge-reco. [privacy-core](https://github.com/gainratio/privacy-core), by the same author, is unrelated: it redacts personal data from AI prompts and is not part of this stack.
+The backend installs `edge-proc` and `edgeproc-core` from PyPI (`uv.lock` pins the exact releases), and the frontend installs `@gainratio/browser` from npm (`^0.4.2`, locked in `pnpm-lock.yaml`) — see [`GETTING_STARTED.md`](GETTING_STARTED.md). You only clone edge-reco. [privacy-core](https://github.com/gainratio/privacy-core), by the same author, is unrelated: it redacts personal data from AI prompts and is not part of this stack.
 
 ## System context
 
 ```mermaid
 flowchart TB
   subgraph publish["Publish side — Python, runs in CI"]
-    build["edgereco build-catalog → index → bundle<br>FAISS index · BM25 · ranking_config.json"]
+    build["edgereco build-catalog → index → bundle<br>catalogue.sqlite (FTS5 + INT8 vectors) · ranking_config.json"]
     sign["Sign the latest pointer with Ed25519"]
   end
 
@@ -52,7 +52,7 @@ flowchart TB
   class browser,api local;
 ```
 
-The publisher signs the bundle once. The CDN/edge serves immutable chunks and a short-TTL `latest` pointer. Both runtimes verify it against a pinned ed25519 public key. Python opens the prebuilt FAISS artifact; the browser imports the authenticated `embeddings.f32` rows into SQLite + sqlite-vector in a dedicated Worker and persists that database in OPFS. No browser FAISS or packed in-memory vector fallback exists. After sync, the runtime is offline-capable.
+The publisher signs the bundle once. The CDN/edge serves immutable chunks and a short-TTL `latest` pointer. Both runtimes verify it against a pinned ed25519 public key. The browser imports the authenticated prebuilt `catalogue.sqlite` database (FTS5 + quantized `INT8` `sqlite-vector` embeddings) into SQLite in a dedicated Worker and persists that database in OPFS, duplicating 0 products or vectors in JavaScript memory. No browser FAISS or packed in-memory vector fallback exists. After sync, the runtime is offline-capable.
 
 ## Request lifecycle
 
@@ -82,7 +82,7 @@ sequenceDiagram
 
 A query goes through three stages, on whichever tier is running it:
 
-1. **Retrieve** — BM25 (keyword) plus the tier's exact vector adapter — FAISS in Python, SQLite + sqlite-vector in the browser — return top-k candidates over the same id space. Vector retrieval is exact flat search (FAISS `IndexFlatIP` / sqlite-vector full scan); that is fine at demo scale (5,040 products), and there is no ANN index yet.
+1. **Retrieve** — BM25 (keyword) plus the tier's exact vector adapter — FAISS in Python, SQLite + sqlite-vector in the browser — return top-k candidates over the same id space. Vector retrieval is exact flat search (FAISS `IndexFlatIP` / sqlite-vector full scan over `INT8` or `FLOAT32` embeddings); that is fast at demo scale (100,000 products), and there is no ANN index yet.
 2. **Fuse** — Reciprocal Rank Fusion (`rrf_score(d) = Σ 1/(k + rank_i)`) merges the two lists without depending on raw scores.
 3. **Rerank** — the session-aware scorer applies the published formula.
 
@@ -227,7 +227,7 @@ The SPA consumes the private `@edgereco/browser` workspace package and the stand
 
 `frontend/app/`:
 
-A React + Vite SPA over `@edgereco/browser`, which composes `@gainratio/browser`. The app boots through an intro landing page (its performance tiles quote a dated, recorded measurement of the live site — `src/metrics/live-measurement.json`, written by `pnpm run measure:live` in real Chromium — through `src/metrics/landing-figures.ts`, and `landing-figures.test.ts` recomputes every tile from the raw runs); once launched, the store shows a live `MetricsStrip` of real per-session numbers (recommend latency, backend calls, cold start, JS heap, catalog size). The home page is a 5,040-product catalog grid (balanced across 12 categories, 420 products each) with a search box and a `RailStack` of *For You* / *Trending* / *New arrivals* rails — the For You rail re-ranks live as the user clicks, favorites, adds to cart, or lingers; Trending / New arrivals are stable. Clicking a product opens the PDP (`ProductDetail.tsx`; a `#/p/<id>` hash history entry, no router library, so browser Back stays in-app and a reload restores the view) with its seed-based rails — *Similar items*, *Because you viewed*, *Customers also bought*, *Frequently bought together*. The taste itself is durable on the device: every folded interaction appends to an OPFS taste log (`src/signals/tasteLog.ts`, rolling 500-event window, no PII), boot replays it through the same fold with the bundle's `interaction_weights` to rebuild the profile, and a "Reset taste" control next to the For-You badge wipes log + profile back to baseline — still zero backend calls. The headline demo — `cd backend && uv run poe demo` (or `cd frontend && docker compose up` for a Docker-only run) — brings up the static signed-bundle origin + Caddy edge + the SPA; the browser does the search.
+A React + Vite SPA over `@edgereco/browser`, which composes `@gainratio/browser`. The app boots through an intro landing page (its performance tiles quote a dated, recorded measurement of the live site — `src/metrics/live-measurement.json`, written by `pnpm run measure:live` in real Chromium — through `src/metrics/landing-figures.ts`, and `landing-figures.test.ts` recomputes every tile from the raw runs); once launched, the store shows a live `MetricsStrip` of real per-session numbers (recommend latency, backend calls, cold start, JS heap, catalog size). The home page is a 100,000-product catalog grid across 12 departments with a search box and a `RailStack` of *For You* / *Trending* / *New arrivals* rails — the For You rail re-ranks live as the user clicks, favorites, adds to cart, or lingers; Trending / New arrivals are stable. Clicking a product opens the PDP (`ProductDetail.tsx`; a `#/p/<id>` hash history entry, no router library, so browser Back stays in-app and a reload restores the view) with its seed-based rails — *Similar items*, *Because you viewed*, *Customers also bought*, *Frequently bought together*. The taste itself is durable on the device: every folded interaction appends to an OPFS taste log (`src/signals/tasteLog.ts`, rolling 500-event window, no PII), boot replays it through the same fold with the bundle's `interaction_weights` to rebuild the profile, and a "Reset taste" control next to the For-You badge wipes log + profile back to baseline — still zero backend calls. The headline demo — `cd backend && uv run poe demo` (or `cd frontend && docker compose up` for a Docker-only run) — brings up the static signed-bundle origin + Caddy edge + the SPA; the browser does the search.
 
 The SPA pins the verify public key (`public/public.key`) at build time — it never trusts the origin for the key. That trust root may be a raw 32-byte Ed25519 key or an `edgeproc.keyring/v1` JSON keyring (key rotation + revocation). The sync Worker and the ranking-proof check both parse it with `@gainratio/browser`'s `parseTrustRoot`, so the two readers always agree on its format.
 
@@ -273,7 +273,7 @@ that are not floats remain exact.
 
 ## Release reliability and performance contract
 
-The browser release gate uses the committed 5,040-product catalog, the real q8
+The browser release gate uses the committed 100,000-product catalog, the real q8
 MiniLM model, ONNX/WASM, signed-bundle sync, and headless Chromium. Budgets are
 chosen from the demo promise (a short first-load screen, then visibly instant local
 search), before measurement:
@@ -301,7 +301,7 @@ requires the exact-SHA and canonical-host checks in `.github/workflows/deploy.ym
 
 ```mermaid
 flowchart TB
-  build["Your cloud<br>build + sign the catalog<br>5,040 products → one 17.0 MB bundle"]
+  build["Your cloud<br>build + sign the catalog<br>100,000 products → one 32.6 MB bundle"]
   sync["Download once, then check it<br>Ed25519 + SHA-256<br>any mismatch aborts the load"]
   engine["Search + rank in the tab<br>keywords + meaning → fuse → personalize"]
   recs["Results and recommendations<br>0 backend calls · works offline"]
@@ -318,12 +318,13 @@ flowchart TB
 Everything in green happens on the shopper's own device. Your cloud is touched only to
 publish a new catalog, never to answer a search.
 
-- **origin** serves a *signed, content-addressed bundle*: the products, the prebuilt
-  search index and the ranking weights. *Content-addressed* means every piece is named by
+- **origin** serves a *signed, content-addressed bundle*: the prebuilt SQLite database
+  (`catalogue.sqlite` holding the products, FTS5 index, and quantized 384-d `sqlite-vector`
+  embeddings) and the ranking weights. *Content-addressed* means every piece is named by
   the hash of its own bytes, so it can be cached forever and cannot be changed without
   detection. It is a `latest` version pointer plus immutable `manifest/<hash>` and
-  `chunk/<hash>` objects. A committed 5,040-product bundle lives in
-  `backend/examples/catalog/` (17.0 MB on disk).
+  `chunk/<hash>` objects. A committed 100,000-product bundle lives in
+  `backend/examples/catalog/` (32.6 MB / 31.1 MiB on disk).
 - **edge** is a Caddy reverse proxy (a small static web server standing in for a CDN)
   with the cache policy: immutable chunks cached forever, a short-lived pointer.
 - **browser tier**: the Nimbus single-page app syncs the bundle (fetches it, checks its
@@ -337,15 +338,15 @@ publish a new catalog, never to answer a search.
 
 The Python side depends on [`edge-proc[localvec,bundles]`](../backend/pyproject.toml).
 The browser side depends on the standalone
-[`@gainratio/browser`](https://github.com/hseshadr/edgeproc-browser) package for signed
+[`@gainratio/browser`](https://github.com/gainratio/edgeproc-browser) package for signed
 sync, integrity checks, Workers, OPFS and vector contracts, while this repo's
 [`@edgereco/browser`](../frontend/packages/edgereco-browser/) package owns only the
 recommendation-specific embedding, search, ranking and session logic.
 
 ## Delivery and updates
 
-The whole engine ships as static files: the app code, plus the signed bundle holding the
-products, a prebuilt 4 KiB page-aligned SQLite database (`catalogue.sqlite` with FTS5 and
+The whole engine ships as static files: the app code, plus the signed bundle holding a
+prebuilt 4 KiB page-aligned SQLite database (`catalogue.sqlite` with products, FTS5 and
 `sqlite-vector` indices already populated and vacuumed), the ranking weights and the "also
 bought" map. The live demo serves all of it from Cloudflare Pages on its own origin; any
 static host works.
@@ -356,8 +357,8 @@ edit modifies only the touched SQLite B-tree leaf pages while every surrounding 
 stays identical. A client compares the new manifest with what it already has in OPFS and
 fetches only the pieces that changed, reusing the rest (notably the unaffected SQLite pages
 and vector rows). In the live Nimbus storefront, clicking **⚡ Apply delta** switches from the
-baseline catalog (`sequence: 18`) to the flash-sale delta overlay (`sequence: 19`, `/bundle-delta/`),
-fetches only **4 changed chunks (~42 KB)** while reusing **1,371 cached chunks** from OPFS (99.7%
+baseline catalog (`sequence: 30`) to the flash-sale delta overlay (`sequence: 31`, `/bundle-delta/`),
+fetches only **2 changed chunks (~32 KB)** while reusing **2,059 cached chunks** from OPFS (99.90%
 chunk reuse), and calls `EngineRuntime.syncUpdate()` to hot-swap the
 SQLite database in place — without reloading the page, the 23 MB ONNX model, or the shopper's
 `taste_events`. As [DEPLOY.md](DEPLOY.md) puts it: *"a one-line edit re-publishes one chunk;
@@ -433,7 +434,7 @@ exist.
 
 **Bundle-sync verification is not displayed.** Signature checking runs on every sync and
 a tampered file is refused. The implementation comes from the standalone
-[`@gainratio/browser`](https://github.com/hseshadr/edgeproc-browser) dependency; EdgeReco
+[`@gainratio/browser`](https://github.com/gainratio/edgeproc-browser) dependency; EdgeReco
 keeps no private copy. What does not exist is a screen showing that sync outcome. The
 landing page's "verify (Ed25519 + SHA-256, fail-closed)" step is static copy, not a live
 result.
@@ -471,7 +472,7 @@ and an approximate index for large catalogs are ideas, not scheduled work.
 | A hosted search/recommendation service (pay per query) | Huge catalogs, merchandising dashboards, A/B testing, and a vendor who runs it | Cost that grows with traffic, and every keystroke crosses the network |
 | Your platform's built-in keyword search | Shoppers search by exact product names | Meaning: "aching back" only finds titles that contain "back" |
 | Your own search server (for example a vector database behind an API) | Millions of products, or data that must never ship to the browser | A server to run, scale and pay for on the busiest day |
-| EdgeReco | Thousands of products, cost that doesn't grow with traffic, and offline use | A one-time download on first visit, and the whole catalog is public |
+| EdgeReco | Up to ~100,000 products, cost that doesn't grow with traffic, and offline use | A one-time download on first visit, and the whole catalog is public |
 
 ## CI and release pipeline
 
@@ -504,7 +505,7 @@ without a coverage gap.
   - `backend/features/`: Gherkin behaviour specs, decoupled from step implementations
   - `backend/tests/`: `unit/` `bdd/` `integration/` `e2e/`
   - `backend/deploy/`: `Dockerfile`, `docker-compose.yml`, Caddy edge config
-  - `backend/examples/catalog/`: committed signed 5,040-product bundle (`latest` + `manifest/` + `chunk/`)
+  - `backend/examples/catalog/`: committed signed 100,000-product bundle (`latest` + `manifest/` + `chunk/`)
   - `backend/examples/source/catalog.csv`: committed, reproducible build source (12 balanced categories)
   - `backend/examples/keys/public.key`: pinned Ed25519 verify key for the bundle
   - `backend/demo_server/`: optional FastAPI launcher (not in the main checks); ships the synthetic fixture

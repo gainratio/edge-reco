@@ -165,3 +165,51 @@ def test_can_stage_catalogue_sqlite_rejects_mismatched_or_corrupt_inputs(
     (staging / "vector" / "embeddings.f32").write_bytes(b"\x00" * 8)
     with pytest.raises(ValueError, match=r"embeddings\.f32 has 8 bytes"):
         build_catalogue_sqlite(staging, embedding_dim=_DIM, embedding_count=len(_PRODUCTS))
+
+
+def test_publish_bundle_sqlite_only_quantizes_int8_and_omits_redundant_files(
+    tmp_path: Path,
+) -> None:
+    staging = _stage_real_catalog(tmp_path)
+    origin = tmp_path / "origin"
+    private, public = generate_keypair()
+    key_path = tmp_path / "private.key"
+    save_seed(private.private_bytes_raw(), key_path)
+
+    publish_bundle(
+        staging_dir=staging,
+        origin_dir=origin,
+        private_key_path=key_path,
+        catalog_id="amazon-demo",
+        version="v1",
+        embedding_model="sentence-transformers/all-MiniLM-L6-v2",
+        embedding_dim=_DIM,
+        embedding_count=len(_PRODUCTS),
+        product_count=len(_PRODUCTS),
+        sqlite_only=True,
+    )
+
+    cache = FilesystemCacheStore(tmp_path / "cache")
+    sync_index(
+        base_url=str(origin),
+        store=cache,
+        adapter=FilesystemAdapter(),
+        verifier=Ed25519Verifier(public),
+    )
+    pointer = cache.read_active()
+    assert pointer is not None
+    manifest = cache._load_manifest(pointer.manifest_hash)
+    paths = {entry.path for entry in manifest.files}
+    assert CATALOGUE_SQLITE_NAME in paths
+    assert "products.jsonl" not in paths
+    assert "vector/embeddings.f32" not in paths
+    assert "vector/index.faiss" not in paths
+
+    sqlite_bytes = materialize_file(cache, manifest, CATALOGUE_SQLITE_NAME)
+    db_file = tmp_path / "int8.sqlite"
+    db_file.write_bytes(sqlite_bytes)
+    with closing(sqlite3.connect(db_file)) as conn:
+        lengths = [
+            row[0] for row in conn.execute("SELECT length(embedding) FROM products").fetchall()
+        ]
+        assert lengths == [_DIM, _DIM]

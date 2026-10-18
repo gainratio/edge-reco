@@ -21,7 +21,17 @@ import zstandard as zstd
 from edgereco.embeddings.index import VectorIndex
 from edgereco.search.vector import VectorSearcher
 
-_CATALOG = Path(__file__).resolve().parents[3] / "examples" / "catalog"
+_CATALOG = (
+    Path(__file__).resolve().parents[4]
+    / "frontend"
+    / "packages"
+    / "edgereco-browser"
+    / "src"
+    / "engine"
+    / "__fixtures__"
+    / "bundle"
+    / "catalog"
+)
 _DIM = 384
 
 
