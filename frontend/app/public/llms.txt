@@ -3,7 +3,7 @@
 > EdgeReco is an open-source, browser-first product recommendation engine. After a
 > one-time sync of a small signed catalog bundle, product search, ranking, and
 > recommendations run entirely on the shopper's device — with no per-query backend
-> ranking call. "Nimbus" is a fictional demo store used to showcase EdgeReco.
+> ranking call. The live storefront showcases EdgeReco on a 100,000-product catalog.
 
 ## Canonical links
 
@@ -33,7 +33,7 @@
   in-session interaction signals (clicks, views, cart, favorites)
 - Primary use case: local product search and recommendations without a per-query
   backend ranking call
-- Demo store: Nimbus (a fictional storefront used only to demonstrate EdgeReco)
+- Demo store: EdgeReco live storefront (100,000 products across 12 departments)
 - Repository: gainratio/edge-reco
 - Status: experimental / beta
 

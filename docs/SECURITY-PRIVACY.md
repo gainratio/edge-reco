@@ -5,7 +5,7 @@
 No user data leaves the device. The shopper's activity is stored only in their own
 browser's SQLite database, and nothing is sent to or stored on any server or cloud.
 
-The hosted Nimbus demo downloads a public, signed catalog and runs queries and
+The hosted EdgeReco demo downloads a public, signed catalog and runs queries and
 personalization inside the browser. There is no analytics, no event uplink, no collector
 and no application API in the build. Catalog integrity fails closed. Product photos are
 self-hosted on the app origin, so showing them makes no third-party requests.
@@ -35,7 +35,7 @@ boundary; no integrity error falls back to unverified data.
 | Search text | Processed in the embedder/search Workers | Memory for the active operation; not persisted by EdgeReco | None after bundle/model sync |
 | Click, view, favorite, cart | Folded into the in-tab session profile | `taste_events` table in the shopper's own on-device SQLite database (`edgereco-user`, its own OPFS pool, never rebuilt by a catalogue refresh): product ID, event type, timestamp. No user ID, no session ID, no PII. Rolling window of the newest 500 events, replayed locally on boot to rebuild the profile. When OPFS is refused or another tab holds the database, SQLite runs in memory and the log resets on reload; a status pill says so. Erased by "Reset taste" or by clearing site data | None. The app has no code that sends it anywhere |
 | Catalog, embeddings, model, WASM, public key | Public release artifacts | OPFS, service-worker/transformers caches, HTTP cache | Same-origin sync/download only |
-| Product images | Generated SVG product cards (a Lucide icon for the product's shelf on a pastel backdrop), self-hosted with the app under `/images/<product-id>.svg` (720 files, about 0.8 MB); the signed catalog's `image_url` is root-relative and no third-party image is loaded | Browser HTTP cache only; not precached by the service worker. The same cards are also signed into the bundle as `images/<id>.svg`, and a build guard (`frontend/app/scripts/check-product-images.mjs`) fails the build if any product's card is missing | Same-origin image requests only (`img-src 'self' data:`) |
+| Product images | Generated SVG product cards (a Lucide icon for the product's shelf on a pastel backdrop), self-hosted with the app under `/images/<product-id>.svg` (760 pooled files, about 0.8 MB); the signed catalog's `image_url` is root-relative and no third-party image is loaded | Browser HTTP cache only; not precached by the service worker. The same cards are also signed into the bundle as `images/<id>.svg`, and a build guard (`frontend/app/scripts/check-product-images.mjs`) fails the build if any product's card is missing | Same-origin image requests only (`img-src 'self' data:`) |
 | Self-hosted API-server search (optional, not in the demo) | Query text and parameters only; the server is stateless, keeps no session or profile, and ignores any session header | None; each request is ranked against an empty profile and nothing is kept after the response | Client-to-API request; normal access logs may contain the URL query and must be governed by the operator |
 
 SQLite is the only store for app data. Other browser storage holds no shopper data:

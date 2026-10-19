@@ -1,13 +1,13 @@
 # Architecture
 
-EdgeReco runs a store's recommendation engine on the shopper's device instead of in the cloud — so serving cost stops scaling with traffic and there's no backend to overprovision for Black Friday. Architecturally it's a hybrid product-discovery engine that runs **the same pipeline on the server and in the browser**. The headline demo (Nimbus, our example store) runs entirely in the tab; the FastAPI runtime is the same engine packaged as an API server. One source of truth, two execution shapes.
+EdgeReco runs a store's recommendation engine on the shopper's device instead of in the cloud — so serving cost stops scaling with traffic and there's no backend to overprovision for Black Friday. Architecturally it's a hybrid product-discovery engine that runs **the same pipeline on the server and in the browser**. The headline demo storefront runs entirely in the tab; the FastAPI runtime is the same engine packaged as an API server. One source of truth, two execution shapes.
 
 Three pieces, composed from a shared browser Lego:
 
 - **`backend/`** — Python build-side. Catalog ingest, embedding, SQLite + vector bundle build, signed-bundle publish.
 - **[`@gainratio/browser`](https://github.com/gainratio/edgeproc-browser)** — the standalone browser substrate: signed-bundle sync into OPFS, integrity, Worker transport, and vector adapter contracts.
 - **`frontend/packages/edgereco-browser/`** — `@edgereco/browser`. EdgeReco's transformers.js embedder, hybrid search, ranking, and session logic composed over that substrate.
-- **`frontend/app/`** — the Nimbus React storefront. Thin UI over `@edgereco/browser`; no app server in the request path.
+- **`frontend/app/`** — the EdgeReco React storefront. Thin UI over `@edgereco/browser`; no app server in the request path.
 
 The cross-cutting substrate is **[edge-proc](https://github.com/gainratio/edge-proc)** — a content-addressed, signed-bundle sync engine, plus the BM25 ⊕ vector → RRF retrieval primitives both tiers run. EdgeReco uses it to ship the prebuilt index from the build host to every edge / device, fail-closed on signature, and to do the local retrieval once the bundle is resident. **This is what makes on-device search possible** — EdgeReco is the product brain (scoring formula, session signals, reranker) layered on top.
 
@@ -15,7 +15,7 @@ The whole system is four repositories that compose as one stack:
 
 | Repo | Role |
 | --- | --- |
-| [**edge-reco**](https://github.com/gainratio/edge-reco) (this repo) | the product brain — scoring formula, session signals, session-aware reranker, the Nimbus demo storefront. |
+| [**edge-reco**](https://github.com/gainratio/edge-reco) (this repo) | the product brain — scoring formula, session signals, session-aware reranker, the EdgeReco demo storefront. |
 | [**edge-proc**](https://github.com/gainratio/edge-proc) | the reusable local-compute substrate — signed bundle sync, content-addressed OPFS/CAS cache, fail-closed Ed25519 + SHA-256 verification, BM25 ⊕ vector → RRF retrieval. |
 | [**edgeproc-browser**](https://github.com/gainratio/edgeproc-browser) | the reusable browser substrate — signed sync, OPFS/CAS, Worker transport, integrity, and swappable vector indexes. |
 | [**edgeproc-core**](https://github.com/gainratio/edgeproc-core) | the vector-partitioning protocol edge-proc builds its local vector index on (formerly `shared-libs-python`). On PyPI as [`edgeproc-core`](https://pypi.org/project/edgeproc-core/). |
@@ -59,7 +59,7 @@ The publisher signs the bundle once. The CDN/edge serves immutable chunks and a 
 ```mermaid
 sequenceDiagram
     autonumber
-    participant UI as Nimbus UI
+    participant UI as Storefront UI
     participant Engine as Engine (same code, both tiers)
     participant BM25 as BM25 keyword index
     participant Vec as Vector index<br/>FAISS (Python) / SQLite (browser)
@@ -185,7 +185,7 @@ Serve-side (when running as API server): `edgereco serve` syncs the signed bundl
 
 ```mermaid
 flowchart LR
-  app["Nimbus React app<br>frontend/app/"]
+  app["Storefront React app<br>frontend/app/"]
   engine["Engine — searchEngine.ts<br>query embed → SQL → session rerank"]
   sync["Shared sync worker — @gainratio/browser<br>fetch latest, verify Ed25519,<br>diff the manifest, re-check every chunk's sha256"]
   embed["Embedder worker — embedderWorker.ts<br>transformers.js, all-MiniLM-L6-v2"]
@@ -223,7 +223,7 @@ flowchart LR
 
 The SPA consumes the private `@edgereco/browser` workspace package and the standalone `@gainratio/browser` npm dependency (caret range, exact version in the lockfile). No shared source or sibling checkout is required.
 
-## Frontend tier (Nimbus storefront)
+## Frontend tier (storefront SPA)
 
 `frontend/app/`:
 
@@ -327,7 +327,7 @@ publish a new catalog, never to answer a search.
   `backend/examples/catalog/` (32.6 MB / 31.1 MiB on disk).
 - **edge** is a Caddy reverse proxy (a small static web server standing in for a CDN)
   with the cache policy: immutable chunks cached forever, a short-lived pointer.
-- **browser tier**: the Nimbus single-page app syncs the bundle (fetches it, checks its
+- **browser tier**: the storefront single-page app syncs the bundle (fetches it, checks its
   signature, stores it) into **OPFS** (Origin Private File System, the browser's private
   per-site disk). It verifies Ed25519 signatures and SHA-256 checksums against a key
   built into the app and aborts on any mismatch, loads the `all-MiniLM-L6-v2` model, and
@@ -356,7 +356,7 @@ page size (`journal_mode = DELETE`, `VACUUM`) and chunked with Gear-CDC, a local
 edit modifies only the touched SQLite B-tree leaf pages while every surrounding chunk hash
 stays identical. A client compares the new manifest with what it already has in OPFS and
 fetches only the pieces that changed, reusing the rest (notably the unaffected SQLite pages
-and vector rows). In the live Nimbus storefront, clicking **⚡ Apply delta** switches from the
+and vector rows). In the live EdgeReco storefront, clicking **⚡ Apply delta** switches from the
 baseline catalog (`sequence: 30`) to the flash-sale delta overlay (`sequence: 31`, `/bundle-delta/`),
 fetches only **2 changed chunks (~32 KB)** while reusing **2,059 cached chunks** from OPFS (99.90%
 chunk reuse), and calls `EngineRuntime.syncUpdate()` to hot-swap the
@@ -366,7 +366,7 @@ every consumer fetches one chunk and reuses the rest."*
 
 ## Offline use and install
 
-Nimbus is a PWA (Progressive Web App: a site the browser can install like an app). After
+The storefront is a PWA (Progressive Web App: a site the browser can install like an app). After
 the first visit it works with no network. A service worker precaches the app shell on
 first load; the language model and its runtime stay in the browser's own caches. The
 signed catalog is already in OPFS, and the service worker deliberately never touches it,
@@ -511,7 +511,7 @@ without a coverage gap.
   - `backend/demo_server/`: optional FastAPI launcher (not in the main checks); ships the synthetic fixture
   - `backend/scripts/`: `curate_demo_catalog.py` and browser parity-fixture generators
 - `frontend/`: pnpm workspace root (`package.json`, `pnpm-workspace.yaml`, `pnpm-lock.yaml`).
-  - `frontend/app/`: Nimbus React storefront (syncs and runs the engine in the browser)
+  - `frontend/app/`: EdgeReco React storefront (syncs and runs the engine in the browser)
   - `frontend/packages/edgereco-browser/`: `@edgereco/browser`, EdgeReco-specific embedding, hybrid search, ranking and session logic
 - `docs/`: this file, `GETTING_STARTED.md`, `USAGE.md`, `QUICKSTART.md`, `DEPLOY.md`, `SECURITY-PRIVACY.md`
 

@@ -20,13 +20,13 @@
       {
         "id": "discovery-path",
         "label": "On-device discovery",
-        "focus": ["bundle_cache", "runtime", "sqlite_vector", "embedder_worker", "hybrid_engine", "nimbus_ui", "shopper"],
+        "focus": ["bundle_cache", "runtime", "sqlite_vector", "embedder_worker", "hybrid_engine", "storefront_ui", "shopper"],
         "note": "Keyword and semantic retrieval, fusion, and reranking run in the shopper's tab over the hot-swappable SQLite catalog."
       },
       {
         "id": "personalization",
         "label": "Private personalization",
-        "focus": ["shopper", "nimbus_ui", "hybrid_engine", "taste_log"],
+        "focus": ["shopper", "storefront_ui", "hybrid_engine", "taste_log"],
         "note": "Interaction events rebuild a bounded local taste profile without entering the default network path."
       }
     ]
@@ -88,9 +88,9 @@
       "sources": [{ "path": "frontend/packages/edgereco-browser/src/engine/searchEngine.ts", "line": 1, "end_line": 17, "label": "Discovery pipeline" }]
     },
     {
-      "id": "nimbus_ui",
+      "id": "storefront_ui",
       "type": "frontend",
-      "label": "Nimbus Storefront",
+      "label": "EdgeReco Storefront",
       "sublabel": "Search + delta UI",
       "pos": [975, 320],
       "size": [130, 72],
@@ -150,8 +150,8 @@
     { "id": "cache_materializes", "from": "bundle_cache", "to": "runtime", "label": "bundle files", "labelAt": [653, 415] },
     { "id": "runtime_imports", "from": "runtime", "to": "sqlite_vector", "label": "hot-swap SQLite", "variant": "security", "fromSide": "bottom", "toSide": "top", "labelAt": [730, 406] },
     { "id": "sqlite_searches", "from": "sqlite_vector", "to": "hybrid_engine", "label": "FTS5 + cosine", "variant": "emphasis", "fromSide": "top", "toSide": "bottom", "labelAt": [785, 455] },
-    { "id": "engine_ranks", "from": "hybrid_engine", "to": "nimbus_ui", "label": "ranked products", "variant": "emphasis", "labelAt": [963, 415] },
-    { "id": "ui_serves", "from": "nimbus_ui", "to": "shopper", "label": "local results", "variant": "emphasis", "labelAt": [1118, 415] },
+    { "id": "engine_ranks", "from": "hybrid_engine", "to": "storefront_ui", "label": "ranked products", "variant": "emphasis", "labelAt": [963, 415] },
+    { "id": "ui_serves", "from": "storefront_ui", "to": "shopper", "label": "local results", "variant": "emphasis", "labelAt": [1118, 415] },
     { "id": "builder_stages", "from": "catalog_builder", "to": "publisher", "label": "staged artifacts", "fromSide": "bottom", "toSide": "top", "labelAt": [113, 235] },
     { "id": "embedder_feeds", "from": "embedder_worker", "to": "hybrid_engine", "label": "query vector", "fromSide": "bottom", "toSide": "top", "labelAt": [885, 235] },
     { "id": "taste_personalizes", "from": "taste_log", "to": "hybrid_engine", "label": "session profile", "variant": "dashed", "fromSide": "top", "toSide": "bottom", "labelAt": [940, 480] }

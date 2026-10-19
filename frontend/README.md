@@ -1,6 +1,6 @@
-# Nimbus storefront demo
+# EdgeReco storefront demo
 
-**TL;DR.** Nimbus is a storefront for a fictional "everything store" whose entire
+**TL;DR.** The EdgeReco storefront is a demo store whose entire
 search-and-recommend brain — [edge-reco](../)'s hybrid search and session-aware
 recommendations — runs **inside your browser tab**. There is no application backend.
 On load, the SPA syncs a **signed, content-addressed catalog bundle** from a CDN edge,
@@ -19,7 +19,7 @@ synthetic inputs — not that the result on screen was computed from them.
 ```
  examples/catalog (signed bundle)        IN THE BROWSER TAB
  ┌───────────────────────────┐          ┌──────────────────────────────────────┐
- │ origin (static files)     │          │ Nimbus SPA (React)                     │
+ │ origin (static files)     │          │ Storefront SPA (React)               │
  │  latest / manifest / chunk│          │   sync Worker  ── OPFS ── verify + CAS │
  └────────────┬──────────────┘          │   embedder Worker ── all-MiniLM-L6-v2  │
               │                          │   engine: BM25 ⊕ vector → RRF → rerank │
@@ -51,7 +51,7 @@ the request path for this demo (it remains available for the API-server use case
 
 ## Screenshot
 
-![Nimbus storefront](docs/storefront.png)
+![EdgeReco storefront](docs/storefront.png)
 
 *The "Recommended for you" rail (right) re-ranks live as you click; the session badge counts
 the signals captured this session. (Produced by the Playwright e2e run — see `make test`.)*
@@ -89,7 +89,7 @@ The dev SPA reads `VITE_BUNDLE_BASE_URL` (default `http://localhost:8081`, the e
 ## Demo flow (the realistic one)
 
 1. **Open the store** at http://localhost:5174. After the boot screen, the grid shows the
-   720-product synthetic catalog; the "Recommended for you" rail starts cold (no signals yet).
+   100,000-product synthetic catalog; the "Recommended for you" rail starts cold (no signals yet).
 2. **Search** for something — e.g. `wireless headphones`. The query is embedded **in your
    tab**; the grid swaps to fused BM25 + vector results.
 3. **Click 2–3 products in one category** (say, audio gear). Each click folds into the in-tab
