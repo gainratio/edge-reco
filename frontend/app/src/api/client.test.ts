@@ -766,12 +766,13 @@ describe("Origin-First cold start, SqlSwapTimeoutError fallback, and syncUpdate(
 
 		__setRuntimeForTests({
 			spawnEngine: () => ({
-				async sync(baseUrl) {
+				async sync(...args) {
+					const [baseUrl] = args;
 					syncedUrls.push(baseUrl);
 					if (!baseUrl.endsWith("-delta")) {
 						throw rollbackErr;
 					}
-					const synced = await base.sync(baseUrl);
+					const synced = await base.sync(...args);
 					return { ...synced, version: "v2" };
 				},
 				readFile: (path) => base.readFile(path),
