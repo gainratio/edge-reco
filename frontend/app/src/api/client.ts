@@ -235,6 +235,20 @@ function isSwapTimeoutError(error: unknown): boolean {
 	);
 }
 
+function isRollbackRefusal(error: unknown): boolean {
+	if (typeof error === "object" && error !== null) {
+		const code = (error as { readonly code?: unknown }).code;
+		if (code === "rollback") {
+			return true;
+		}
+		const name = (error as { readonly name?: unknown }).name;
+		if (name === "RollbackError") {
+			return true;
+		}
+	}
+	return false;
+}
+
 export function createDataClient(deps: ClientDeps = {}): DataClient {
 	const runtime = new EngineRuntime(resolveDeps(deps));
 	const originFallback = deps.originFallback;
@@ -282,7 +296,7 @@ export function createDataClient(deps: ClientDeps = {}): DataClient {
 			onStage: OnStage = () => {},
 			config: RuntimeConfig = appRuntimeConfig(),
 		): Promise<void> {
-			const engine = await runtime.bootstrap(config, (stage) => {
+			const handleStage: OnStage = (stage) => {
 				warnIfExpired(stage);
 				if (stage.kind === "synced") {
 					record({
@@ -295,7 +309,37 @@ export function createDataClient(deps: ClientDeps = {}): DataClient {
 					});
 				}
 				onStage(stage);
-			});
+			};
+			let engine: SearchEngine;
+			try {
+				engine = await runtime.bootstrap(config, handleStage);
+			} catch (error) {
+				// When a visitor applies the companion v2 delta patch (/bundle-delta,
+				// sequence N+1) and later reloads or reopens the tab, the in-memory
+				// deltaBundleChannel flag resets to false while OPFS still pins
+				// sequence N+1. Retry against the companion delta bundle URL; if the
+				// stored floor is still higher (a genuine rollback), rethrow the
+				// original refusal untouched so BootScreen's fail-closed warning fires.
+				const deltaUrl = resolveDeltaBundleUrl();
+				if (
+					!isDeltaBundleChannel() &&
+					config.bundleBaseUrl === resolveBaseBundleUrl() &&
+					config.bundleBaseUrl !== deltaUrl &&
+					isRollbackRefusal(error)
+				) {
+					try {
+						engine = await runtime.bootstrap(
+							{ ...config, bundleBaseUrl: deltaUrl },
+							handleStage,
+						);
+						setDeltaBundleChannel(true);
+					} catch {
+						throw error;
+					}
+				} else {
+					throw error;
+				}
+			}
 			productById = new Map(engine.catalog().map((p) => [p.id, p]));
 			interactionWeights = engine.interactionWeights();
 			// The taste log lives in the shopper's own SQLite database, separate

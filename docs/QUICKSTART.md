@@ -1,6 +1,6 @@
 # Quickstart
 
-Goal: clone the repo, gate both subprojects, then run the headline demo (Nimbus, our example storefront) end-to-end. Ten minutes.
+Goal: clone the repo, gate both subprojects, then run the headline demo storefront end-to-end. Ten minutes.
 
 ## Prereqs
 
@@ -57,7 +57,7 @@ the `torch>=2.12.1` floor; the `--ignore-vuln` flag has been dropped.))
 
 ## 2. Frontend gate (pnpm workspaces)
 
-`@gainratio/browser` comes from npm with a caret range (`^0.2.0`) in both
+`@gainratio/browser` comes from npm with a caret range (`^0.4.2`) in both
 workspace manifests; `pnpm-lock.yaml` pins the exact release CI tested. No sibling checkout or copied source
 is required.
 
@@ -105,7 +105,7 @@ page — click **Launch the live demo** to watch the boot screen step through:
 2. *Reassembling the index* — into OPFS.
 3. *Loading the model* — transformers.js fetches `Xenova/all-MiniLM-L6-v2`.
 
-Then the 720-product synthetic storefront (12 categories, 60 products each; every brand and product is invented). Click a few products in one category: the "Recommended for you" rail visibly re-ranks toward that category, **no network round trip per click**. The home page also stacks *Trending* and *New arrivals* rails; click into any product to open its product page (a `#/p/<id>` history entry — browser Back stays in the app) with *Similar items*, *Because you viewed*, *Customers also bought*, and *Frequently bought together* — all seven rails are named strategies carried in the signed bundle (`ranking_config.json` + `cooccurrence.json`), computed in-tab. Your taste survives a reload too: interactions land in a small on-device log (OPFS, product ids only, newest 500) that replays through the same fold at boot — press **Reset taste** next to the For-You badge to clear it. Stop `origin` + `edge` and reload: the bundle is in OPFS and the model is cached, so it keeps working offline — personalization included.
+Then the 100,000-product synthetic storefront (12 categories; every brand and product is invented). Click a few products in one category: the "Recommended for you" rail visibly re-ranks toward that category, **no network round trip per click**. The home page also stacks *Trending* and *New arrivals* rails; click into any product to open its product page (a `#/p/<id>` history entry — browser Back stays in the app) with *Similar items*, *Because you viewed*, *Customers also bought*, and *Frequently bought together* — all seven rails are named strategies carried in the signed bundle (`ranking_config.json` + `cooccurrence.json`), computed in-tab. Your taste survives a reload too: interactions land in a small on-device log (OPFS, product ids only, newest 500) that replays through the same fold at boot — press **Reset taste** next to the For-You badge to clear it. Stop `origin` + `edge` and reload: the bundle is in OPFS and the model is cached, so it keeps working offline — personalization included.
 
 ## 4. Iterate on the SPA locally
 
@@ -142,7 +142,7 @@ EDGEPROC_ALLOW_MODEL_DOWNLOAD=1 uv run edgereco index /tmp/cache /tmp/staging
 uv run edgeproc keygen --out /tmp/keys
 
 uv run edgereco bundle /tmp/staging /tmp/origin /tmp/keys/private.key \
-    --catalog-id amazon-demo --version v1 --product-count 720 --embedding-count 720
+    --catalog-id amazon-demo --version v1 --product-count 100000 --embedding-count 100000
 ```
 
 Drop the origin behind any static HTTP server / CDN and point the SPA at it (`VITE_BUNDLE_BASE_URL` at build time).

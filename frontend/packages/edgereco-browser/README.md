@@ -6,7 +6,7 @@ signed sync, integrity, OPFS, Worker transport, and vector contracts, then adds
 only EdgeReco's embedding, hybrid search, ranking, and session logic. No
 application backend sits in the request path.
 
-This is the engine the [Nimbus storefront demo](../../README.md) runs on. It
+This is the engine the [EdgeReco storefront demo](../../README.md) runs on. It
 publishes the same wire format and the same scoring formula as the Python core
 in [`src/edgereco/`](../../../backend/src/edgereco) — the two are top-k parity-tested
 against the same committed bundle (see `src/engine/hybridParity.test.ts`).

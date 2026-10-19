@@ -15,7 +15,7 @@ Both deliver the same scoring; the bundle contract is identical.
 flowchart TB
   origin["Static origin<br>latest + manifest + chunk objects"]
   edge["Caddy edge / CDN<br>chunks immutable, latest short-TTL"]
-  spa["Nimbus SPA — static files<br>public key pinned at build time"]
+  spa["Storefront SPA — static files<br>public key pinned at build time"]
   verify["Sync + verify<br>Ed25519 on latest, sha256 per chunk<br>any mismatch aborts the load"]
   opfs[("OPFS<br>content-addressed cache")]
   tab["Search + recommend in the tab<br>no application backend in the request path"]
@@ -32,7 +32,7 @@ Architecture:
 
 - A static **origin** holds the signed bundle (`latest` + `manifest/<hash>` + `chunk/<hash>` + `embeddings.f32` / `products.jsonl` / the Python FAISS artifact, plus the signed `ranking_config.json` scoring-weights + strategy map and the `cooccurrence.json` item-to-item neighbour map). The browser ignores the FAISS artifact and imports authenticated embedding rows into its SQLite-vector OPFS database.
 - A **Caddy edge** fronts the origin with the right cache policy (immutable chunks + manifest, short-TTL pointer, permissive CORS).
-- The **Nimbus SPA** is a static bundle. The browser pins a public key at build time, syncs the bundle into OPFS, verifies, then runs the engine in the tab.
+- The **Storefront SPA** is a static bundle. The browser pins a public key at build time, syncs the bundle into OPFS, verifies, then runs the engine in the tab.
 
 There is **no application backend in the request path**. The browser does the work.
 

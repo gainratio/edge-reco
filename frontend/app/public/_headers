@@ -19,7 +19,16 @@
   Cross-Origin-Opener-Policy: same-origin
   Permissions-Policy: accelerometer=(), autoplay=(), camera=(), display-capture=(), geolocation=(), gyroscope=(), magnetometer=(), microphone=(), midi=(), payment=(), usb=()
 
-# Keep the service worker and manifest fresh so updates propagate immediately.
+# Keep the service worker, manifest, and HTML entry routes fresh and prevent
+# edge proxies from transforming HTML response bodies.
+/
+  Cache-Control: public, max-age=0, must-revalidate, no-transform
+/index.html
+  Cache-Control: public, max-age=0, must-revalidate, no-transform
+/github.html
+  Cache-Control: public, max-age=0, must-revalidate, no-transform
+/faq.html
+  Cache-Control: public, max-age=0, must-revalidate, no-transform
 /sw.js
   Cache-Control: public, max-age=0, must-revalidate
 /manifest.webmanifest

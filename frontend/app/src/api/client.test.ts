@@ -749,4 +749,54 @@ describe("Origin-First cold start, SqlSwapTimeoutError fallback, and syncUpdate(
 		expect(replayed?.version).toBe("v2");
 		setDeltaBundleChannel(false);
 	});
+
+	it("bootstrap() resumes from the -delta bundle after a reload when OPFS pins v2, and rethrows genuine rollbacks", async () => {
+		const { isDeltaBundleChannel, setDeltaBundleChannel } = await import(
+			"./bundleUrl"
+		);
+		setDeltaBundleChannel(false);
+		const base = fakeEnginePort();
+		const syncedUrls: string[] = [];
+		const rollbackErr = Object.assign(
+			new Error(
+				"refusing rollback: sequence is not fresher than the active pointer's",
+			),
+			{ code: "rollback" },
+		);
+
+		__setRuntimeForTests({
+			spawnEngine: () => ({
+				async sync(baseUrl) {
+					syncedUrls.push(baseUrl);
+					if (!baseUrl.endsWith("-delta")) {
+						throw rollbackErr;
+					}
+					const synced = await base.sync(baseUrl);
+					return { ...synced, version: "v2" };
+				},
+				readFile: (path) => base.readFile(path),
+			}),
+			makeEmbedder: () => stubEmbedder,
+		});
+
+		await bootstrap();
+		expect(syncedUrls).toHaveLength(2);
+		expect(syncedUrls[0]?.endsWith("-delta")).toBe(false);
+		expect(syncedUrls[1]?.endsWith("-delta")).toBe(true);
+		expect(isDeltaBundleChannel()).toBe(true);
+
+		// A genuine rollback (where even -delta is older than the floor) rethrows the original error.
+		setDeltaBundleChannel(false);
+		__setRuntimeForTests({
+			spawnEngine: () => ({
+				sync() {
+					return Promise.reject(rollbackErr);
+				},
+				readFile: (path) => base.readFile(path),
+			}),
+			makeEmbedder: () => stubEmbedder,
+		});
+		await expect(bootstrap()).rejects.toBe(rollbackErr);
+		expect(isDeltaBundleChannel()).toBe(false);
+	});
 });

@@ -1,6 +1,6 @@
-# Nimbus SPA (`frontend/app`)
+# EdgeReco Storefront SPA (`frontend/app`)
 
-**TL;DR.** This is the browser app for [Nimbus](../README.md) — a React + TypeScript +
+**TL;DR.** This is the browser app for the [EdgeReco storefront](../README.md) — a React + TypeScript +
 Vite storefront with **no application backend**. On load it syncs a signed,
 content-addressed catalog bundle from a CDN edge, verifies it in the tab
 (ed25519 + sha256, against the key pinned in `public/public.key`), and then runs every
@@ -47,7 +47,7 @@ same-origin.
 ## How it relates to the backend bundles
 
 The app consumes the same signed bundle format the Python tier produces:
-`backend/examples/catalog` holds the committed 720-product demo bundle
+`backend/examples/catalog` holds the committed 100,000-product demo bundle
 (`latest` pointer → manifest → content-addressed chunks). Rebuild or re-sign it
 with the `edgereco` CLI (see [`docs/QUICKSTART.md`](../../docs/QUICKSTART.md) §5)
 and the app picks up the new version on the next load — verified fail-closed

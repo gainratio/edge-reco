@@ -24,12 +24,12 @@ the cost does not grow with traffic, and the store keeps working offline.
 ## Try it
 
 1. Open [edge-reco.com](https://edge-reco.com) and click **Launch the live demo**. This
-   opens Nimbus, a pretend store with 100,000 products across 12 departments. The
+   opens the EdgeReco demo store with 100,000 products across 12 departments. The
    first launch downloads the catalog and a small language model, so give it a moment.
    Later visits start from the copy in your browser.
 2. Type `something for my aching back` in the search box and press Enter.
 
-![The Nimbus demo store after searching "something for my aching back": a neck and back massager is the first result, then a stadium seat with back support. The strip under the search box reads 0 backend calls and 100,000 catalog.](docs/assets/search-aching-back.png)
+![The EdgeReco demo store after searching "something for my aching back": a neck and back massager is the first result, then a stadium seat with back support. The strip under the search box reads 0 backend calls and 100,000 catalog.](docs/assets/search-aching-back.png)
 
 A neck and back massager comes first, then a stadium seat with back support. Only three
 products come back, because nothing else in the store is a good match. The strip under
