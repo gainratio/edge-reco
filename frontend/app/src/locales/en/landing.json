@@ -17,7 +17,7 @@
 		"titleLead": "Why it's",
 		"titleAccent": "fast",
 		"titleTrail": "— and what it costs",
-		"live": "measured on edge-reco.com, {{date}} — before the 100k catalog"
+		"live": "measured on edge-reco.com, {{date}}"
 	},
 	"metrics": {
 		"latency": {
