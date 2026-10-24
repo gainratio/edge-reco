@@ -45,7 +45,9 @@ Open http://localhost:4173, click **Launch the live demo**, and search for
 1. Vitalune Neck and Back Massager | 4 Heads | 20 Speeds | Quiet Motor
 2. Kestrow Stadium Seat with Back Support | Extra Wide | Armrests | Red
 3. Vitalune Neck and Back Massager | 6 Heads | 20 Speeds | Carry Case
-strip: 41 ms latency · 0 backend calls · 2.5 s cold start · 15.8 MB js heap · 100,000 catalog
+strip: local search latency · 0 backend calls · 100,000 catalog · ~32.6 MB first download
+  (the 2026-09-26 measured cold-start figure was taken on a 720-product bundle; re-measuring
+  the 100,000-product build is tracked, so do not quote it as the current cold start)
 console errors: 0
 ```
 
