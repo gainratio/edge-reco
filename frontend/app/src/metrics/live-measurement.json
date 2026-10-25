@@ -1,53 +1,45 @@
 {
 	"schema": "edgereco.live-measurement/v1",
-	"measuredAt": "2026-09-26T13:28:20.702Z",
+	"measuredAt": "2026-10-25T16:45:48.097Z",
 	"target": "https://edge-reco.com/",
-	"deployedCommit": "ca8cff98f8ceafda11743ca0a51ccffcbbd632d0",
+	"deployedCommit": "74b92dbaa7a2ba1cb44aad85b7c103b85379b4a1",
 	"browser": "Chromium 153.0.8010.12, headed, fresh profile per cold run",
 	"machine": "darwin arm64, unthrottled network",
 	"command": "cd frontend/app && pnpm run measure:live",
 	"coldStartMs": [
-		3294.9,
-		2583.6,
-		2607.2,
-		2365.2,
-		3633.7,
-		2546.2,
-		2689.3
+		18733.2,
+		19043.1,
+		23352,
+		25817.3,
+		22107.8
 	],
 	"warmStartMs": [
-		814.2,
-		790.8,
-		630.7,
-		662.7,
-		532.3,
-		591.5,
-		575.8
+		834.4,
+		697.1,
+		721.3,
+		815.4,
+		607.5
 	],
 	"searchP50Ms": [
-		16.3,
-		14.3,
-		15.1,
-		13.3,
-		13.3,
-		16.6,
-		13.4
+		52.9,
+		38.6,
+		39.5,
+		39.1,
+		38.6
 	],
 	"heapMb": [
-		24,
-		17.5,
-		20.5,
-		20.4,
-		16,
-		13,
-		21.2
+		34.2,
+		11.7,
+		18.8,
+		34.4,
+		12.7
 	],
 	"firstVisitDownloadMb": {
-		"other": 1.5,
-		"appCode": 5.9,
-		"signedBundle": 1.6,
+		"other": 0.9,
+		"appCode": 0.8,
+		"signedBundle": 35,
 		"embeddingModel": 23.2,
 		"onnxRuntimeWasm": 5.1
 	},
-	"catalogProducts": 720
+	"catalogProducts": 100000
 }
