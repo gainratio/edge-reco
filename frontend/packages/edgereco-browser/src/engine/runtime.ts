@@ -390,9 +390,7 @@ export function configFromEnv(): RuntimeConfig {
 	const pubkeyUrl = new URL("public.key", document.baseURI).toString();
 	const expectedBundleId = import.meta.env.VITE_BUNDLE_ID ?? "amazon-demo";
 	const expectedChannel = import.meta.env.VITE_BUNDLE_CHANNEL ?? "stable";
-	// The app renders from the signed catalog first; the model loads on the
-	// first semantic query. Callers that want the eager warm pass false.
-	return { bundleBaseUrl, pubkeyUrl, expectedBundleId, expectedChannel, deferEmbedder: true };
+	return { bundleBaseUrl, pubkeyUrl, expectedBundleId, expectedChannel };
 }
 
 /**

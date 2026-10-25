@@ -6,7 +6,7 @@ import {
 	useRef,
 	useState,
 } from "react";
-import { bootstrap, clearCatalogCache } from "./api/client";
+import { bootstrapApp, clearCatalogCache } from "./api/client";
 import { type BootFailure, bootFailure } from "./api/syncErrors";
 import { BootScreen } from "./components/BootScreen";
 import { Footer } from "./components/Footer";
@@ -63,7 +63,7 @@ export function App() {
 		setFailure(null);
 		setStage(null);
 		const t0 = performance.now();
-		bootstrap(setStage)
+		bootstrapApp(setStage)
 			.then(() => {
 				record({ coldStartMs: performance.now() - t0 });
 				setReady(true);

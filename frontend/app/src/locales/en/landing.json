@@ -30,7 +30,7 @@
 		},
 		"coldStart": {
 			"label": "first visit to first results",
-			"sub": "download + verify {{products}} products · {{warm}} on return"
+			"sub": "starter {{products}} products first · {{warm}} on return · {{full}} in background"
 		},
 		"heap": {
 			"label": "JS heap (Chromium)",
@@ -45,7 +45,7 @@
 			"sub": "{{categories}} categories · {{bundle}} bundle"
 		}
 	},
-	"footnote": "First load fetches a ~{{bundle}} signed bundle; the ~{{model}} search model downloads on the first semantic search, then both are cached and offline. Timings are medians of real Chromium runs on a fast connection; a slower network adds download time.",
+	"footnote": "First visit fetches a ~{{starterBundle}} signed starter, renders, then upgrades to the full ~{{bundle}} 100k catalogue in the background. The ~{{model}} search model loads on the first semantic search; everything is cached and offline after that. Timings are medians of real Chromium runs on a fast connection; a slower network adds download time.",
 	"whys": {
 		"ariaLabel": "Why",
 		"private": {

@@ -12,7 +12,7 @@
 // reads the same values), so the landing quotes exactly what a shopper's tab
 // measures. The output file is the ONLY source the landing tiles may read;
 // landing-figures.test.ts fails if a tile disagrees with it.
-import { mkdtempSync, rmSync, writeFileSync } from "node:fs";
+import { mkdtempSync, readdirSync, rmSync, statSync, writeFileSync } from "node:fs";
 import { arch, platform, tmpdir } from "node:os";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
@@ -134,6 +134,12 @@ const warm = [];
 for (let i = 0; i < RUNS; i++) warm.push(await warmRun(warmDir));
 rmSync(warmDir, { recursive: true, force: true });
 
+const modelDir = join(dirname(fileURLToPath(import.meta.url)), "../public/models");
+const modelBytes = readdirSync(modelDir, { withFileTypes: true, recursive: true }).reduce((sum, entry) => {
+	if (!entry.isFile()) return sum;
+	return sum + statSync(join(entry.parentPath ?? modelDir, entry.name)).size;
+}, 0);
+
 const record = {
 	schema: "edgereco.live-measurement/v1",
 	measuredAt: new Date().toISOString(),
@@ -147,6 +153,7 @@ const record = {
 	searchP50Ms: warm.map((r) => round1(r.p50)),
 	heapMb: warm.map((r) => round1(r.heap)),
 	firstVisitDownloadMb: toMb(cold[0].bytes),
+	embeddingModelMb: round1(modelBytes / 1_000_000),
 };
 writeFileSync(OUT, `${JSON.stringify(record, null, "\t")}\n`);
 console.log(

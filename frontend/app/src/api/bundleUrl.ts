@@ -39,6 +39,14 @@ export function resolveDeltaBundleUrl(
 	return `${resolveBaseBundleUrl(raw, appBase, origin)}-delta`;
 }
 
+export function resolveStarterBundleUrl(
+	raw?: string,
+	appBase: string = import.meta.env.BASE_URL,
+	origin: string = window.location.origin,
+): string {
+	return `${resolveBaseBundleUrl(raw, appBase, origin)}-starter`;
+}
+
 export function resolveBundleBaseUrl(
 	raw?: string,
 	appBase: string = import.meta.env.BASE_URL,

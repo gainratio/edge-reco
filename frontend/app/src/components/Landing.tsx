@@ -5,6 +5,7 @@ import {
 	LANDING_MEASURED_ON,
 	LANDING_METRICS,
 	MODEL_DOWNLOAD,
+	STARTER_BUNDLE,
 	type RepresentativeMetric,
 } from "../metrics/landing-figures";
 
@@ -102,6 +103,7 @@ export function Landing({ onLaunch }: LandingProps) {
 							</p>
 							<p className="landing__footnote">
 								{t("footnote", {
+									starterBundle: STARTER_BUNDLE,
 									bundle: BUNDLE_SIZE,
 									model: MODEL_DOWNLOAD,
 								})}
