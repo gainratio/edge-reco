@@ -52,6 +52,7 @@ import {
 	resolveBaseBundleUrl,
 	resolveBundleBaseUrl,
 	resolveDeltaBundleUrl,
+	resolveStarterBundleUrl,
 	setDeltaBundleChannel,
 } from "./bundleUrl";
 import type {
@@ -651,6 +652,28 @@ export function bootstrap(
 	config?: RuntimeConfig,
 ): Promise<void> {
 	return active.bootstrap(onStage, config);
+}
+
+/**
+ * First visit renders the small signed starter catalogue (sequence 29), then
+ * upgrades to the full 100k bundle in the background. Existing visitors already
+ * hold the full catalogue (active sequence 30): the starter's lower sequence is
+ * a rollback refusal, so they fall straight back to the full bundle. No marker
+ * is stored; the signed sequence is the state.
+ */
+export async function bootstrapApp(onStage?: OnStage): Promise<void> {
+	const full = { ...appRuntimeConfig(), deferEmbedder: true };
+	const starter = { ...full, bundleBaseUrl: resolveStarterBundleUrl() };
+	try {
+		await active.bootstrap(onStage, starter);
+	} catch {
+		await active.bootstrap(onStage, full);
+		return;
+	}
+	void active.syncUpdate(undefined, full).catch((error: unknown) => {
+		// Keep the starter usable; the next reload retries the full upgrade.
+		console.warn("full catalog upgrade failed", error);
+	});
 }
 export function syncUpdate(
 	onStage?: OnStage,

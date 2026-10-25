@@ -33,9 +33,7 @@ const seconds = (ms: number): string => (ms / 1000).toFixed(1);
 export const LANDING_MEASURED_ON = measurement.measuredAt.slice(0, 10);
 
 /** One-time embedding model download on a first visit, as measured. */
-export const MODEL_DOWNLOAD = `${Math.round(
-	measurement.firstVisitDownloadMb.embeddingModel,
-)} MB`;
+export const MODEL_DOWNLOAD = `${Math.round(measurement.embeddingModelMb)} MB`;
 
 /** Products in the committed demo catalog. Guarded against the signed bundle in tests. */
 export const CATALOG_PRODUCTS = 100000;
@@ -46,6 +44,9 @@ export const CATALOG_CATEGORIES = 12;
  * Guarded against the bundle's real byte count in landing-figures.test.ts.
  */
 export const BUNDLE_SIZE = "32.6 MB";
+/** The small signed catalogue rendered before the full 100k upgrade. */
+export const STARTER_BUNDLE = `${measurement.starterBundleMb} MB`;
+export const STARTER_PRODUCTS = measurement.starterProducts;
 
 export interface RepresentativeMetric {
 	/** Stable key into the `landing` namespace: `metrics.<id>.{label,sub}`. */
@@ -71,7 +72,8 @@ export const LANDING_METRICS: readonly RepresentativeMetric[] = [
 		num: `~${seconds(median(measurement.coldStartMs))}`,
 		unit: "s",
 		vars: {
-			products: measurement.catalogProducts,
+			products: STARTER_PRODUCTS,
+			full: CATALOG_PRODUCTS,
 			warm: `${seconds(median(measurement.warmStartMs))} s`,
 		},
 	},

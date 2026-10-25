@@ -9,7 +9,7 @@ const { bootstrap, clearCatalogCache } = vi.hoisted(() => ({
 	bootstrap: vi.fn(() => new Promise<void>(() => {})),
 	clearCatalogCache: vi.fn(() => Promise.resolve()),
 }));
-vi.mock("./api/client", () => ({ bootstrap, clearCatalogCache }));
+vi.mock("./api/client", () => ({ bootstrapApp: bootstrap, clearCatalogCache }));
 vi.mock("./components/Storefront", () => ({
 	Storefront: () => <div>storefront</div>,
 }));
