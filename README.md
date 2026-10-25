@@ -1,6 +1,6 @@
 # EdgeReco
 
-Search and product recommendations for small online stores, running in each shopper's browser instead of a paid server.
+Search and product recommendations for online stores — from independent shops to large catalogs — running in each shopper's browser instead of a paid server.
 
 **[Try the demo store at edge-reco.com](https://edge-reco.com)**. Nothing to install.
 
@@ -14,19 +14,50 @@ plain keyword search, which misses what shoppers mean: type "something for my ac
 back" and it only finds products whose titles happen to contain the word "back".
 
 EdgeReco does the searching and ranking inside the shopper's browser tab. Your store
-publishes one signed catalog bundle, about 32.6 MB for 100,000 products. The browser downloads
-it once, checks the signature, and from then on searches by meaning as well as by words,
-and re-ranks recommendations as the shopper clicks. No server answers the searches, so
-the cost does not grow with traffic, and the store keeps working offline.
+publishes signed catalog bundles: a **4.7 MB starter** for the first paint, then the
+full 100,000-product catalog (about 36 MB) in the background. The browser verifies every
+chunk, searches by meaning as well as by words, and re-ranks recommendations as the
+shopper clicks. No server answers the searches, so the application and inference cost
+does not grow with traffic, and the store keeps working offline.
 
 **Technical docs:** [Architecture](docs/ARCHITECTURE.md) · [Getting started for developers](docs/GETTING_STARTED.md) · [Python library and CLI](docs/USAGE.md) · [Security and privacy](docs/SECURITY-PRIVACY.md) · [Deploy](docs/DEPLOY.md)
+
+## The Black Friday problem
+
+A recommendation row is cheap per shopper and brutal at peak. On Black Friday, traffic
+can multiply while every product page still asks for "recommended for you", "customers
+also bought", and search-as-you-type. A hosted search or recommendation service charges
+per request and has to be provisioned for the busiest hour; inference capacity sits idle
+most of the year, then becomes the bottleneck exactly when revenue is concentrated.
+
+EdgeReco moves that work to the shopper's device. The catalog and ranking data are
+signed static assets served by a CDN. The browser downloads them once, verifies them,
+and runs search and re-ranking locally. The retailer pays **no per-query application or
+inference cost**; a traffic spike adds CDN bytes and uses the shopper's own CPU, not a
+queue of API calls or a fleet sized for the worst hour.
+
+For a Fortune 500 catalog, that is an **offload layer**: keep the systems of record,
+pricing, and checkout in the cloud, but stop paying per recommendation and stop making
+the recommendation service the scaling bottleneck. Every shopper uses the same signed
+bundle; a price change ships as a few changed chunks.
+
+Illustratively, if a store serves `N` shoppers with `R` recommendation requests each and
+its vendor charges `p` per request, the hosted bill is roughly `N × R × p`. EdgeReco
+replaces that with a bundle download per new device plus CDN egress; after the bundle is
+cached, another request adds no server work. Plug in your own vendor price — the point is
+the shape, not a quoted rate.
+
+This is not a replacement for a multi-million-item merchandising platform. It is an edge
+tier for the 100,000-SKU range and for the high-volume rows where per-request pricing
+hurts most.
 
 ## Try it
 
 1. Open [edge-reco.com](https://edge-reco.com) and click **Launch the live demo**. This
    opens the EdgeReco demo store with 100,000 products across 12 departments. The
-   first launch downloads the catalog and a small language model, so give it a moment.
-   Later visits start from the copy in your browser.
+   first launch fetches a 4.7 MB starter, then upgrades to the full catalog and loads
+   the small language model on the first semantic search, so give it a moment. Later
+   visits start from the copy in your browser.
 2. Type `something for my aching back` in the search box and press Enter.
 
 ![The EdgeReco demo store after searching "something for my aching back": a neck and back massager is the first result, then a stadium seat with back support. The strip under the search box reads 0 backend calls and 100,000 catalog.](docs/assets/search-aching-back.png)
@@ -89,8 +120,9 @@ a separate, unrelated project (it hides personal data in AI prompts).
   approximate index, and the whole catalog database is downloaded.
 - **Private catalogs.** Every shopper gets the full catalog file, so anything in it is
   public.
-- **Low-memory phones.** A first visit downloads about 125 MB and needs real memory. It
-  has not been measured on physical phones yet.
+- **Low-memory phones.** A first visit fetches a 4.7 MB starter, then about 36 MB of
+  full catalog plus a ~24 MB model in the background; it needs real memory and has not
+  been measured on physical phones yet.
 - **A hosted service.** You build the catalog and host the static files yourself.
 - **Merchandising tools.** There is no dashboard, A/B testing or manual boosting. Ranking
   is tuned by editing weights in the signed catalog.
@@ -106,6 +138,7 @@ a separate, unrelated project (it hides personal data in AI prompts).
 | Shoppers who search by exact product names only | Your store platform's built-in search |
 | A catalog that must stay private | Your own search server behind an API |
 | Up to ~100,000 products, flat cost, offline use, nothing to run per search | EdgeReco |
+| A Fortune 500 peak-traffic offload tier in front of an existing catalog | EdgeReco for the high-volume rows; keep the system of record hosted |
 
 ## Run it yourself
 
