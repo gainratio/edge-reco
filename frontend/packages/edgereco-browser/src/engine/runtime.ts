@@ -78,6 +78,9 @@ export interface RuntimeConfig {
 	readonly pubkeyUrl: string;
 	readonly expectedBundleId?: string;
 	readonly expectedChannel?: string;
+	/** Skip the eager 23 MB model warm; the first semantic search loads it.
+	 * The storefront can render from the signed catalog before the model. */
+	readonly deferEmbedder?: boolean;
 }
 
 /** The sync-Worker surface bootstrap needs: pull the bundle, read its files. */
@@ -387,7 +390,9 @@ export function configFromEnv(): RuntimeConfig {
 	const pubkeyUrl = new URL("public.key", document.baseURI).toString();
 	const expectedBundleId = import.meta.env.VITE_BUNDLE_ID ?? "amazon-demo";
 	const expectedChannel = import.meta.env.VITE_BUNDLE_CHANNEL ?? "stable";
-	return { bundleBaseUrl, pubkeyUrl, expectedBundleId, expectedChannel };
+	// The app renders from the signed catalog first; the model loads on the
+	// first semantic query. Callers that want the eager warm pass false.
+	return { bundleBaseUrl, pubkeyUrl, expectedBundleId, expectedChannel, deferEmbedder: true };
 }
 
 /**
@@ -541,12 +546,14 @@ export class EngineRuntime {
 			engineClient = null;
 			this.#assertCurrent(generation);
 
-			onStage({ kind: "loading-model" });
 			embedder = this.#deps.makeEmbedder();
 			this.#embedder = embedder;
-			// Force the ~25 MB model download/compile now so "loading-model" reflects
-			// real work and the first user query is fast.
-			await embedder.embed(WARMUP_PROMPT);
+			if (config.deferEmbedder !== true) {
+				onStage({ kind: "loading-model" });
+				// Eager mode: force the ~25 MB model download/compile now so the first
+				// user query is fast.
+				await embedder.embed(WARMUP_PROMPT);
+			}
 			this.#assertCurrent(generation);
 
 			const catalogueFactory: CatalogueStoreFactory | undefined =

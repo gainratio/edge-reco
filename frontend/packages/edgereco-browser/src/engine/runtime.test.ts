@@ -100,6 +100,18 @@ describe("EngineRuntime resource lifecycle", () => {
 		expect(engine.terminated).toBe(true);
 	});
 
+	it("skips the eager model warmup when deferEmbedder is set", async () => {
+		const engine = await syncedEnginePort();
+		const embedder = rejectingEmbedder(new Error("must not warm"));
+		const runtime = new EngineRuntime({
+			spawnEngine: () => engine,
+			makeEmbedder: () => embedder,
+		});
+
+		await runtime.bootstrap({ ...config, deferEmbedder: true });
+		expect(embedder.embed).not.toHaveBeenCalled();
+	});
+
 	it("disposes both workers when model warmup times out", async () => {
 		const engine = enginePort();
 		const embedder = rejectingEmbedder(new Error("embed timeout"));
