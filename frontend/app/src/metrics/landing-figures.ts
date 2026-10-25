@@ -71,7 +71,7 @@ export const LANDING_METRICS: readonly RepresentativeMetric[] = [
 		num: `~${seconds(median(measurement.coldStartMs))}`,
 		unit: "s",
 		vars: {
-			products: CATALOG_PRODUCTS,
+			products: measurement.catalogProducts,
 			warm: `${seconds(median(measurement.warmStartMs))} s`,
 		},
 	},
