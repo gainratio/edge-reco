@@ -1,6 +1,6 @@
 // The PerformanceObserver wiring is hard to drive in jsdom, so the per-entry
 // counting is factored into the pure `countBackendCalls` helper and tested here
-// directly: edge/other count, images don't, pre-readyAt entries are
+// directly: edge syncs don't count, other origins do, images don't, pre-readyAt entries are
 // ignored, and unparseable URLs fall through to "other" (i.e. counted).
 
 import {
@@ -34,9 +34,9 @@ function entry(name: string, startTime: number) {
 }
 
 describe("countBackendCalls", () => {
-	it("counts edge-origin requests as backend calls", () => {
+	it("does NOT count signed-edge-origin bundle syncs as backend calls", () => {
 		const entries = [entry("https://cdn.example.com/latest", 150)];
-		expect(countBackendCalls(entries, OPTS)).toBe(1);
+		expect(countBackendCalls(entries, OPTS)).toBe(0);
 	});
 
 	it("counts unknown ('other') origins as backend calls", () => {
@@ -92,19 +92,19 @@ describe("countBackendCalls", () => {
 	});
 
 	it("counts an entry exactly at readyAt (inclusive boundary)", () => {
-		const entries = [entry("https://cdn.example.com/latest", READY_AT)];
+		const entries = [entry("https://api.example.com/at-ready", READY_AT)];
 		expect(countBackendCalls(entries, OPTS)).toBe(1);
 	});
 
-	it("sums a mixed batch: only post-ready edge/other count", () => {
+	it("sums a mixed batch: only post-ready non-CDN origins count", () => {
 		const entries = [
-			entry("https://cdn.example.com/manifest", 200), // edge  -> count
+			entry("https://cdn.example.com/manifest", 200), // edge sync -> skip
 			entry("https://m.media-amazon.com/x.jpg", 210), // image -> skip
 			entry("https://events.example.com/events", 220), // other -> count
 			entry("https://api.foo.com/infer", 230), // other -> count
 			entry("https://cdn.example.com/early", 10), // pre-ready -> skip
 		];
-		expect(countBackendCalls(entries, OPTS)).toBe(3);
+		expect(countBackendCalls(entries, OPTS)).toBe(2);
 	});
 });
 
@@ -216,7 +216,7 @@ describe("startMetricsObservers", () => {
 	it("subscribes a resource observer + memory poll and cleans both up", () => {
 		vi.stubGlobal("PerformanceObserver", FakeObserver);
 		vi.spyOn(performance, "getEntriesByType").mockReturnValue([
-			{ name: "https://cdn.example.com/manifest", startTime: 5 },
+			{ name: "https://api.example.com/at-ready", startTime: 5 },
 		] as unknown as PerformanceEntryList);
 		setHeapBytes(50 * 1024 * 1024); // 50 MB
 
@@ -377,7 +377,7 @@ describe("startMetricsObservers — Worker traffic", () => {
 		expect(vi.mocked(record)).toHaveBeenLastCalledWith({ backendCalls: 1 });
 	});
 
-	it("sums distinct contexts and still excludes non-backend traffic", () => {
+	it("sums distinct contexts and still excludes CDN syncs and images", () => {
 		startMetricsObservers(LIVE_OPTS);
 		const channel = ReaderChannel.instances[0];
 
@@ -404,7 +404,7 @@ describe("startMetricsObservers — Worker traffic", () => {
 			]),
 		);
 
-		expect(vi.mocked(record)).toHaveBeenLastCalledWith({ backendCalls: 2 });
+		expect(vi.mocked(record)).toHaveBeenLastCalledWith({ backendCalls: 1 });
 	});
 
 	it("ignores a message that is not a sentinel report", () => {
