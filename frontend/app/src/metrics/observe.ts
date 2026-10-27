@@ -77,7 +77,10 @@ export function toResourceEntries(
  * so far and the classify options, return the count of entries that represent a
  * real backend call: classified "edge" or "other", and starting at/after
  * `readyAt`. Static assets and images are excluded;
- * pre-ready entries (the sync itself, the model fetch) are ignored.
+ * pre-ready entries (the sync itself, the model fetch) are ignored. Signed
+ * edge-CDN traffic is bundle sync, not a backend call: the starter upgrades to
+ * the full bundle after ready, and that must not turn the headline into "7
+ * backend calls".
  */
 export function countBackendCalls(
 	entries: readonly ResourceEntryLike[],
@@ -92,7 +95,7 @@ export function countBackendCalls(
 			edgeOrigin: opts.edgeOrigin,
 			appOrigin: opts.appOrigin ?? null,
 		});
-		if (bucket === "edge" || bucket === "other") {
+		if (bucket === "other") {
 			count += 1;
 		}
 	}
