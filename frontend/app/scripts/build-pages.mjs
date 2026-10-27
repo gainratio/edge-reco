@@ -52,9 +52,20 @@ export const CATALOG_DELTA_DIR = resolve(
 	"catalog-delta",
 );
 
+/** Small signed starter catalogue rendered before the full 100k upgrade. */
+export const CATALOG_STARTER_DIR = resolve(
+	APP_DIR,
+	"..",
+	"..",
+	"backend",
+	"examples",
+	"catalog-starter",
+);
+
 const DIST_DIR = join(APP_DIR, "dist");
 const DIST_BUNDLE_DIR = join(DIST_DIR, "bundle");
 const DIST_BUNDLE_DELTA_DIR = join(DIST_DIR, "bundle-delta");
+const DIST_BUNDLE_STARTER_DIR = join(DIST_DIR, "bundle-starter");
 
 /** Static build env: fill the two host knobs unless the caller already set them. */
 export function pagesEnv(env) {
@@ -184,11 +195,19 @@ function main() {
 	if (!existsSync(join(DIST_BUNDLE_DELTA_DIR, "latest"))) {
 		die("bundle-delta copy failed — dist/bundle-delta/latest missing.");
 	}
+	rmSync(DIST_BUNDLE_STARTER_DIR, { recursive: true, force: true });
+	if (!existsSync(CATALOG_STARTER_DIR)) {
+		die("bundle-starter missing — backend/examples/catalog-starter is required.");
+	}
+	cpSync(CATALOG_STARTER_DIR, DIST_BUNDLE_STARTER_DIR, { recursive: true });
+	if (!existsSync(join(DIST_BUNDLE_STARTER_DIR, "latest"))) {
+		die("bundle-starter copy failed — dist/bundle-starter/latest missing.");
+	}
 	requireShippedProductImages(env);
 	writeBuildIdentity(env);
 	applyImageModeCsp(env);
 	process.stdout.write(
-		`>> Pages dist ready: ${DIST_DIR} (signed bundle copied same-origin to dist/bundle and dist/bundle-delta)\n`,
+		`>> Pages dist ready: ${DIST_DIR} (signed full, delta and starter bundles copied same-origin)\n`,
 	);
 }
 
