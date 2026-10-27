@@ -200,6 +200,9 @@ const pwa = process.env.VITEST
 						"**/bundle-delta/**",
 						"**/models/**",
 						"**/ort/**",
+						// Vite emits ORT wasm under /assets/, not /ort/, so the
+						// globPatterns **/*.wasm matched it and precached 22 MB.
+						"**/assets/ort-wasm-*",
 						"_worker.js",
 						"_headers",
 						"_redirects",
@@ -215,7 +218,9 @@ const pwa = process.env.VITEST
 						{
 							// The same-origin onnxruntime-web WASM mirror stays offline-capable
 							// without forcing a ~23 MB service-worker install download.
-							urlPattern: ({ url }) => url.pathname.startsWith("/ort/"),
+							urlPattern: ({ url }) =>
+								url.pathname.startsWith("/ort/") ||
+								url.pathname.includes("/assets/ort-wasm-"),
 							handler: "CacheFirst",
 							options: {
 								cacheName: "edgereco-wasm",
