@@ -42,6 +42,7 @@ class ImageMode(StrEnum):
     """
 
     LOCAL = "local"
+    LOCAL_NO_IMAGES = "local-no-images"
     REMOTE = "remote"
 
 
@@ -165,7 +166,12 @@ def localize_catalog(
         # The catalog's own urls ARE the contract in this mode; rewriting them here is
         # what would silently strand the deployment on placeholders.
         return raw, {}
-    return _localize_records(raw, staged or {})
+    rewritten, cards = _localize_records(raw, staged or {})
+    if mode is ImageMode.LOCAL_NO_IMAGES:
+        # Keep the local /images/<id>.svg urls but leave the files out of this bundle:
+        # the deployer serves them from the static origin on demand.
+        return rewritten, {}
+    return rewritten, cards
 
 
 def _localize_records(raw: str, staged: Mapping[str, str]) -> tuple[str, dict[str, bytes]]:

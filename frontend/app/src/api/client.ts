@@ -408,6 +408,7 @@ export function createDataClient(deps: ClientDeps = {}): DataClient {
 					productById = await engine.productsByIds([...productById.keys()]);
 				}
 				interactionWeights = engine.interactionWeights();
+				record({ productCount: productById.size });
 			}
 			return updated;
 		},
@@ -670,10 +671,20 @@ export async function bootstrapApp(onStage?: OnStage): Promise<void> {
 		await active.bootstrap(onStage, full);
 		return;
 	}
-	void active.syncUpdate(undefined, full).catch((error: unknown) => {
-		// Keep the starter usable; the next reload retries the full upgrade.
-		console.warn("full catalog upgrade failed", error);
-	});
+	const upgrade = (attempt: number): void => {
+		void active.syncUpdate(undefined, full).catch((error: unknown) => {
+			// Cloudflare can return a transient 5xx on one chunk under the burst of
+			// 2,000+ requests. Retry twice with backoff; verified chunks stay cached,
+			// so a retry only fetches what is missing.
+			if (attempt < 2) {
+				window.setTimeout(() => upgrade(attempt + 1), 5_000 * (attempt + 1));
+				return;
+			}
+			// Keep the starter usable; the next reload retries the full upgrade.
+			console.warn("full catalog upgrade failed", error);
+		});
+	};
+	upgrade(0);
 }
 export function syncUpdate(
 	onStage?: OnStage,

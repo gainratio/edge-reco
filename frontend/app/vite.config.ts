@@ -200,6 +200,12 @@ const pwa = process.env.VITEST
 						"**/bundle-delta/**",
 						"**/models/**",
 						"**/ort/**",
+						// Vite emits ORT wasm under /assets/, not /ort/, so the
+						// globPatterns **/*.wasm matched it and precached 22 MB.
+						"**/assets/ort-wasm-*",
+						// 720 product SVGs are not needed to boot. Precaching them made
+						// the SW install fetch 720 separate files; runtime cache them.
+						"**/images/**",
 						"_worker.js",
 						"_headers",
 						"_redirects",
@@ -213,9 +219,22 @@ const pwa = process.env.VITEST
 					navigateFallbackDenylist: [/\/bundle(?:-delta)?\//],
 					runtimeCaching: [
 						{
+							// Product images are loaded only when a card is rendered; cache
+							// them on first view instead of at install.
+							urlPattern: ({ url }) => url.pathname.startsWith("/images/"),
+							handler: "CacheFirst",
+							options: {
+								cacheName: "edgereco-images",
+								expiration: { maxEntries: 500, maxAgeSeconds: 60 * 60 * 24 * 365 },
+								cacheableResponse: { statuses: [0, 200] },
+							},
+						},
+						{
 							// The same-origin onnxruntime-web WASM mirror stays offline-capable
 							// without forcing a ~23 MB service-worker install download.
-							urlPattern: ({ url }) => url.pathname.startsWith("/ort/"),
+							urlPattern: ({ url }) =>
+								url.pathname.startsWith("/ort/") ||
+								url.pathname.includes("/assets/ort-wasm-"),
 							handler: "CacheFirst",
 							options: {
 								cacheName: "edgereco-wasm",
