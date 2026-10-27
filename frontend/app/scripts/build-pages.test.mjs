@@ -11,7 +11,12 @@ import assert from "node:assert/strict";
 import { existsSync } from "node:fs";
 import { join } from "node:path";
 import { test } from "node:test";
-import { CATALOG_DIR, pagesEnv } from "./build-pages.mjs";
+import {
+	CATALOG_DELTA_DIR,
+	CATALOG_DIR,
+	CATALOG_STARTER_DIR,
+	pagesEnv,
+} from "./build-pages.mjs";
 
 test("pagesEnv defaults VITE_BASE to root and sets a same-origin bundle URL", () => {
 	const env = pagesEnv({ PATH: "/usr/bin" });
@@ -42,4 +47,17 @@ test("CATALOG_DIR points at the committed signed bundle (latest pointer present)
 		existsSync(join(CATALOG_DIR, "latest")),
 		`expected a signed bundle at ${CATALOG_DIR}`,
 	);
+});
+
+test("all three signed bundles exist with a latest pointer", () => {
+	for (const [name, dir] of [
+		["full", CATALOG_DIR],
+		["delta", CATALOG_DELTA_DIR],
+		["starter", CATALOG_STARTER_DIR],
+	]) {
+		assert.ok(
+			existsSync(join(dir, "latest")),
+			`expected the ${name} signed bundle at ${dir}`,
+		);
+	}
 });
