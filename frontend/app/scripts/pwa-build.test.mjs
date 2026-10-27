@@ -47,6 +47,13 @@ test(
 			"service worker precache must exclude bundle/**",
 		);
 
+		// Vite emits ORT wasm under /assets/, so **/*.wasm matched it. Precaching it
+		// forced a ~22 MB install download before the starter could render.
+		assert.ok(
+			!/url:\s*"[^"]*ort-wasm-/.test(sw),
+			"service worker precache must exclude assets/ort-wasm-*",
+		);
+
 		// Cloudflare Pages advanced mode consumes these four filenames as platform
 		// configuration and 404s them as assets. Workbox's install is atomic, so a
 		// single one in the precache means the deployed site gets NO service worker
