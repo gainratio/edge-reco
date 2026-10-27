@@ -203,6 +203,9 @@ const pwa = process.env.VITEST
 						// Vite emits ORT wasm under /assets/, not /ort/, so the
 						// globPatterns **/*.wasm matched it and precached 22 MB.
 						"**/assets/ort-wasm-*",
+						// 720 product SVGs are not needed to boot. Precaching them made
+						// the SW install fetch 720 separate files; runtime cache them.
+						"**/images/**",
 						"_worker.js",
 						"_headers",
 						"_redirects",
@@ -215,6 +218,17 @@ const pwa = process.env.VITEST
 					// The signed bundle origin is cross-origin in the Docker shape; never fall back to it.
 					navigateFallbackDenylist: [/\/bundle(?:-delta)?\//],
 					runtimeCaching: [
+						{
+							// Product images are loaded only when a card is rendered; cache
+							// them on first view instead of at install.
+							urlPattern: ({ url }) => url.pathname.startsWith("/images/"),
+							handler: "CacheFirst",
+							options: {
+								cacheName: "edgereco-images",
+								expiration: { maxEntries: 500, maxAgeSeconds: 60 * 60 * 24 * 365 },
+								cacheableResponse: { statuses: [0, 200] },
+							},
+						},
 						{
 							// The same-origin onnxruntime-web WASM mirror stays offline-capable
 							// without forcing a ~23 MB service-worker install download.

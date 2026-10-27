@@ -146,5 +146,13 @@ def test_localize_catalog_remote_mode_is_noop() -> None:
     assert cards == {}
 
 
+def test_localize_catalog_no_images_keeps_local_urls_but_omits_cards() -> None:
+    raw = _product(id="NB-00001").model_dump_json() + "\n"
+    rewritten, cards = localize_catalog(raw, mode=ImageMode.LOCAL_NO_IMAGES)
+    assert cards == {}
+    product = Product.model_validate_json(rewritten)
+    assert product.image_url == "/images/NB-00001.svg"
+
+
 def _fill_stops(svg: str) -> list[str]:
     return re.findall(r'stop-color="([^"]+)"', svg)
