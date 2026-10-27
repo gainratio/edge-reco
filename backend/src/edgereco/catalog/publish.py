@@ -437,6 +437,8 @@ def _localize_product_images(staging_dir: Path, image_mode: ImageMode) -> None:
         products_path.read_text(encoding="utf-8"), _staged_photos(images_dir), image_mode
     )
     _write_json_no_follow(products_path, rewritten)
+    if image_mode is ImageMode.LOCAL_NO_IMAGES:
+        return
     images_dir.mkdir(exist_ok=True)
     for relpath, svg in cards.items():
         _write_bytes_no_follow(staging_dir / relpath, svg)
