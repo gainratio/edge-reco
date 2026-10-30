@@ -1,6 +1,6 @@
 # EdgeReco
 
-Search and product recommendations for online stores — from independent shops to large catalogs — running in each shopper's browser instead of a paid server.
+Search and product recommendations that run in each shopper's browser, not a paid server.
 
 **[Try the demo store at edge-reco.com](https://edge-reco.com)**. Nothing to install.
 
@@ -34,7 +34,7 @@ EdgeReco moves that work to the shopper's device. The catalog and ranking data a
 signed static assets served by a CDN. The browser downloads them once, verifies them,
 and runs search and re-ranking locally. The retailer pays **no per-query application or
 inference cost**; a traffic spike adds CDN bytes and uses the shopper's own CPU, not a
-queue of API calls or a fleet sized for the worst hour.
+queue of API calls or servers sized for the worst hour.
 
 For a Fortune 500 catalog, that is an **offload layer**: keep the systems of record,
 pricing, and checkout in the cloud, but stop paying per recommendation and stop making
