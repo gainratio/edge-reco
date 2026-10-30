@@ -197,7 +197,9 @@ function main() {
 	}
 	rmSync(DIST_BUNDLE_STARTER_DIR, { recursive: true, force: true });
 	if (!existsSync(CATALOG_STARTER_DIR)) {
-		die("bundle-starter missing — backend/examples/catalog-starter is required.");
+		die(
+			"bundle-starter missing — backend/examples/catalog-starter is required.",
+		);
 	}
 	cpSync(CATALOG_STARTER_DIR, DIST_BUNDLE_STARTER_DIR, { recursive: true });
 	if (!existsSync(join(DIST_BUNDLE_STARTER_DIR, "latest"))) {
