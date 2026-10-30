@@ -3,9 +3,9 @@ import userEvent from "@testing-library/user-event";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import {
 	BUNDLE_SIZE,
-	STARTER_BUNDLE,
 	LANDING_MEASURED_ON,
 	LANDING_METRICS,
+	STARTER_BUNDLE,
 } from "../metrics/landing-figures";
 import { Landing } from "./Landing";
 

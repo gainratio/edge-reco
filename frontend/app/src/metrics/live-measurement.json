@@ -6,34 +6,10 @@
 	"browser": "Chromium 153.0.8010.12, headed, fresh profile per cold run",
 	"machine": "darwin arm64, unthrottled network",
 	"command": "cd frontend/app && pnpm run measure:live",
-	"coldStartMs": [
-		5246.5,
-		3589,
-		1412.7,
-		1953.6,
-		1534.5
-	],
-	"warmStartMs": [
-		368,
-		308.1,
-		1530.7,
-		635.5,
-		729
-	],
-	"searchP50Ms": [
-		9.9,
-		10.8,
-		52.1,
-		39.6,
-		39.3
-	],
-	"heapMb": [
-		12.8,
-		22.8,
-		12,
-		12.3,
-		25.6
-	],
+	"coldStartMs": [5246.5, 3589, 1412.7, 1953.6, 1534.5],
+	"warmStartMs": [368, 308.1, 1530.7, 635.5, 729],
+	"searchP50Ms": [9.9, 10.8, 52.1, 39.6, 39.3],
+	"heapMb": [12.8, 22.8, 12, 12.3, 25.6],
 	"firstVisitDownloadMb": {
 		"other": 0.3,
 		"appCode": 0.9,

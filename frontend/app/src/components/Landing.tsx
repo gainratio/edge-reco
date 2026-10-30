@@ -5,8 +5,8 @@ import {
 	LANDING_MEASURED_ON,
 	LANDING_METRICS,
 	MODEL_DOWNLOAD,
-	STARTER_BUNDLE,
 	type RepresentativeMetric,
+	STARTER_BUNDLE,
 } from "../metrics/landing-figures";
 
 interface LandingProps {

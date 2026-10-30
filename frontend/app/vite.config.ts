@@ -225,7 +225,10 @@ const pwa = process.env.VITEST
 							handler: "CacheFirst",
 							options: {
 								cacheName: "edgereco-images",
-								expiration: { maxEntries: 500, maxAgeSeconds: 60 * 60 * 24 * 365 },
+								expiration: {
+									maxEntries: 500,
+									maxAgeSeconds: 60 * 60 * 24 * 365,
+								},
 								cacheableResponse: { statuses: [0, 200] },
 							},
 						},
