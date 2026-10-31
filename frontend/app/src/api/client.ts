@@ -671,34 +671,49 @@ export async function bootstrapApp(onStage?: OnStage): Promise<void> {
 		await active.bootstrap(onStage, full);
 		return;
 	}
-	// WebKit cannot complete the 100k OPFS hot-swap inside the iOS memory budget.
-	// Attempting it only burns memory and leaves stale clients vulnerable to a
-	// deploy-skew delta 404. Keep the 504-product starter on WebKit.
-	if (isWebKit()) {
-		console.info(
-			"[edge-reco] full catalog upgrade skipped on WebKit; starter catalog stays active",
-		);
-		return;
-	}
-	const upgrade = (attempt: number): void => {
-		void active.syncUpdate(undefined, full).catch((error: unknown) => {
-			// Cloudflare can return a transient 5xx on one chunk under the burst of
-			// 2,000+ requests. Retry twice with backoff; verified chunks stay cached,
-			// so a retry only fetches what is missing.
-			if (attempt < 2) {
-				window.setTimeout(() => upgrade(attempt + 1), 5_000 * (attempt + 1));
-				return;
-			}
-			// Keep the starter usable; the next reload retries the full upgrade.
-			console.warn("full catalog upgrade failed", error);
-		});
-	};
-	upgrade(0);
+	// If OPFS is unavailable, the SQLite catalogue falls back to memory. A 100k
+	// hot-swap then exhausts the tab; keep the verified starter instead. Real
+	// Safari has OPFS and still upgrades; Playwright's WebKit does not.
+	void canUseOpfs().then((available) => {
+		if (!available) {
+			console.info(
+				"[edge-reco] OPFS unavailable; full catalog upgrade skipped and starter catalog stays active",
+			);
+			return;
+		}
+		const upgrade = (attempt: number): void => {
+			void active.syncUpdate(undefined, full).catch((error: unknown) => {
+				// Cloudflare can return a transient 5xx on one chunk under the burst of
+				// 2,000+ requests. Retry twice with backoff; verified chunks stay cached,
+				// so a retry only fetches what is missing.
+				if (attempt < 2) {
+					window.setTimeout(() => upgrade(attempt + 1), 5_000 * (attempt + 1));
+					return;
+				}
+				// Keep the starter usable; the next reload retries the full upgrade.
+				console.warn("full catalog upgrade failed", error);
+			});
+		};
+		upgrade(0);
+	});
 }
-function isWebKit(): boolean {
-	if (typeof navigator === "undefined") return false;
-	const ua = navigator.userAgent;
-	return /AppleWebKit/i.test(ua) && !/Android/i.test(ua);
+
+async function canUseOpfs(): Promise<boolean> {
+	if (
+		typeof navigator === "undefined" ||
+		navigator.storage?.getDirectory === undefined
+	) {
+		return false;
+	}
+	const name = ".edge-reco-opfs-probe";
+	try {
+		const root = await navigator.storage.getDirectory();
+		await root.getFileHandle(name, { create: true });
+		await root.removeEntry(name);
+		return true;
+	} catch {
+		return false;
+	}
 }
 
 export function syncUpdate(
