@@ -45,6 +45,15 @@
   Content-Type: application/octet-stream
   Cache-Control: public, max-age=31536000, immutable
 
+# Mutable pointers: never let an old client pin a previous manifest and then
+# request a manifest/chunk that this deployment no longer serves.
+/bundle/latest
+  Cache-Control: no-store
+/bundle-starter/latest
+  Cache-Control: no-store
+/bundle-delta/latest
+  Cache-Control: no-store
+
 # Signed bundle manifests/chunks are content-addressed. Vite assets and the
 # self-hosted model/ORT runtime are sha256-pinned by build preflight, so each
 # successful release can cache them without revalidation.

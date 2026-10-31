@@ -671,6 +671,15 @@ export async function bootstrapApp(onStage?: OnStage): Promise<void> {
 		await active.bootstrap(onStage, full);
 		return;
 	}
+	// WebKit cannot complete the 100k OPFS hot-swap inside the iOS memory budget.
+	// Attempting it only burns memory and leaves stale clients vulnerable to a
+	// deploy-skew delta 404. Keep the 504-product starter on WebKit.
+	if (isWebKit()) {
+		console.info(
+			"[edge-reco] full catalog upgrade skipped on WebKit; starter catalog stays active",
+		);
+		return;
+	}
 	const upgrade = (attempt: number): void => {
 		void active.syncUpdate(undefined, full).catch((error: unknown) => {
 			// Cloudflare can return a transient 5xx on one chunk under the burst of
@@ -686,6 +695,12 @@ export async function bootstrapApp(onStage?: OnStage): Promise<void> {
 	};
 	upgrade(0);
 }
+function isWebKit(): boolean {
+	if (typeof navigator === "undefined") return false;
+	const ua = navigator.userAgent;
+	return /AppleWebKit/i.test(ua) && !/Android/i.test(ua);
+}
+
 export function syncUpdate(
 	onStage?: OnStage,
 	config?: RuntimeConfig,
