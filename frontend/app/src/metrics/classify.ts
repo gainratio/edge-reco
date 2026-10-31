@@ -12,6 +12,8 @@ const STATIC_ASSET_PATHS = new Set([
 	"/favicon.svg",
 	"/pwa-192x192.png",
 ]);
+/** Release-owned directories and runtimes served same-origin by the app. */
+const STATIC_ASSET_PREFIXES = ["/assets/", "/models/", "/ort/", "/sqlite"];
 
 export interface ClassifyOptions {
 	/** The signed-bundle CDN origin (e.g. "https://cdn.example.com"). */
@@ -47,12 +49,16 @@ export function classifyResource(
 
 	// 1. Release-owned root assets that browsers may load after readyAt. Exact
 	// paths keep same-origin API/backend calls visible to the counter.
-	if (
-		opts.appOrigin != null &&
-		parsed.origin === opts.appOrigin &&
-		STATIC_ASSET_PATHS.has(parsed.pathname)
-	) {
-		return "asset";
+	if (opts.appOrigin != null && parsed.origin === opts.appOrigin) {
+		if (
+			STATIC_ASSET_PATHS.has(parsed.pathname) ||
+			STATIC_ASSET_PREFIXES.some((prefix) =>
+				parsed.pathname.startsWith(prefix),
+			) ||
+			parsed.pathname.endsWith(".wasm")
+		) {
+			return "asset";
+		}
 	}
 
 	// 2. Product images.
