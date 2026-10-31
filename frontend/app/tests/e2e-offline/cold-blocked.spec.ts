@@ -91,6 +91,21 @@ test("cold boot with HF + jsDelivr blocked: model loads from /models/, search wo
 	// is a SAME-ORIGIN /models/ URL is the interception-independent proof of
 	// the weights' provenance: had they come from the HF hub, the cache keys
 	// would be huggingface.co URLs.
+	// The model response is cached asynchronously; poll instead of racing the
+	// CacheStorage write immediately after the search result renders.
+	await expect
+		.poll(
+			async () =>
+				page.evaluate(async () => {
+					const cache = await caches.open("transformers-cache");
+					const keys = await cache.keys();
+					return keys
+						.map((req) => req.url)
+						.filter((url) => url.includes("all-MiniLM-L6-v2")).length;
+				}),
+			{ timeout: 60_000 },
+		)
+		.toBeGreaterThan(0);
 	const cachedModelUrls = await page.evaluate(async () => {
 		const cache = await caches.open("transformers-cache");
 		const keys = await cache.keys();
@@ -98,10 +113,6 @@ test("cold boot with HF + jsDelivr blocked: model loads from /models/, search wo
 			.map((req) => req.url)
 			.filter((url) => url.includes("all-MiniLM-L6-v2"));
 	});
-	expect(
-		cachedModelUrls.length,
-		"transformers-cache was not populated",
-	).toBeGreaterThan(0);
 	const origin = new URL(page.url()).origin;
 	for (const url of cachedModelUrls) {
 		expect(
