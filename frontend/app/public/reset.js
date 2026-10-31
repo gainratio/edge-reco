@@ -2,11 +2,13 @@
 // Lives outside the app bundle so an old client can always navigate to it.
 const status = document.querySelector("#status");
 
-async function reset(): Promise<void> {
+async function reset() {
 	try {
 		if ("serviceWorker" in navigator) {
 			const registrations = await navigator.serviceWorker.getRegistrations();
-			await Promise.all(registrations.map((registration) => registration.unregister()));
+			await Promise.all(
+				registrations.map((registration) => registration.unregister()),
+			);
 		}
 		if ("caches" in window) {
 			const names = await caches.keys();
@@ -18,5 +20,6 @@ async function reset(): Promise<void> {
 }
 
 void reset().catch(() => {
-	if (status) status.textContent = "Reset failed. Close the tab and reopen EdgeReco.";
+	if (status)
+		status.textContent = "Reset failed. Close the tab and reopen EdgeReco.";
 });
