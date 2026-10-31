@@ -81,7 +81,7 @@ describe("classifyResource", () => {
 			expect(
 				classifyResource("http://localhost:5173/assets/search-abc.js", opts),
 			).toBe("asset");
-			expect(classifyResource("http://localhost:5173/sqlite3.wasm", opts)).toBe(
+			expect(classifyResource("http://localhost:5173/runtime.wasm", opts)).toBe(
 				"asset",
 			);
 			expect(
