@@ -71,6 +71,31 @@ describe("classifyResource", () => {
 		});
 	});
 
+	describe("same-origin release assets", () => {
+		const opts = {
+			edgeOrigin: EDGE_ORIGIN,
+			appOrigin: "http://localhost:5173",
+		};
+
+		it("excludes lazy build chunks and the SQLite runtime from backend calls", () => {
+			expect(
+				classifyResource("http://localhost:5173/assets/search-abc.js", opts),
+			).toBe("asset");
+			expect(classifyResource("http://localhost:5173/sqlite3.wasm", opts)).toBe(
+				"asset",
+			);
+			expect(
+				classifyResource("http://localhost:5173/models/tokenizer.json", opts),
+			).toBe("asset");
+		});
+
+		it("still counts a same-origin API path as a backend call", () => {
+			expect(
+				classifyResource("http://localhost:5173/api/search?q=boot", opts),
+			).toBe("other");
+		});
+	});
+
 	describe("no uplink exemption", () => {
 		it("buckets an events-collector URL as other (a backend call), never exempt", () => {
 			expect(
