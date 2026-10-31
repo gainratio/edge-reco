@@ -53,12 +53,14 @@ def test_should_bind_the_protected_dagger_job_to_the_exact_checkout_sha() -> Non
     steps = workflow["jobs"]["dagger"]["steps"]
 
     # Then
-    assert steps[0]["with"] == {
+    checkout = next(step for step in steps if step.get("uses", "").startswith("actions/checkout@"))
+    dagger = next(step for step in steps if "dagger-for-github" in step.get("uses", ""))
+    assert checkout["with"] == {
         "fetch-depth": 0,
         "persist-credentials": False,
         "ref": "${{ github.sha }}",
     }
-    assert steps[1]["with"] == {
+    assert dagger["with"] == {
         "version": "0.21.8",
         "call": "ci --commit-sha=${{ github.sha }} --repository=${{ github.repository }}",
     }
