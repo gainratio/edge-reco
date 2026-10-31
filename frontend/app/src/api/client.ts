@@ -675,9 +675,12 @@ export async function bootstrapApp(onStage?: OnStage): Promise<void> {
 	// hot-swap then exhausts the tab; keep the verified starter instead. Real
 	// Safari has OPFS and still upgrades; Playwright's WebKit does not.
 	void canUseOpfs().then((available) => {
-		if (!available) {
+		// Chromium's OPFS is reliable; only suppress the upgrade when WebKit
+		// cannot persist (its SQLite fallback would otherwise become an
+		// in-memory 100k catalogue). Real Safari with OPFS still upgrades.
+		if (!available && isWebKit()) {
 			console.info(
-				"[edge-reco] OPFS unavailable; full catalog upgrade skipped and starter catalog stays active",
+				"[edge-reco] WebKit has no OPFS; full catalog upgrade skipped and starter catalog stays active",
 			);
 			return;
 		}
@@ -696,6 +699,14 @@ export async function bootstrapApp(onStage?: OnStage): Promise<void> {
 		};
 		upgrade(0);
 	});
+}
+
+function isWebKit(): boolean {
+	if (typeof navigator === "undefined") return false;
+	return (
+		/AppleWebKit/i.test(navigator.userAgent) &&
+		!/Android/i.test(navigator.userAgent)
+	);
 }
 
 async function canUseOpfs(): Promise<boolean> {
