@@ -22,6 +22,7 @@ import type { Product, SearchResult, Strategy } from "../api/types";
 
 const mocks = vi.hoisted(() => ({
 	applyDeltaPatch: vi.fn(),
+	iosPlatform: vi.fn(() => false),
 	browse: vi.fn(),
 	search: vi.fn(),
 	recommendStrategy: vi.fn(),
@@ -38,7 +39,7 @@ const mocks = vi.hoisted(() => ({
 
 vi.mock("../api/client", () => ({
 	applyDeltaPatch: mocks.applyDeltaPatch,
-	isIosPlatform: () => false,
+	isIosPlatform: mocks.iosPlatform,
 	browse: mocks.browse,
 	search: mocks.search,
 	recommendStrategy: mocks.recommendStrategy,
@@ -103,6 +104,7 @@ beforeEach(() => {
 	// Every case starts on the browse view's canonical URL (no PDP hash).
 	window.history.replaceState(null, "", "/");
 	vi.spyOn(window, "scrollTo").mockImplementation(() => {});
+	mocks.iosPlatform.mockReturnValue(false);
 	mocks.strategies.mockReturnValue({} as Record<string, Strategy>);
 	mocks.catalog.mockReturnValue(GRID);
 	mocks.resetSession.mockResolvedValue(undefined);
@@ -571,6 +573,15 @@ describe("Storefront durable taste (badge restore + reset affordance)", () => {
 		expect(
 			await screen.findByText(/stored only in this browser/i),
 		).toBeInTheDocument();
+	});
+
+	it("hides the delta action on iOS", async () => {
+		mocks.iosPlatform.mockReturnValue(true);
+		render(<Storefront />);
+		await screen.findByText("Grid Gadget");
+		expect(
+			screen.queryByRole("button", { name: /Apply delta/i }),
+		).not.toBeInTheDocument();
 	});
 
 	it("Apply delta triggers applyDeltaPatch, refreshes the grid and rails, and flashes a toast", async () => {
