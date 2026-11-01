@@ -1,9 +1,8 @@
-import { createHash } from "node:crypto";
 import { readFile } from "node:fs/promises";
 import { dirname, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 
-import { expect, test } from "@playwright/test";
+import { expect, type Page, test } from "@playwright/test";
 
 import { MODEL_FILES, MODEL_ID } from "../../scripts/download-model.mjs";
 
@@ -16,48 +15,86 @@ const sourceLatest = resolve(
 	"../../../../backend/examples/catalog/latest",
 );
 
-async function fetchJson(url: string) {
-	const response = await fetch(url, { cache: "no-store" });
-	if (!response.ok) throw new Error(`${url} returned ${response.status}`);
-	return response.json();
+async function ensurePageOrigin(page: Page) {
+	let currentOrigin = "";
+	try {
+		currentOrigin = new URL(page.url()).origin;
+	} catch {
+		currentOrigin = "";
+	}
+	if (currentOrigin !== ORIGIN) {
+		await page.goto(BASE_URL, { waitUntil: "domcontentloaded" });
+	}
 }
 
-async function verifyRelease() {
+async function fetchJson(page: Page, path: string) {
+	await ensurePageOrigin(page);
+	return page.evaluate(async (targetPath) => {
+		const response = await fetch(targetPath, { cache: "no-store" });
+		if (!response.ok)
+			throw new Error(`${targetPath} returned ${response.status}`);
+		return response.json();
+	}, path);
+}
+
+async function verifyRelease(page: Page) {
 	if (!/^[0-9a-f]{40}$/u.test(EXPECTED_SHA))
 		throw new Error("invalid release SHA");
-	const identity = await fetchJson(`${BASE_URL}/build.json`);
+	const identity = await fetchJson(page, "/build.json");
 	if (identity.commit !== EXPECTED_SHA)
 		throw new Error("live source identity drifted");
 	const committed = JSON.parse(await readFile(sourceLatest, "utf8"));
-	const bundle = await fetchJson(`${BASE_URL}/bundle/latest`);
+	const bundle = await fetchJson(page, "/bundle/latest");
 	if (JSON.stringify(bundle) !== JSON.stringify(committed))
 		throw new Error("live signed bundle drifted");
 	if (identity.bundleManifestHash !== bundle.manifest_hash)
 		throw new Error("bundle identity drifted");
 }
 
-async function verifyModels() {
+async function verifyModels(page: Page) {
+	await ensurePageOrigin(page);
 	for (const file of MODEL_FILES) {
-		const response = await fetch(`${BASE_URL}/models/${MODEL_ID}/${file.path}`);
-		if (!response.ok) throw new Error(`live model missing: ${file.path}`);
-		const bytes = new Uint8Array(await response.arrayBuffer());
-		if (createHash("sha256").update(bytes).digest("hex") !== file.sha256)
+		const digest = await page.evaluate(
+			async ({ modelId, filePath }) => {
+				const response = await fetch(`/models/${modelId}/${filePath}`);
+				if (!response.ok) throw new Error(`live model missing: ${filePath}`);
+				const bytes = await response.arrayBuffer();
+				const hashBuffer = await crypto.subtle.digest("SHA-256", bytes);
+				return Array.from(new Uint8Array(hashBuffer))
+					.map((b) => b.toString(16).padStart(2, "0"))
+					.join("");
+			},
+			{ modelId: MODEL_ID, filePath: file.path },
+		);
+		if (digest !== file.sha256)
 			throw new Error(`live model hash mismatch: ${file.path}`);
 	}
 }
 
-async function verifyRedirect() {
+async function verifyRedirect(page: Page) {
 	const path = "/faq?source=deploy-check";
-	const response = await fetch(`https://www.edge-reco.com${path}`, {
-		redirect: "manual",
-	});
-	if (![301, 308].includes(response.status))
+	const sourceUrl = `https://www.edge-reco.com${path}`;
+	let redirectStatus = 0;
+	let redirectLocation: string | null = null;
+	const onResponse = (response: import("@playwright/test").Response) => {
+		if (response.url() === sourceUrl && redirectStatus === 0) {
+			redirectStatus = response.status();
+			redirectLocation = response.headers().location ?? null;
+		}
+	};
+	page.on("response", onResponse);
+	try {
+		await page.goto(sourceUrl, { waitUntil: "domcontentloaded" });
+	} finally {
+		page.off("response", onResponse);
+	}
+	if (![301, 308].includes(redirectStatus))
 		throw new Error("canonical redirect status drifted");
-	if (response.headers.get("location") !== `${BASE_URL}${path}`)
+	if (redirectLocation !== `${BASE_URL}${path}`)
 		throw new Error("canonical redirect target drifted");
 }
 
-function backendCalls(page: import("@playwright/test").Page) {
+function backendCalls(page: Page) {
 	return page
 		.locator(".metrics-strip__tile")
 		.filter({ hasText: "backend calls" })
@@ -70,10 +107,10 @@ function backendCalls(page: import("@playwright/test").Page) {
 // they check is not the one this checkout's EXPECTED_SHA describes.
 test("production serves the exact signed release", {
 	tag: "@release",
-}, async () => {
-	await verifyRelease();
-	await verifyModels();
-	await verifyRedirect();
+}, async ({ page }) => {
+	await verifyRelease(page);
+	await verifyModels(page);
+	await verifyRedirect(page);
 });
 
 test("fresh visitor completes the backend-free signed storefront journey", {

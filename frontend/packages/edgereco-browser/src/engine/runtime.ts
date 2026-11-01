@@ -373,13 +373,44 @@ async function applyManifestChunkAccounting(
 	}
 }
 
+const STREAM_CHUNK_CONCURRENCY = 16;
+
+async function fetchAndVerifyChunk(
+	ref: ChunkRef,
+	base: string,
+	fetchFn: FetchBytes,
+	cachedChunkBaseUrls?: ReadonlyMap<string, string>,
+): Promise<Uint8Array> {
+	const cachedBase = cachedChunkBaseUrls?.get(ref.hash)?.replace(/\/+$/, "");
+	let compressed: Uint8Array;
+	if (cachedBase !== undefined && cachedBase !== base) {
+		try {
+			compressed = await fetchWithRetry(
+				fetchFn,
+				`${cachedBase}/chunk/${ref.hash}`,
+				MAX_COMPRESSED_CHUNK_BYTES,
+			);
+		} catch {
+			compressed = await fetchWithRetry(
+				fetchFn,
+				`${base}/chunk/${ref.hash}`,
+				MAX_COMPRESSED_CHUNK_BYTES,
+			);
+		}
+	} else {
+		compressed = await fetchWithRetry(
+			fetchFn,
+			`${base}/chunk/${ref.hash}`,
+			MAX_COMPRESSED_CHUNK_BYTES,
+		);
+	}
+	return decompressAndVerify(ref.hash, compressed, ref.size);
+}
+
 /**
- * Stream verified `catalogue.sqlite` chunks one at a time directly from the
- * bundle origin. The manifest is hash-verified against `manifestHash` (which
- * the sync Worker already verified against the signed `latest` pointer), and
- * each chunk is zstd-decompressed and SHA-256 + byte-length verified via
- * `decompressAndVerify` before yielding. Peak JS heap is bounded to one chunk
- * (~60 KB) at a time.
+ * Stream verified `catalogue.sqlite` chunks in strict index order using a
+ * bounded sliding prefetch window (`STREAM_CHUNK_CONCURRENCY = 16`). Peak JS
+ * heap in the stream is bounded to at most 16 chunks (~576 KiB) in flight.
  */
 export async function* streamBundleSqliteChunks(
 	options: StreamBundleSqliteChunksOptions,
@@ -404,34 +435,35 @@ export async function* streamBundleSqliteChunks(
 		);
 	}
 	const entry = parseManifestFileEntry(manifestBytes, targetPath);
-	for (const ref of entry.chunks) {
-		const cachedBase = options.cachedChunkBaseUrls
-			?.get(ref.hash)
-			?.replace(/\/+$/, "");
-		let compressed: Uint8Array;
-		if (cachedBase !== undefined && cachedBase !== base) {
-			try {
-				compressed = await fetchWithRetry(
-					fetchFn,
-					`${cachedBase}/chunk/${ref.hash}`,
-					MAX_COMPRESSED_CHUNK_BYTES,
-				);
-			} catch {
-				compressed = await fetchWithRetry(
-					fetchFn,
-					`${base}/chunk/${ref.hash}`,
-					MAX_COMPRESSED_CHUNK_BYTES,
-				);
-			}
-		} else {
-			compressed = await fetchWithRetry(
-				fetchFn,
-				`${base}/chunk/${ref.hash}`,
-				MAX_COMPRESSED_CHUNK_BYTES,
-			);
-		}
-		const plain = await decompressAndVerify(ref.hash, compressed, ref.size);
-		yield plain;
+	const chunks = entry.chunks;
+	const inFlight: Array<Promise<Uint8Array>> = [];
+	let nextIndex = 0;
+	const enqueueNext = (): void => {
+		const ref = chunks[nextIndex];
+		if (ref === undefined) return;
+		nextIndex += 1;
+		const promise = fetchAndVerifyChunk(
+			ref,
+			base,
+			fetchFn,
+			options.cachedChunkBaseUrls,
+		);
+		promise.catch(() => {});
+		inFlight.push(promise);
+	};
+	while (
+		inFlight.length < STREAM_CHUNK_CONCURRENCY &&
+		nextIndex < chunks.length
+	) {
+		enqueueNext();
+	}
+	for (
+		let head = inFlight.shift();
+		head !== undefined;
+		head = inFlight.shift()
+	) {
+		enqueueNext();
+		yield await head;
 	}
 }
 
