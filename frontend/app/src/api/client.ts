@@ -675,10 +675,9 @@ export async function bootstrapApp(onStage?: OnStage): Promise<void> {
 	// hot-swap then exhausts the tab; keep the verified starter instead. Real
 	// Safari has OPFS and still upgrades; Playwright's WebKit does not.
 	void canUseOpfs().then((available) => {
-		// iOS Safari has OPFS, but its process memory budget cannot hold the
-		// 100k hot-swap plus the model. Keep the 504-product starter on iOS;
-		// desktop Safari/Chromium still upgrade when OPFS is available.
-		if (isIosPlatform() || (!available && isWebKit())) {
+		// iOS Safari has OPFS; attempt the full catalogue there too. The OPFS
+		// capability probe still prevents the in-memory fallback path.
+		if (!available && isWebKit()) {
 			console.info(
 				"[edge-reco] iOS/limited OPFS: full catalog upgrade skipped and starter catalog stays active",
 			);
