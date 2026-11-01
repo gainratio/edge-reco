@@ -715,7 +715,7 @@ function isWebKit(): boolean {
 	);
 }
 
-async function canUseOpfs(): Promise<boolean> {
+export async function canUseOpfs(): Promise<boolean> {
 	if (
 		typeof navigator === "undefined" ||
 		navigator.storage?.getDirectory === undefined

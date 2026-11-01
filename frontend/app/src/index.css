@@ -2316,6 +2316,17 @@ input {
    Echoes the .clicks-badge / .session-pill vocabulary: Fraunces numbers, pill
    shapes, --line dividers, the steady "0" in --abyss, --muted labels. Kept
    compact — a status row, not a panel. */
+.storage-warning {
+	margin: 0 0 1rem;
+	padding: 0.75rem 1rem;
+	border: 1px solid #d97706;
+	border-radius: 0.75rem;
+	background: #fffbeb;
+	color: #7c2d12;
+	font-size: 0.9rem;
+	line-height: 1.4;
+}
+
 .metrics-strip {
 	max-width: 1320px;
 	margin: 0 auto;

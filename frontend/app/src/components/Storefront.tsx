@@ -5,6 +5,7 @@ import { resolveBundleBaseUrl } from "../api/bundleUrl";
 import {
 	applyDeltaPatch,
 	browse,
+	canUseOpfs,
 	catalog,
 	catalogInfo,
 	isIosPlatform,
@@ -173,6 +174,7 @@ export function Storefront() {
 	const [toast, setToast] = useState<string | null>(null);
 	const [applyingDelta, setApplyingDelta] = useState(false);
 	const [catalogSize, setCatalogSize] = useState(0);
+	const [storageLimited, setStorageLimited] = useState(false);
 	const [syncEpoch, setSyncEpoch] = useState(0);
 	const toastTimer = useRef<number | undefined>(undefined);
 	// Monotonic id for grid loads: a slow older search must not clobber a newer
@@ -310,6 +312,10 @@ export function Storefront() {
 		strategyMap.current = strategies();
 		void refreshRails();
 	}, [refreshRails]);
+
+	useEffect(() => {
+		void canUseOpfs().then((available) => setStorageLimited(!available));
+	}, []);
 
 	useEffect(() => {
 		return () => window.clearTimeout(toastTimer.current);
@@ -583,6 +589,13 @@ export function Storefront() {
 				onSelectCategory={onSelectCategory}
 				cartCount={cartCount}
 			/>
+
+			{storageLimited && (
+				<p className="storage-warning" role="status">
+					Local catalogue storage is unavailable. Private Browsing blocks the
+					100k catalogue; reopen EdgeReco in a normal Safari tab.
+				</p>
+			)}
 
 			<MetricsStrip
 				{...(isIosPlatform() || catalogSize <= 600 ? {} : { onApplyDelta })}
