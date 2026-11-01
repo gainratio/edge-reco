@@ -606,7 +606,7 @@ export class CatalogueDb implements CatalogueStore {
 					},
 				});
 			} finally {
-				await this.#sql.exec("PRAGMA cache_size = -65536;");
+				await this.#sql.exec("PRAGMA cache_size = -4096; PRAGMA shrink_memory;");
 			}
 			const [sample] = await this.#sql.query(
 				"SELECT length(embedding) AS len FROM products LIMIT 1",
