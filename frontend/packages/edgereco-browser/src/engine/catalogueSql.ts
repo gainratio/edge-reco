@@ -78,7 +78,16 @@ async function openNamedSql(
 	deps: OpenCatalogueSqlDeps,
 ): Promise<CatalogueSql> {
 	const sql = await openSqlDatabase(
-		{ name, persistence: "opfs", fallback: "memory", memoryProfile: "auto" },
+		{
+			name,
+			persistence: "opfs",
+			fallback: "memory",
+			// The 100k catalogue imports a ~75 MB SQLite image; the iOS
+			// "minimal" profile's 48 MB hard heap makes that import impossible.
+			// "lite" (96 MB hard / 48 MB soft / 16 MB cache) admits it while
+			// keeping the user DB on the smaller auto profile.
+			memoryProfile: label === "catalogue" ? "lite" : "auto",
+		},
 		deps,
 	);
 	console.info(`[edge-reco] ${label} database storage`, sql.storage);
