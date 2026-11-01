@@ -28,6 +28,7 @@ export {
 export {
 	type OpfsPoolRemoval,
 	type OpfsRoot,
+	importDatabaseFromStream,
 	openSqlDatabase,
 	removeOpfsPool,
 	type SqlBind,
