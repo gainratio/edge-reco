@@ -7,6 +7,7 @@ import {
 	browse,
 	catalog,
 	catalogInfo,
+	isIosPlatform,
 	productById,
 	rankingProofEvidence,
 	recommendStrategy,
@@ -579,7 +580,10 @@ export function Storefront() {
 				cartCount={cartCount}
 			/>
 
-			<MetricsStrip onApplyDelta={onApplyDelta} applyingDelta={applyingDelta} />
+			<MetricsStrip
+				{...(isIosPlatform() ? {} : { onApplyDelta })}
+				applyingDelta={applyingDelta}
+			/>
 
 			{/* Browse gets a modifier: its grid (the page h1) precedes the rails in
 			    DOM order for a sound heading outline, while CSS `order` keeps the
