@@ -34,6 +34,7 @@ import {
 	catalog,
 	catalogInfo,
 	clearCatalogCache,
+	isIosPlatform,
 	rankingProofEvidence,
 	recommend,
 	recommendStrategy,
@@ -799,5 +800,34 @@ describe("Origin-First cold start, SqlSwapTimeoutError fallback, and syncUpdate(
 		});
 		await expect(bootstrap()).rejects.toBe(rollbackErr);
 		expect(isDeltaBundleChannel()).toBe(false);
+	});
+});
+
+describe("isIosPlatform", () => {
+	afterEach(() => {
+		vi.unstubAllGlobals();
+	});
+
+	it("detects iPhone and iPadOS, but not desktop", () => {
+		vi.stubGlobal("navigator", {
+			userAgent: "Mozilla/5.0 (iPhone; CPU iPhone OS 18_0 like Mac OS X)",
+			platform: "iPhone",
+			maxTouchPoints: 5,
+		});
+		expect(isIosPlatform()).toBe(true);
+
+		vi.stubGlobal("navigator", {
+			userAgent: "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7)",
+			platform: "MacIntel",
+			maxTouchPoints: 5,
+		});
+		expect(isIosPlatform()).toBe(true);
+
+		vi.stubGlobal("navigator", {
+			userAgent: "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7)",
+			platform: "MacIntel",
+			maxTouchPoints: 0,
+		});
+		expect(isIosPlatform()).toBe(false);
 	});
 });
