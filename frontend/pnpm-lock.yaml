@@ -122,8 +122,8 @@ importers:
         specifier: ^0.5.3
         version: 0.5.3
       '@gainratio/browser':
-        specifier: ^0.4.2
-        version: 0.4.2
+        specifier: ^0.4.4
+        version: 0.4.4
       '@huggingface/transformers':
         specifier: ^4.2.0
         version: 4.2.0(@types/node@26.6.4)
@@ -999,10 +999,6 @@ packages:
 
   '@gainratio/avow@0.5.3':
     resolution: {integrity: sha512-EeIvZ2xkXDiLpJRhVyODbTNscURy0Xqnzxucbkn9UfZSUIuSqwDfG/EvfSl0AcOLnJQ8PNMM2s2Oq41ACC8uqQ==}
-    engines: {node: '>=22.13'}
-
-  '@gainratio/browser@0.4.2':
-    resolution: {integrity: sha512-/h6QbjmCrMrd4Ee2F9K/P6nmbdMzRLEDWSPCYwNgb60S+PnZxcE5SSUt61+As8iVHnoUP8Da13cqTChP4va3ig==}
     engines: {node: '>=22.13'}
 
   '@gainratio/browser@0.4.4':
@@ -4123,12 +4119,6 @@ snapshots:
     dependencies:
       '@noble/ed25519': 3.2.0
       canonicalize: 3.0.0
-
-  '@gainratio/browser@0.4.2':
-    dependencies:
-      '@hpcc-js/wasm-zstd': 1.16.2
-      '@noble/ed25519': 3.2.0
-      age-encryption: 0.3.1
 
   '@gainratio/browser@0.4.4':
     dependencies:
