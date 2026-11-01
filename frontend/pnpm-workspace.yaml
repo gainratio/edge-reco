@@ -4,6 +4,14 @@ packages:
 
 minimumReleaseAge: 0
 
+# The only remaining audit finding is deepmerge's LOW-severity prototype
+# poisoning advisory. The advisory's "patched" 4.3.2 does not exist (4.3.1 is
+# the latest published release), so there is no version floor to pin. It is a
+# dev-only transitive of workbox-build; remove this ignore when upstream ships.
+auditConfig:
+  ignoreGhsas:
+    - GHSA-gcqx-w48m-w2h4
+
 # Security dependency overrides. pnpm v10+ reads `overrides` from here, not from
 # the package.json `pnpm` field (which v11 ignores). undici >=7.28.0 clears 6
 # Dependabot alerts (test-only, via jsdom); protobufjs >=7.6.5 clears 1 alert
@@ -138,6 +146,9 @@ overrides:
   serialize-javascript: ">=7.1.3 <8"
   global-agent: ">=4.1.3 <5"
   source-map-js: ">=1.2.2 <2"
+  # 2026-11-01 pnpm audit on the Edge gate: workbox-build transitive advisories.
+  minimatch: ">=11.0.1 <12"
+  glob: ">=14.0.2 <15"
 
 # pnpm v11 does not run a dependency's build/postinstall scripts unless it is
 # explicitly allowlisted here (replaces v10's onlyBuiltDependencies). These are
