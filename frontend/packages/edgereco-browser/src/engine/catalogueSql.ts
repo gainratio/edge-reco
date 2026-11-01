@@ -78,7 +78,7 @@ async function openNamedSql(
 	deps: OpenCatalogueSqlDeps,
 ): Promise<CatalogueSql> {
 	const sql = await openSqlDatabase(
-		{ name, persistence: "opfs", fallback: "memory", memoryProfile: "full" },
+		{ name, persistence: "opfs", fallback: "memory", memoryProfile: "auto" },
 		deps,
 	);
 	console.info(`[edge-reco] ${label} database storage`, sql.storage);
