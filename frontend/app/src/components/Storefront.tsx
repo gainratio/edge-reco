@@ -172,6 +172,7 @@ export function Storefront() {
 	const [error, setError] = useState<string | null>(null);
 	const [toast, setToast] = useState<string | null>(null);
 	const [applyingDelta, setApplyingDelta] = useState(false);
+	const [catalogSize, setCatalogSize] = useState(0);
 	const [syncEpoch, setSyncEpoch] = useState(0);
 	const toastTimer = useRef<number | undefined>(undefined);
 	// Monotonic id for grid loads: a slow older search must not clobber a newer
@@ -325,7 +326,10 @@ export function Storefront() {
 			appOrigin: window.location.origin,
 		});
 		record({ backendCalls: 0 });
-		void catalogInfo().then(({ count }) => record({ productCount: count }));
+		void catalogInfo().then(({ count }) => {
+			record({ productCount: count });
+			setCatalogSize(count);
+		});
 		return stop;
 	}, [syncEpoch]);
 
@@ -581,7 +585,7 @@ export function Storefront() {
 			/>
 
 			<MetricsStrip
-				{...(isIosPlatform() ? {} : { onApplyDelta })}
+				{...(isIosPlatform() || catalogSize <= 600 ? {} : { onApplyDelta })}
 				applyingDelta={applyingDelta}
 			/>
 
