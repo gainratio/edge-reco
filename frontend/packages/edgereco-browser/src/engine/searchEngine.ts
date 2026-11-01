@@ -153,6 +153,16 @@ export interface SearchEngine {
 	dispose(): Promise<void>;
 }
 
+const EMBEDDER_OOM_RE =
+	/RangeError.*Out of memory|out of memory|no available backend found.*out of memory|failed to allocate/i;
+
+function isEmbedderMemoryError(error: unknown): boolean {
+	return (
+		error instanceof RangeError ||
+		(error instanceof Error && EMBEDDER_OOM_RE.test(error.message))
+	);
+}
+
 async function hydrateFused(
 	index: VectorIndex,
 	fused: ReadonlyArray<{ readonly id: string; readonly score: number }>,
@@ -250,7 +260,19 @@ class HybridSearchEngine implements SearchEngine {
 		}
 		// Candidate width matches the backend: k = max(limit*3, 30).
 		const k = Math.max(limit * 3, 30);
-		const queryVec = await this.#embedder.embed(query);
+		let queryVec: Float32Array;
+		try {
+			queryVec = await this.#embedder.embed(query);
+		} catch (error) {
+			if (!isEmbedderMemoryError(error)) {
+				throw error;
+			}
+			console.warn(
+				"[edge-reco] embedder WASM memory exhausted; degrading query to SQLite FTS5 lexical search",
+				error,
+			);
+			queryVec = new Float32Array(this.#index.dim);
+		}
 		const fused = await this.#index.hybrid(query, queryVec, k);
 
 		const fusedResults = await hydrateFused(

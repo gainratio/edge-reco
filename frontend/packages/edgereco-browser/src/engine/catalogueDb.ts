@@ -250,6 +250,24 @@ const HYBRID_SQL = `
 	ORDER BY f.fused DESC, k.rank IS NULL, k.rank, s.rank
 `;
 
+const LEXICAL_HYBRID_SQL = `
+	WITH lexical AS (
+		SELECT rowid, -bm25(products_fts, ?1, ?2, ?3, ?4) AS score
+		FROM products_fts WHERE products_fts MATCH ?5
+		ORDER BY bm25(products_fts, ?1, ?2, ?3, ?4), rowid LIMIT ?6
+	),
+	keyword AS (
+		SELECT rowid, score, row_number() OVER (ORDER BY score DESC, rowid) AS rank
+		FROM lexical
+	)
+	SELECT p.id AS id, (1.0 / (?7 + k.rank)) AS fused,
+		k.score AS lexical_score, k.rank AS lexical_rank,
+		NULL AS semantic_score, NULL AS semantic_rank
+	FROM keyword AS k
+	JOIN products AS p ON p.rowid = k.rowid
+	ORDER BY k.rank ASC
+`;
+
 /** An empty phrase: valid FTS5 that matches no row (MATCH NULL is an error). */
 const MATCH_NOTHING = '""';
 
@@ -283,6 +301,24 @@ export function matchExpression(query: string): string | null {
 		return null;
 	}
 	return chunks.map((chunk) => `"${chunk.replaceAll('"', '""')}"`).join(" OR ");
+}
+
+function matchPrefixExpression(query: string): string | null {
+	const chunks = query.split(/\s+/u).filter((chunk) => chunk.length > 0);
+	return chunks.length === 0
+		? null
+		: chunks
+				.map((chunk) => {
+					const quoted = `"${chunk.replaceAll('"', '""')}"`;
+					return /^[\p{L}\p{N}]+$/u.test(chunk)
+						? `${quoted} OR ${quoted}*`
+						: quoted;
+				})
+				.join(" OR ");
+}
+
+function isZeroVector(vector: Float32Array): boolean {
+	return vector.every((v) => v === 0);
 }
 
 function asNumberOrNull(value: unknown): number | null {
@@ -619,7 +655,7 @@ export class CatalogueDb implements CatalogueStore {
 					"DROP TABLE IF EXISTS products_fts; DROP TABLE IF EXISTS products; DELETE FROM _sqliteai_vector; VACUUM;",
 				);
 			}
-			await this.#sql.exec("PRAGMA cache_size = -4096; PRAGMA shrink_memory;");
+			await this.#sql.exec("PRAGMA shrink_memory;");
 			try {
 				await importDatabase.call(this.#sql, bytes, {
 					virtualTableModules: ["fts5"],
@@ -744,6 +780,7 @@ export class CatalogueDb implements CatalogueStore {
 				[revisionKey],
 			);
 		}
+		await this.#sql.exec("PRAGMA shrink_memory;");
 	}
 
 	/** Number of products in the database. */
@@ -930,10 +967,29 @@ export class CatalogueDb implements CatalogueStore {
 	): Promise<ReadonlyArray<HybridRow>> {
 		this.#assertVector(vector);
 		return this.#readThroughGate(async () => {
+			const w = this.#weights;
+			if (isZeroVector(vector)) {
+				const rows = await this.#sql.query(LEXICAL_HYBRID_SQL, [
+					w.title,
+					w.category,
+					w.tags,
+					w.brand,
+					matchPrefixExpression(query) ?? MATCH_NOTHING,
+					Math.max(0, k),
+					RRF_K,
+				]);
+				return rows.map((row) => ({
+					id: String(row.id),
+					fused: Number(row.fused),
+					lexicalScore: asNumberOrNull(row.lexical_score),
+					lexicalRank: asNumberOrNull(row.lexical_rank),
+					semanticScore: null,
+					semanticRank: null,
+				}));
+			}
 			if (this.#vectorType === null) {
 				await this.#ensureVectorInit("FLOAT32");
 			}
-			const w = this.#weights;
 			const rows = await this.#sql.query(HYBRID_SQL, [
 				w.title,
 				w.category,

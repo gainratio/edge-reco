@@ -510,15 +510,15 @@ async function applyBundleToStore(
 		}
 	}
 	if (files.sqlite !== undefined) {
+		if (store.importSqlite !== undefined) {
+			await store.importSqlite(files.sqlite, swapOpts);
+			return;
+		}
 		if (store.importSqliteFromChunks !== undefined) {
 			await store.importSqliteFromChunks(
 				singleChunkStream(files.sqlite),
 				swapOpts,
 			);
-			return;
-		}
-		if (store.importSqlite !== undefined) {
-			await store.importSqlite(files.sqlite, swapOpts);
 			return;
 		}
 	}

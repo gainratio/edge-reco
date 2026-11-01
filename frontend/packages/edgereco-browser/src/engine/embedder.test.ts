@@ -22,6 +22,8 @@ import {
 	createEmbedder,
 	createEmbedderWith,
 	EMBEDDING_DTYPE,
+	installBoundedWasmMemory,
+	MAX_BROWSER_WASM_MEMORY_PAGES,
 	pipelineOptions,
 } from "./embedder";
 
@@ -90,19 +92,20 @@ describe("transformers.js env — self-hosted model config (house standard §8.1
 	// aml-filter's ORT-web hardening config — AND load the onnxruntime-web wasm
 	// runtime from the same-origin /ort/ mirror (staged by
 	// app/scripts/stage-ort-wasm.mjs) instead of jsDelivr.
-	it("browser runtime: self-hosted /models/ + /ort/ + transformers-cache enabled", () => {
+	it("browser runtime: self-hosted /models/ + /ort/ + transformers-cache enabled + single-threaded ORT wasm", () => {
 		const fake = {
 			useBrowserCache: false,
 			allowLocalModels: false,
 			allowRemoteModels: true,
 			localModelPath: "sentinel",
 		};
-		const fakeOrt: { wasmPaths?: string } = {};
+		const fakeOrt: { wasmPaths?: string; numThreads?: number } = {};
 		configureTransformersEnv(fake, fakeOrt, false);
 		expect(fake.useBrowserCache).toBe(true);
 		expect(fake.allowLocalModels).toBe(true);
 		expect(fake.localModelPath).toBe("/models/");
 		expect(fakeOrt.wasmPaths).toBe("/ort/");
+		expect(fakeOrt.numThreads).toBe(1);
 	});
 
 	// transformers.js defaults `allowRemoteModels` to true, so a missing/renamed
@@ -198,5 +201,44 @@ describe("model-load lifecycle", () => {
 		);
 		await expect(embedder.embed("retry")).resolves.toHaveLength(384);
 		expect(loadCalls).toBe(2);
+	});
+});
+
+describe("installBoundedWasmMemory — iOS Safari 4 GiB SharedArrayBuffer cage guard", () => {
+	it("caps 65536-page (4 GiB) WebAssembly.Memory descriptors and steps down on RangeError", () => {
+		const seenMax: number[] = [];
+		class FakeMemory {
+			readonly descriptor: WebAssembly.MemoryDescriptor;
+			public constructor(descriptor: WebAssembly.MemoryDescriptor) {
+				seenMax.push(descriptor.maximum ?? -1);
+				if ((descriptor.maximum ?? 0) > 2048) {
+					throw new RangeError("Out of memory");
+				}
+				this.descriptor = descriptor;
+			}
+		}
+		const host = {
+			Memory: FakeMemory as unknown as typeof WebAssembly.Memory,
+		};
+		const restore = installBoundedWasmMemory(host);
+		try {
+			const mem = new host.Memory({
+				initial: 256,
+				maximum: 65536,
+				shared: true,
+			}) as unknown as FakeMemory;
+			expect(seenMax).toEqual([MAX_BROWSER_WASM_MEMORY_PAGES, 2048]);
+			expect(mem.descriptor.maximum).toBe(2048);
+
+			seenMax.length = 0;
+			const small = new host.Memory({
+				initial: 16,
+				maximum: 512,
+			}) as unknown as FakeMemory;
+			expect(seenMax).toEqual([512]);
+			expect(small.descriptor.maximum).toBe(512);
+		} finally {
+			restore();
+		}
 	});
 });

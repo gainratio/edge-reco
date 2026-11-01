@@ -40,6 +40,14 @@ async function load(): Promise<InProcessSqlite> {
 	return initInProcessSqlite(wasmBinary);
 }
 
+function resolveNodeMemoryProfile(
+	profile: Parameters<typeof resolveMemoryProfile>[0],
+) {
+	return resolveMemoryProfile(
+		profile === undefined || profile === "auto" ? "full" : profile,
+	);
+}
+
 const openEngine: Parameters<typeof createSqlWorkerHandler>[0] = async (
 	options,
 ) => {
@@ -57,7 +65,7 @@ const openEngine: Parameters<typeof createSqlWorkerHandler>[0] = async (
 	};
 	const engine = new SqlEngine(raw, {
 		storage: { persistence: "memory", reason: "opfs-unavailable" },
-		memoryProfile: resolveMemoryProfile(options.memoryProfile ?? "auto"),
+		memoryProfile: resolveNodeMemoryProfile(options.memoryProfile),
 		serializer: sqlite.serializer,
 		control: sqlite.control,
 	});
@@ -119,16 +127,23 @@ const importStream: NonNullable<
 			combined.set(part, offset);
 			offset += part.byteLength;
 		}
-		const check = new SqlEngine(sqlite.openMemory(), {
-			storage: { persistence: "memory", reason: "opfs-unavailable" },
-			memoryProfile: resolveMemoryProfile(options.memoryProfile ?? "auto"),
-			serializer: sqlite.serializer,
-			control: sqlite.control,
-		});
+		const header = new TextDecoder().decode(combined.subarray(0, 16));
+		if (combined.byteLength < 100 || header !== "SQLite format 3\0") {
+			throw new Error("not a SQLite database");
+		}
+		const scratch = sqlite.serializer.scratch();
+		let releaseBuf: (() => void) | undefined;
 		try {
-			check.importDatabase(combined);
+			releaseBuf = sqlite.serializer.deserialize(
+				scratch,
+				"main",
+				combined,
+				true,
+			);
+			scratch.selectObjects("PRAGMA schema_version");
 		} finally {
-			check.close();
+			scratch.close();
+			releaseBuf?.();
 		}
 		pendingStreamImports.set(options.name, combined);
 		return { persistence: "memory", reason: "opfs-unavailable" } as const;

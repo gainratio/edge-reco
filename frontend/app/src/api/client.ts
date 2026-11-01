@@ -423,10 +423,14 @@ export function createDataClient(deps: ClientDeps = {}): DataClient {
 				} else {
 					await runtime.clearBundleCache();
 				}
-				await runtime.syncUpdate({
-					...envConfig,
-					bundleBaseUrl: resolveBaseBundleUrl(),
-				});
+				await runtime.syncUpdate(
+					{
+						...envConfig,
+						bundleBaseUrl: resolveBaseBundleUrl(),
+					},
+					undefined,
+					{ skipReload: true },
+				);
 			}
 			const updated = await this.syncUpdate(onStage, {
 				...envConfig,

@@ -79,6 +79,9 @@ function fakeEnginePort(): EnginePort {
 			}
 			return materializeFile(store, manifest, path);
 		},
+		clear(): Promise<void> {
+			return Promise.resolve();
+		},
 	};
 }
 
@@ -102,6 +105,7 @@ describe("backend-free data layer", () => {
 	});
 
 	afterEach(() => {
+		vi.unstubAllGlobals();
 		__setRuntimeForTests({
 			spawnEngine: () => fakeEnginePort(),
 			makeEmbedder: () => stubEmbedder,
@@ -604,6 +608,7 @@ describe("expired signed pointer — surfaced, never silently served", () => {
 
 describe("clearCatalogCache — the explicit recovery", () => {
 	afterEach(() => {
+		vi.unstubAllGlobals();
 		__setRuntimeForTests({
 			spawnEngine: () => fakeEnginePort(),
 			makeEmbedder: () => stubEmbedder,
@@ -628,6 +633,7 @@ describe("clearCatalogCache — the explicit recovery", () => {
 
 describe("Origin-First cold start, SqlSwapTimeoutError fallback, and syncUpdate()", () => {
 	afterEach(() => {
+		vi.unstubAllGlobals();
 		__setRuntimeForTests({
 			spawnEngine: () => fakeEnginePort(),
 			makeEmbedder: () => stubEmbedder,

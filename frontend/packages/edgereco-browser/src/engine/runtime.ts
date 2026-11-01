@@ -202,6 +202,7 @@ export interface StreamBundleSqliteChunksOptions {
 	readonly manifestHash: string;
 	readonly fetchBytes?: FetchBytes;
 	readonly path?: string;
+	readonly cachedChunkBaseUrls?: ReadonlyMap<string, string>;
 }
 
 async function fetchWithRetry(
@@ -223,10 +224,9 @@ async function fetchWithRetry(
 	throw lastError;
 }
 
-function parseManifestFileEntry(
+function parseManifestFiles(
 	manifestBytes: Uint8Array,
-	targetPath: string,
-): FileEntry {
+): ReadonlyArray<FileEntry> {
 	let parsed: unknown;
 	try {
 		parsed = JSON.parse(new TextDecoder().decode(manifestBytes));
@@ -242,6 +242,14 @@ function parseManifestFileEntry(
 	if (!Array.isArray(files)) {
 		throw new IntegrityError("manifest.files must be an array");
 	}
+	return files as ReadonlyArray<FileEntry>;
+}
+
+function parseManifestFileEntry(
+	manifestBytes: Uint8Array,
+	targetPath: string,
+): FileEntry {
+	const files = parseManifestFiles(manifestBytes);
 	const entry = files.find(
 		(candidate): candidate is FileEntry =>
 			typeof candidate === "object" &&
@@ -289,6 +297,82 @@ function parseManifestFileEntry(
 	return entry;
 }
 
+async function applyManifestChunkAccounting(
+	rawResult: SyncResult,
+	baseUrl: string,
+	fetchFn: FetchBytes,
+	chunkBaseUrlByHash: Map<string, string>,
+): Promise<{
+	readonly result: SyncResult;
+	readonly previousChunkBaseUrls: ReadonlyMap<string, string>;
+}> {
+	const previousChunkBaseUrls = new Map(chunkBaseUrlByHash);
+	const base = baseUrl.replace(/\/+$/, "");
+	if (!SHA256_HEX_RE.test(rawResult.manifestHash)) {
+		return { result: rawResult, previousChunkBaseUrls };
+	}
+	try {
+		const manifestBytes = await fetchWithRetry(
+			fetchFn,
+			`${base}/manifest/${rawResult.manifestHash}`,
+			MAX_MANIFEST_BYTES,
+		);
+		if ((await sha256Hex(manifestBytes)) !== rawResult.manifestHash) {
+			return { result: rawResult, previousChunkBaseUrls };
+		}
+		const files = parseManifestFiles(manifestBytes);
+		const distinctHashes = new Set<string>();
+		for (const file of files) {
+			if (Array.isArray(file?.chunks)) {
+				for (const ref of file.chunks) {
+					if (typeof ref?.hash === "string" && SHA256_HEX_RE.test(ref.hash)) {
+						distinctHashes.add(ref.hash);
+					}
+				}
+			}
+		}
+		if (distinctHashes.size === 0) {
+			return { result: rawResult, previousChunkBaseUrls };
+		}
+		if (rawResult.chunksFetched === 0) {
+			for (const hash of distinctHashes) {
+				if (!chunkBaseUrlByHash.has(hash)) {
+					chunkBaseUrlByHash.set(hash, base);
+				}
+			}
+			return {
+				result: {
+					...rawResult,
+					chunksFetched: 0,
+					chunksReused: distinctHashes.size,
+					bytesFetched: 0,
+				},
+				previousChunkBaseUrls,
+			};
+		}
+		let reused = 0;
+		let fetched = 0;
+		for (const hash of distinctHashes) {
+			if (previousChunkBaseUrls.has(hash)) {
+				reused += 1;
+			} else {
+				fetched += 1;
+				chunkBaseUrlByHash.set(hash, base);
+			}
+		}
+		return {
+			result: {
+				...rawResult,
+				chunksFetched: fetched,
+				chunksReused: reused,
+			},
+			previousChunkBaseUrls,
+		};
+	} catch {
+		return { result: rawResult, previousChunkBaseUrls };
+	}
+}
+
 /**
  * Stream verified `catalogue.sqlite` chunks one at a time directly from the
  * bundle origin. The manifest is hash-verified against `manifestHash` (which
@@ -321,25 +405,33 @@ export async function* streamBundleSqliteChunks(
 	}
 	const entry = parseManifestFileEntry(manifestBytes, targetPath);
 	for (const ref of entry.chunks) {
-		const compressed = await fetchWithRetry(
-			fetchFn,
-			`${base}/chunk/${ref.hash}`,
-			MAX_COMPRESSED_CHUNK_BYTES,
-		);
+		const cachedBase = options.cachedChunkBaseUrls
+			?.get(ref.hash)
+			?.replace(/\/+$/, "");
+		let compressed: Uint8Array;
+		if (cachedBase !== undefined && cachedBase !== base) {
+			try {
+				compressed = await fetchWithRetry(
+					fetchFn,
+					`${cachedBase}/chunk/${ref.hash}`,
+					MAX_COMPRESSED_CHUNK_BYTES,
+				);
+			} catch {
+				compressed = await fetchWithRetry(
+					fetchFn,
+					`${base}/chunk/${ref.hash}`,
+					MAX_COMPRESSED_CHUNK_BYTES,
+				);
+			}
+		} else {
+			compressed = await fetchWithRetry(
+				fetchFn,
+				`${base}/chunk/${ref.hash}`,
+				MAX_COMPRESSED_CHUNK_BYTES,
+			);
+		}
 		const plain = await decompressAndVerify(ref.hash, compressed, ref.size);
 		yield plain;
-	}
-}
-
-async function* sliceBytes(
-	bytes: Uint8Array,
-	chunkSize = 65_536,
-): AsyncGenerator<Uint8Array> {
-	for (let offset = 0; offset < bytes.byteLength; offset += chunkSize) {
-		yield bytes.subarray(
-			offset,
-			Math.min(offset + chunkSize, bytes.byteLength),
-		);
 	}
 }
 
@@ -481,7 +573,6 @@ async function readBundleFiles(
 						embeddings: new Uint8Array(0),
 						products: new Uint8Array(0),
 						sqlite,
-						sqliteChunks: () => sliceBytes(sqlite),
 						...(revisionKey !== undefined ? { revisionKey } : {}),
 					},
 					preopenedStore,
@@ -516,9 +607,7 @@ async function readBundleFiles(
 			state,
 			embeddings,
 			products,
-			...(sqlite !== undefined
-				? { sqlite, sqliteChunks: () => sliceBytes(sqlite) }
-				: {}),
+			...(sqlite !== undefined ? { sqlite } : {}),
 			...(options?.revisionKey !== undefined
 				? { revisionKey: options.revisionKey }
 				: {}),
@@ -644,6 +733,8 @@ export class EngineRuntime {
 	#manifestHash: string | null = null;
 	#enginePort: EnginePort | null = null;
 	#embedder: Embedder | null = null;
+	#chunkBaseUrlByHash = new Map<string, string>();
+	#seedChunkBaseUrlByHash = new Map<string, string>();
 	#generation = 0;
 
 	public constructor(deps: RuntimeDeps = defaultDeps) {
@@ -691,6 +782,7 @@ export class EngineRuntime {
 	public async syncUpdate(
 		config: RuntimeConfig,
 		onStage: OnStage = () => {},
+		options?: { readonly skipReload?: boolean },
 	): Promise<SyncResult | null> {
 		const ready = this.#ready;
 		if (ready === null) {
@@ -709,7 +801,7 @@ export class EngineRuntime {
 			const useStreamedSqlite =
 				engineClient instanceof EngineClient ||
 				this.#deps.fetchBytes !== undefined;
-			const result = useStreamedSqlite
+			const rawResult = useStreamedSqlite
 				? await engineClient.sync(
 						config.bundleBaseUrl,
 						config.pubkeyUrl,
@@ -724,8 +816,24 @@ export class EngineRuntime {
 						config.expectedChannel,
 					);
 			this.#assertCurrent(generation);
-			if (result.manifestHash === this.#manifestHash) {
+			if (rawResult.manifestHash === this.#manifestHash) {
 				return null;
+			}
+			const { result, previousChunkBaseUrls } = useStreamedSqlite
+				? await applyManifestChunkAccounting(
+						rawResult,
+						config.bundleBaseUrl,
+						this.#deps.fetchBytes ?? fetchBytes,
+						this.#chunkBaseUrlByHash,
+					)
+				: {
+						result: rawResult,
+						previousChunkBaseUrls: this.#chunkBaseUrlByHash,
+					};
+			this.#assertCurrent(generation);
+			if (options?.skipReload === true) {
+				this.#manifestHash = result.manifestHash;
+				return result;
 			}
 			onStage({ kind: "synced", result });
 			onStage({ kind: "reassembling" });
@@ -737,6 +845,7 @@ export class EngineRuntime {
 								streamedSqlite: {
 									baseUrl: config.bundleBaseUrl,
 									manifestHash: result.manifestHash,
+									cachedChunkBaseUrls: previousChunkBaseUrls,
 									...(this.#deps.fetchBytes !== undefined
 										? { fetchBytes: this.#deps.fetchBytes }
 										: {}),
@@ -779,7 +888,7 @@ export class EngineRuntime {
 			const useStreamedSqlite =
 				engineClient instanceof EngineClient ||
 				this.#deps.fetchBytes !== undefined;
-			const result = useStreamedSqlite
+			const rawResult = useStreamedSqlite
 				? await engineClient.sync(
 						config.bundleBaseUrl,
 						config.pubkeyUrl,
@@ -794,6 +903,21 @@ export class EngineRuntime {
 						config.expectedChannel,
 					);
 			this.#assertCurrent(generation);
+			const { result, previousChunkBaseUrls } = useStreamedSqlite
+				? await applyManifestChunkAccounting(
+						rawResult,
+						config.bundleBaseUrl,
+						this.#deps.fetchBytes ?? fetchBytes,
+						this.#chunkBaseUrlByHash,
+					)
+				: {
+						result: rawResult,
+						previousChunkBaseUrls: this.#chunkBaseUrlByHash,
+					};
+			if (this.#seedChunkBaseUrlByHash.size === 0) {
+				this.#seedChunkBaseUrlByHash = new Map(this.#chunkBaseUrlByHash);
+			}
+			this.#assertCurrent(generation);
 			onStage({ kind: "synced", result });
 
 			onStage({ kind: "reassembling" });
@@ -806,6 +930,7 @@ export class EngineRuntime {
 								streamedSqlite: {
 									baseUrl: config.bundleBaseUrl,
 									manifestHash: result.manifestHash,
+									cachedChunkBaseUrls: previousChunkBaseUrls,
 									...(this.#deps.fetchBytes !== undefined
 										? { fetchBytes: this.#deps.fetchBytes }
 										: {}),
@@ -886,6 +1011,8 @@ export class EngineRuntime {
 		this.#generation += 1;
 		this.#enginePromise = null;
 		this.#manifestHash = null;
+		this.#chunkBaseUrlByHash.clear();
+		this.#seedChunkBaseUrlByHash.clear();
 		const ready = this.#ready;
 		this.#ready = null;
 		if (ready !== null) {
@@ -947,6 +1074,8 @@ export class EngineRuntime {
 		}
 		await (this.#deps.deleteFloorDatabase ?? deleteBundleFloorDatabase)();
 		await (this.#deps.clearCatalogueStorage ?? clearCatalogueSqlStorage)();
+		this.#chunkBaseUrlByHash.clear();
+		this.#seedChunkBaseUrlByHash.clear();
 	}
 
 	/**
@@ -967,6 +1096,7 @@ export class EngineRuntime {
 		}
 		await (this.#deps.deleteFloorDatabase ?? deleteBundleFloorDatabase)();
 		this.#manifestHash = null;
+		this.#chunkBaseUrlByHash = new Map(this.#seedChunkBaseUrlByHash);
 	}
 
 	/** Release any sync/embedder worker still held while no boot is running. */

@@ -133,5 +133,40 @@ describe("interactionWeights accessor", () => {
 		};
 		const engine = await createSearchEngine(files, stubEmbedder, retuned);
 		expect(engine.interactionWeights()).toEqual(retunedWeights);
+		await engine.dispose();
+	});
+
+	it("degrades to SQLite FTS5 lexical search when the embedder throws a WASM RangeError: Out of memory, and rethrows non-memory errors", async () => {
+		const files = await syncedFiles();
+		let mode: "oom-msg" | "range-error" | "fatal" = "oom-msg";
+		const oomEmbedder: Embedder = {
+			embed: () => {
+				if (mode === "oom-msg") {
+					return Promise.reject(
+						new Error(
+							"no available backend found. ERR: [wasm] RangeError: Out of memory",
+						),
+					);
+				}
+				if (mode === "range-error") {
+					return Promise.reject(new RangeError("Out of memory"));
+				}
+				return Promise.reject(new Error("unexpected embedder bug"));
+			},
+		};
+		const engine = await createSearchEngine(files, oomEmbedder);
+		const res = await engine.search("auto", { limit: 5 });
+		expect(res.query).toBe("auto");
+		expect(res.results.length).toBeGreaterThan(0);
+
+		mode = "range-error";
+		const res2 = await engine.search("auto!", { limit: 5 });
+		expect(res2.query).toBe("auto!");
+
+		mode = "fatal";
+		await expect(engine.search("auto")).rejects.toThrow(
+			"unexpected embedder bug",
+		);
+		await engine.dispose();
 	});
 });

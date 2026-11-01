@@ -25,6 +25,66 @@ export interface TransformersEnvLike {
  * (transformers.js exposes it as `env.backends.onnx.wasm`). */
 export interface OrtWasmEnvLike {
 	wasmPaths?: string;
+	numThreads?: number;
+}
+
+/**
+ * Maximum WebAssembly memory pages (64 KiB each) requested upfront in browser
+ * Workers. `ort-wasm-simd-threaded.asyncify.mjs` hardcodes `maximum: 65536`
+ * (4.0 GiB) on a `shared: true` memory (`SharedArrayBuffer`), which forces
+ * WebKit on iPhone Safari to reserve a 4.0 GiB virtual address cage upfront
+ * and fails with `RangeError: Out of memory`. Peak memory for quantized
+ * `all-MiniLM-L6-v2` is ~76.5 MiB (1,224 pages); stepping `[4096, 2048, 1536]`
+ * pages (256 MiB -> 128 MiB -> 96 MiB) satisfies WebAssembly import-limits
+ * matching (`actualMax <= 65536`) within iOS Safari's memory budget.
+ */
+export const MAX_BROWSER_WASM_MEMORY_PAGES = 4096;
+const FALLBACK_WASM_MEMORY_PAGES: ReadonlyArray<number> = [4096, 2048, 1536];
+
+/**
+ * Wrap `WebAssembly.Memory` so browser Workers never request a 4 GiB
+ * `SharedArrayBuffer` cage upfront. Returns a restore function for tests.
+ */
+export function installBoundedWasmMemory(
+	wasmHost: { Memory: typeof WebAssembly.Memory } = WebAssembly,
+): () => void {
+	const OriginalMemory = wasmHost.Memory;
+	const BoundedMemory = new Proxy(OriginalMemory, {
+		construct(
+			target,
+			args: [WebAssembly.MemoryDescriptor?],
+			newTarget,
+		): WebAssembly.Memory {
+			const desc = args[0];
+			if (
+				desc === undefined ||
+				typeof desc.maximum !== "number" ||
+				desc.maximum <= MAX_BROWSER_WASM_MEMORY_PAGES
+			) {
+				return Reflect.construct(target, args, newTarget) as WebAssembly.Memory;
+			}
+			const initial = desc.initial ?? 256;
+			let lastError: unknown;
+			for (const cap of FALLBACK_WASM_MEMORY_PAGES) {
+				if (cap < initial) continue;
+				const bounded = { ...desc, maximum: Math.min(desc.maximum, cap) };
+				try {
+					return Reflect.construct(
+						target,
+						[bounded],
+						newTarget,
+					) as WebAssembly.Memory;
+				} catch (error) {
+					lastError = error;
+				}
+			}
+			throw lastError;
+		},
+	});
+	wasmHost.Memory = BoundedMemory;
+	return () => {
+		wasmHost.Memory = OriginalMemory;
+	};
 }
 
 /** True when running under Node (the parity tests) rather than a browser tab
@@ -55,6 +115,9 @@ export function isNodeRuntime(): boolean {
  * its default is the jsDelivr CDN — the cold-blocked e2e caught exactly that
  * (`Failed to fetch … cdn.jsdelivr.net/npm/onnxruntime-web/....asyncify.mjs`),
  * so the runtime pair is staged same-origin by app/scripts/stage-ort-wasm.mjs.
+ * `numThreads = 1`: embedder inference already runs inside a dedicated Web
+ * Worker (`embedderWorker.ts`), so keeping `numThreads = 1` prevents ONNX
+ * Runtime Web from spawning nested pthread Workers on iOS Safari.
  *
  * NODE (the parity tests): everything stays at the library defaults — the HF
  * hub + filesystem cache serve the fp32 export that the Python-golden
@@ -75,6 +138,7 @@ export function configureTransformersEnv(
 	target.allowRemoteModels = false;
 	target.localModelPath = "/models/";
 	ortWasm.wasmPaths = "/ort/";
+	ortWasm.numThreads = 1;
 }
 
 /** The live onnxruntime-web wasm env, reached through transformers.js's loosely
@@ -85,6 +149,9 @@ function ortWasmEnv(): OrtWasmEnvLike {
 	return backends.onnx?.wasm ?? {};
 }
 
+if (!isNodeRuntime() && typeof WebAssembly !== "undefined") {
+	installBoundedWasmMemory();
+}
 configureTransformersEnv(env, ortWasmEnv(), isNodeRuntime());
 
 /** The sentence-transformers model id, mirrored as its Xenova ONNX export. */
