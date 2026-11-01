@@ -37,8 +37,8 @@ importers:
         specifier: workspace:*
         version: link:../packages/edgereco-browser
       '@gainratio/browser':
-        specifier: ^0.4.2
-        version: 0.4.2
+        specifier: ^0.4.4
+        version: 0.4.4
       '@gainratio/errors':
         specifier: ^0.3.1
         version: 0.3.1
@@ -1003,6 +1003,10 @@ packages:
 
   '@gainratio/browser@0.4.2':
     resolution: {integrity: sha512-/h6QbjmCrMrd4Ee2F9K/P6nmbdMzRLEDWSPCYwNgb60S+PnZxcE5SSUt61+As8iVHnoUP8Da13cqTChP4va3ig==}
+    engines: {node: '>=22.13'}
+
+  '@gainratio/browser@0.4.4':
+    resolution: {integrity: sha512-gIbHEcKqj1K95jwz25J78kC8qfRGWmUJdcvsFWtH6rYaa06B/cfrKVQYHQW3NdIpScNhMMtHWwqI2hbrZlhcLg==}
     engines: {node: '>=22.13'}
 
   '@gainratio/errors@0.3.1':
@@ -4121,6 +4125,12 @@ snapshots:
       canonicalize: 3.0.0
 
   '@gainratio/browser@0.4.2':
+    dependencies:
+      '@hpcc-js/wasm-zstd': 1.16.2
+      '@noble/ed25519': 3.2.0
+      age-encryption: 0.3.1
+
+  '@gainratio/browser@0.4.4':
     dependencies:
       '@hpcc-js/wasm-zstd': 1.16.2
       '@noble/ed25519': 3.2.0
