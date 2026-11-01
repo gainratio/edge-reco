@@ -678,7 +678,7 @@ export async function bootstrapApp(onStage?: OnStage): Promise<void> {
 		// iOS Safari has OPFS, but its process memory budget cannot hold the
 		// 100k hot-swap plus the model. Keep the 504-product starter on iOS;
 		// desktop Safari/Chromium still upgrade when OPFS is available.
-		if (isIos() || (!available && isWebKit())) {
+		if (isIosPlatform() || (!available && isWebKit())) {
 			console.info(
 				"[edge-reco] iOS/limited OPFS: full catalog upgrade skipped and starter catalog stays active",
 			);
@@ -701,7 +701,7 @@ export async function bootstrapApp(onStage?: OnStage): Promise<void> {
 	});
 }
 
-function isIos(): boolean {
+export function isIosPlatform(): boolean {
 	if (typeof navigator === "undefined") return false;
 	if (/iPhone|iPad|iPod/i.test(navigator.userAgent)) return true;
 	// iPadOS reports as Macintosh; touch points distinguish it from a Mac.

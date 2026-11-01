@@ -38,6 +38,7 @@ const mocks = vi.hoisted(() => ({
 
 vi.mock("../api/client", () => ({
 	applyDeltaPatch: mocks.applyDeltaPatch,
+	isIosPlatform: () => false,
 	browse: mocks.browse,
 	search: mocks.search,
 	recommendStrategy: mocks.recommendStrategy,
