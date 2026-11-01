@@ -408,7 +408,7 @@ export function createDataClient(deps: ClientDeps = {}): DataClient {
 					productById = await engine.productsByIds([...productById.keys()]);
 				}
 				interactionWeights = engine.interactionWeights();
-				record({ productCount: productById.size });
+				record({ productCount: engine.ntotal });
 			}
 			return updated;
 		},
@@ -437,9 +437,10 @@ export function createDataClient(deps: ClientDeps = {}): DataClient {
 			}
 			return updated;
 		},
-		clearCatalogCache(): Promise<void> {
+		async clearCatalogCache(): Promise<void> {
 			setDeltaBundleChannel(false);
-			return runtime.clearBundleCache();
+			await runtime.dispose();
+			await runtime.clearBundleCache();
 		},
 		resetSession(): Promise<void> {
 			profile = emptyProfile();
@@ -623,12 +624,17 @@ function resolveDeps(deps: ClientDeps): RuntimeDeps {
 	const loadPublisherKey = deps.loadPublisherKey ?? base.loadPublisherKey;
 	const deleteFloorDatabase =
 		deps.deleteFloorDatabase ?? base.deleteFloorDatabase;
+	const clearCatalogueStorage =
+		deps.clearCatalogueStorage ?? base.clearCatalogueStorage;
+	const fetchBytes = deps.fetchBytes ?? base.fetchBytes;
 	const makeCatalogue = deps.makeCatalogue ?? base.makeCatalogue;
 	return {
 		spawnEngine: deps.spawnEngine ?? base.spawnEngine,
 		makeEmbedder: deps.makeEmbedder ?? hookEmbedder ?? base.makeEmbedder,
 		...(loadPublisherKey !== undefined ? { loadPublisherKey } : {}),
 		...(deleteFloorDatabase !== undefined ? { deleteFloorDatabase } : {}),
+		...(clearCatalogueStorage !== undefined ? { clearCatalogueStorage } : {}),
+		...(fetchBytes !== undefined ? { fetchBytes } : {}),
 		...(makeCatalogue !== undefined ? { makeCatalogue } : {}),
 	};
 }
@@ -645,6 +651,7 @@ let active: DataClient = createDataClient();
  */
 export function __setRuntimeForTests(deps: RuntimeDeps & ClientDeps): void {
 	void active.dispose();
+	autoRecoveryAttempted = false;
 	active = createDataClient(deps);
 }
 
@@ -655,49 +662,84 @@ export function bootstrap(
 	return active.bootstrap(onStage, config);
 }
 
+let autoRecoveryAttempted = false;
+
+const RECOVERABLE_CATALOGUE_ERROR_RE =
+	/failed to allocate|out of memory|allocation failed|not a sqlite database|database disk image is malformed|file is not a database|vector index rejected the bundle|could not open the on-device search index/i;
+
+function isRecoverableCatalogueStateError(error: unknown): boolean {
+	if (isRollbackRefusal(error)) {
+		return false;
+	}
+	if (error instanceof RangeError) {
+		return true;
+	}
+	if (!(error instanceof Error)) {
+		return false;
+	}
+	return (
+		error.name === "VectorIndexError" ||
+		error.name === "VectorStoreUnavailableError" ||
+		RECOVERABLE_CATALOGUE_ERROR_RE.test(error.message)
+	);
+}
+
 /**
- * First visit renders the small signed starter catalogue (sequence 29), then
- * upgrades to the full 100k bundle in the background. Existing visitors already
- * hold the full catalogue (active sequence 30): the starter's lower sequence is
- * a rollback refusal, so they fall straight back to the full bundle. No marker
- * is stored; the signed sequence is the state.
+ * Boot the canonical 100k SQLite catalogue into OPFS via synchronized chunked
+ * streaming. Only when OPFS is genuinely unavailable on WebKit (e.g. Safari
+ * Private Browsing or ephemeral Playwright WebKit) does the app boot the small
+ * starter bundle in memory so the tab stays within memory bounds.
+ *
+ * If an interrupted prior update or legacy in-memory import left the local
+ * catalogue OPFS state inconsistent, `bootstrapApp` clears ONLY the catalogue
+ * cache (`edgereco-catalogue` + bundle cache, preserving `edgereco-user` taste
+ * data) and retries once per session before surfacing the recovery screen.
  */
 export async function bootstrapApp(onStage?: OnStage): Promise<void> {
 	const full = { ...appRuntimeConfig(), deferEmbedder: true };
 	const starter = { ...full, bundleBaseUrl: resolveStarterBundleUrl() };
-	try {
-		await active.bootstrap(onStage, starter);
-	} catch {
+	const opfsAvailable = await canUseOpfs();
+	const useStarterOnly =
+		!opfsAvailable &&
+		isWebKit() &&
+		starter.bundleBaseUrl !== full.bundleBaseUrl;
+
+	const runBoot = async (): Promise<void> => {
+		if (useStarterOnly) {
+			try {
+				await active.bootstrap(onStage, starter);
+				console.info(
+					"[edge-reco] iOS/limited OPFS: full catalog upgrade skipped and starter catalog stays active",
+				);
+				return;
+			} catch (starterError) {
+				if (isRecoverableCatalogueStateError(starterError)) {
+					throw starterError;
+				}
+				await active.bootstrap(onStage, full);
+				return;
+			}
+		}
 		await active.bootstrap(onStage, full);
-		return;
-	}
-	// If OPFS is unavailable, the SQLite catalogue falls back to memory. A 100k
-	// hot-swap then exhausts the tab; keep the verified starter instead. Real
-	// Safari has OPFS and still upgrades; Playwright's WebKit does not.
-	void canUseOpfs().then((available) => {
-		// iOS Safari has OPFS; attempt the full catalogue there too. The OPFS
-		// capability probe still prevents the in-memory fallback path.
-		if (!available && isWebKit()) {
-			console.info(
-				"[edge-reco] iOS/limited OPFS: full catalog upgrade skipped and starter catalog stays active",
+	};
+
+	try {
+		await runBoot();
+		autoRecoveryAttempted = false;
+	} catch (error) {
+		if (!autoRecoveryAttempted && isRecoverableCatalogueStateError(error)) {
+			autoRecoveryAttempted = true;
+			console.warn(
+				"[edge-reco] inconsistent local catalogue state detected; clearing catalogue cache once and retrying",
+				error,
 			);
+			await active.clearCatalogCache();
+			await runBoot();
+			autoRecoveryAttempted = false;
 			return;
 		}
-		const upgrade = (attempt: number): void => {
-			void active.syncUpdate(undefined, full).catch((error: unknown) => {
-				// Cloudflare can return a transient 5xx on one chunk under the burst of
-				// 2,000+ requests. Retry twice with backoff; verified chunks stay cached,
-				// so a retry only fetches what is missing.
-				if (attempt < 2) {
-					window.setTimeout(() => upgrade(attempt + 1), 5_000 * (attempt + 1));
-					return;
-				}
-				// Keep the starter usable; the next reload retries the full upgrade.
-				console.warn("full catalog upgrade failed", error);
-			});
-		};
-		upgrade(0);
-	});
+		throw error;
+	}
 }
 
 export function isIosPlatform(): boolean {

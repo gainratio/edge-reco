@@ -59,6 +59,7 @@ const NAME_CODES: Readonly<Record<string, BundleCode>> = {
 	KeyringError: "bundle.integrity_failed",
 	KeyRevokedError: "bundle.integrity_failed",
 	UnknownKeyError: "bundle.integrity_failed",
+	VectorIndexError: "bundle.integrity_failed",
 	NetworkError: "bundle.download_failed",
 	WorkerTimeoutError: "bundle.timeout",
 	WorkerCrashError: "bundle.device_unsupported",

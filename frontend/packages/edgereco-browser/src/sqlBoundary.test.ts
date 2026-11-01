@@ -21,9 +21,9 @@ const SELF = "src/sqlBoundary.test.ts";
 /** A quoted string that loads the SQLite build or reaches into a package dist. */
 const RAW_SQLITE =
 	/["'`][^"'`\n]*(?:sqlite3\.(?:mjs|wasm|js)|@sqlite\.org\/|node_modules\/@gainratio\/)[^"'`\n]*["'`]/u;
-/** Opening or deleting a SQL database: the SQL surface catalogueSql.ts owns. */
+/** Opening, streaming or deleting a SQL database: the SQL surface catalogueSql.ts owns. */
 const SQL_ENTRY =
-	/\b(?:openSqlDatabase|removeOpfsPool|sqliteVectorPoolName)\b/u;
+	/\b(?:openSqlDatabase|importDatabaseFromStream|removeOpfsPool|sqlDatabasePoolName|sqliteVectorPoolName)\b/u;
 /** An import of the library's SQL / SQLite / vector-SQLite subpaths. */
 const SQL_SUBPATH =
 	/["']@gainratio\/browser\/(?:sql|sqlite|vector\/sqlite)(?:\/[^"']*)?["']/u;

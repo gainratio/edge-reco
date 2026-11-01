@@ -549,4 +549,70 @@ describe("loadVectorIndex fail-closed validation", () => {
 		expect(imported).toEqual([sqliteBytes, reloadBytes]);
 		await index.dispose();
 	});
+
+	it("prefers store.importSqliteFromChunks() when files.sqliteChunks is present and falls back to store.importSqlite() when only importSqlite is supported", async () => {
+		const streamedChunks: Uint8Array[] = [];
+		const chunkA = new Uint8Array([83, 81]);
+		const chunkB = new Uint8Array([76, 105]);
+		async function* makeChunks() {
+			yield chunkA;
+			yield chunkB;
+		}
+		const sqlOnlyMeta = encode({
+			catalog_id: "c",
+			version: "v1",
+			embedding_count: 2,
+			embedding_dim: 2,
+		});
+		const streamedIndex = await loadVectorIndex(
+			{
+				meta: sqlOnlyMeta,
+				state: new Uint8Array(0),
+				embeddings: new Uint8Array(0),
+				products: new Uint8Array(0),
+				sqliteChunks: makeChunks,
+			},
+			async () => ({
+				replace: async () => {
+					throw new Error("should not call replace");
+				},
+				importSqliteFromChunks: async (chunks) => {
+					for await (const chunk of chunks) {
+						streamedChunks.push(chunk);
+					}
+				},
+				hybrid: async () => [],
+				vectorSearch: async () => [],
+				nearest: async () => [],
+				dispose: async () => {},
+			}),
+		);
+		expect(streamedChunks).toEqual([chunkA, chunkB]);
+		await streamedIndex.dispose();
+
+		const fallbackBytes: Uint8Array[] = [];
+		const fallbackIndex = await loadVectorIndex(
+			{
+				meta: sqlOnlyMeta,
+				state: new Uint8Array(0),
+				embeddings: new Uint8Array(0),
+				products: new Uint8Array(0),
+				sqliteChunks: makeChunks,
+			},
+			async () => ({
+				replace: async () => {
+					throw new Error("should not call replace");
+				},
+				importSqlite: async (bytes) => {
+					fallbackBytes.push(bytes);
+				},
+				hybrid: async () => [],
+				vectorSearch: async () => [],
+				nearest: async () => [],
+				dispose: async () => {},
+			}),
+		);
+		expect(fallbackBytes).toEqual([new Uint8Array([83, 81, 76, 105])]);
+		await fallbackIndex.dispose();
+	});
 });

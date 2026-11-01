@@ -33,6 +33,8 @@ export interface VectorIndexFiles {
 	readonly products: Uint8Array;
 	/** catalogue.sqlite — canonical pre-built SQLite database. */
 	readonly sqlite?: Uint8Array;
+	/** Demand-driven async stream of verified `catalogue.sqlite` chunks. */
+	readonly sqliteChunks?: () => AsyncIterable<Uint8Array>;
 	/** Optional bundle revision key (`manifestHash` or `catalog_id:version:count`). */
 	readonly revisionKey?: string;
 	/** True when the pre-opened CatalogueStore already activated `revisionKey` on OPFS. */
@@ -346,22 +348,7 @@ export class VectorIndex {
 		options?: CatalogueSwapOptions,
 	): Promise<void> {
 		const parsed = parseBundleRevision(files, this.#dim);
-		if (files.sqlite !== undefined && this.#store.importSqlite !== undefined) {
-			await this.#store.importSqlite(files.sqlite, {
-				...options,
-				revisionKey: options?.revisionKey ?? parsed.revisionKey,
-			});
-		} else {
-			await this.#store.replace(
-				{
-					products: parsed.ids.map((id) =>
-						catalogueRow(id, parsed.products.get(id)),
-					),
-					vectors: parsed.matrix,
-				},
-				options,
-			);
-		}
+		await applyBundleToStore(this.#store, files, parsed, options);
 		this.#ids = parsed.ids;
 		this.#known = new Set(parsed.ids);
 		this.#products = parsed.products;
@@ -444,7 +431,9 @@ function parseBundleRevision(
 		files.revisionKey ??
 		`${String(meta.catalog_id ?? "catalog")}:${String(meta.version ?? "v1")}:${meta.embedding_count}`;
 	if (
-		(files.sqlite !== undefined || files.sqliteAlreadyActive === true) &&
+		(files.sqliteChunks !== undefined ||
+			files.sqlite !== undefined ||
+			files.sqliteAlreadyActive === true) &&
 		files.state.byteLength === 0 &&
 		files.embeddings.byteLength === 0 &&
 		files.products.byteLength === 0
@@ -470,6 +459,84 @@ function parseBundleRevision(
 	return { dim, ntotal, ids: state.faiss_ids, matrix, products, revisionKey };
 }
 
+async function* singleChunkStream(
+	bytes: Uint8Array,
+): AsyncGenerator<Uint8Array> {
+	yield bytes;
+}
+
+async function concatChunks(
+	chunks: AsyncIterable<Uint8Array>,
+): Promise<Uint8Array> {
+	const parts: Uint8Array[] = [];
+	let total = 0;
+	for await (const chunk of chunks) {
+		parts.push(chunk);
+		total += chunk.byteLength;
+	}
+	const out = new Uint8Array(total);
+	let offset = 0;
+	for (const part of parts) {
+		out.set(part, offset);
+		offset += part.byteLength;
+	}
+	return out;
+}
+
+async function applyBundleToStore(
+	store: CatalogueStore,
+	files: VectorIndexFiles,
+	parsed: {
+		readonly ids: ReadonlyArray<string>;
+		readonly matrix: Float32Array;
+		readonly products: ReadonlyMap<string, Product>;
+		readonly revisionKey: string;
+	},
+	options?: CatalogueSwapOptions,
+): Promise<void> {
+	const swapOpts: CatalogueSwapOptions = {
+		...options,
+		revisionKey: options?.revisionKey ?? parsed.revisionKey,
+	};
+	if (files.sqliteChunks !== undefined) {
+		if (store.importSqliteFromChunks !== undefined) {
+			await store.importSqliteFromChunks(files.sqliteChunks(), swapOpts);
+			return;
+		}
+		if (store.importSqlite !== undefined) {
+			const bytes = files.sqlite ?? (await concatChunks(files.sqliteChunks()));
+			await store.importSqlite(bytes, swapOpts);
+			return;
+		}
+	}
+	if (files.sqlite !== undefined) {
+		if (store.importSqliteFromChunks !== undefined) {
+			await store.importSqliteFromChunks(
+				singleChunkStream(files.sqlite),
+				swapOpts,
+			);
+			return;
+		}
+		if (store.importSqlite !== undefined) {
+			await store.importSqlite(files.sqlite, swapOpts);
+			return;
+		}
+	}
+	// The database is durable across catalogue revisions; replace() swaps the
+	// whole revision (products, FTS5 index, vectors) in ONE transaction, so a
+	// removed product cannot linger and an interrupted import leaves the old
+	// revision intact. Bootstrap fails closed and the next attempt redoes it.
+	await store.replace(
+		{
+			products: parsed.ids.map((id) =>
+				catalogueRow(id, parsed.products.get(id)),
+			),
+			vectors: parsed.matrix,
+		},
+		options,
+	);
+}
+
 /**
  * Parse the synced files and build a query-ready VectorIndex.
  *
@@ -489,21 +556,29 @@ export async function loadVectorIndex(
 		if (files.sqliteAlreadyActive === true) {
 			return new VectorIndex(store, ids, products, dim, ntotal);
 		}
-		if (files.sqlite !== undefined && store.importSqlite !== undefined) {
+		const hasSqlite =
+			files.sqliteChunks !== undefined || files.sqlite !== undefined;
+		const canImportSqlite =
+			store.importSqliteFromChunks !== undefined ||
+			store.importSqlite !== undefined;
+		if (hasSqlite && canImportSqlite) {
 			if (
 				store.activateRevision === undefined ||
 				!(await store.activateRevision(revisionKey, ntotal))
 			) {
-				await store.importSqlite(files.sqlite, { revisionKey });
+				await applyBundleToStore(store, files, {
+					ids,
+					matrix,
+					products,
+					revisionKey,
+				});
 			}
 		} else {
-			// The database is durable across catalogue revisions; replace() swaps the
-			// whole revision (products, FTS5 index, vectors) in ONE transaction, so a
-			// removed product cannot linger and an interrupted import leaves the old
-			// revision intact. Bootstrap fails closed and the next attempt redoes it.
-			await store.replace({
-				products: ids.map((id) => catalogueRow(id, products.get(id))),
-				vectors: matrix,
+			await applyBundleToStore(store, files, {
+				ids,
+				matrix,
+				products,
+				revisionKey,
 			});
 		}
 		return new VectorIndex(store, ids, products, dim, ntotal);

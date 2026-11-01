@@ -49,10 +49,13 @@ export {
 	defaultRuntimeDeps,
 	type EnginePort,
 	EngineRuntime,
+	type EngineSyncOptions,
 	type OnStage,
 	type RuntimeConfig,
 	type RuntimeDeps,
+	type StreamBundleSqliteChunksOptions,
 	spawnEngineClient,
+	streamBundleSqliteChunks,
 } from "./engine/runtime";
 // --- the search surface + its option/return contracts ---
 export {

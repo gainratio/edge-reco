@@ -22,7 +22,7 @@ import type { Product, SearchResult, Strategy } from "../api/types";
 
 const mocks = vi.hoisted(() => ({
 	applyDeltaPatch: vi.fn(),
-	iosPlatform: vi.fn(() => false),
+	canUseOpfs: vi.fn(async () => true),
 	browse: vi.fn(),
 	search: vi.fn(),
 	recommendStrategy: vi.fn(),
@@ -39,8 +39,7 @@ const mocks = vi.hoisted(() => ({
 
 vi.mock("../api/client", () => ({
 	applyDeltaPatch: mocks.applyDeltaPatch,
-	isIosPlatform: mocks.iosPlatform,
-	canUseOpfs: async () => true,
+	canUseOpfs: mocks.canUseOpfs,
 	browse: mocks.browse,
 	search: mocks.search,
 	recommendStrategy: mocks.recommendStrategy,
@@ -105,7 +104,7 @@ beforeEach(() => {
 	// Every case starts on the browse view's canonical URL (no PDP hash).
 	window.history.replaceState(null, "", "/");
 	vi.spyOn(window, "scrollTo").mockImplementation(() => {});
-	mocks.iosPlatform.mockReturnValue(false);
+	mocks.canUseOpfs.mockResolvedValue(true);
 	mocks.strategies.mockReturnValue({} as Record<string, Strategy>);
 	mocks.catalog.mockReturnValue(GRID);
 	mocks.resetSession.mockResolvedValue(undefined);
@@ -576,10 +575,13 @@ describe("Storefront durable taste (badge restore + reset affordance)", () => {
 		).toBeInTheDocument();
 	});
 
-	it("hides the delta action on iOS", async () => {
-		mocks.iosPlatform.mockReturnValue(true);
+	it("hides the delta action when OPFS is unavailable (Private Browsing)", async () => {
+		mocks.canUseOpfs.mockResolvedValueOnce(false);
 		render(<Storefront />);
 		await screen.findByText("Grid Gadget");
+		expect(
+			await screen.findByText(/Local catalogue storage is unavailable/i),
+		).toBeInTheDocument();
 		expect(
 			screen.queryByRole("button", { name: /Apply delta/i }),
 		).not.toBeInTheDocument();

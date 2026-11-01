@@ -44,9 +44,6 @@ export const CATALOG_CATEGORIES = 12;
  * Guarded against the bundle's real byte count in landing-figures.test.ts.
  */
 export const BUNDLE_SIZE = "32.6 MB";
-/** The small signed catalogue rendered before the full 100k upgrade. */
-export const STARTER_BUNDLE = `${measurement.starterBundleMb} MB`;
-export const STARTER_PRODUCTS = measurement.starterProducts;
 
 export interface RepresentativeMetric {
 	/** Stable key into the `landing` namespace: `metrics.<id>.{label,sub}`. */
@@ -72,8 +69,7 @@ export const LANDING_METRICS: readonly RepresentativeMetric[] = [
 		num: `~${seconds(median(measurement.coldStartMs))}`,
 		unit: "s",
 		vars: {
-			products: STARTER_PRODUCTS,
-			full: CATALOG_PRODUCTS,
+			products: CATALOG_PRODUCTS,
 			warm: `${seconds(median(measurement.warmStartMs))} s`,
 		},
 	},

@@ -301,7 +301,7 @@ requires the exact-SHA and canonical-host checks in `.github/workflows/deploy.ym
 
 ```mermaid
 flowchart TB
-  build["Your cloud<br>build + sign the catalog<br>100,000 products → 4.7 MB starter + ~36 MB full bundle"]
+  build["Your cloud<br>build + sign the catalog<br>100,000 products → ~32.6 MB signed bundle"]
   sync["Download once, then check it<br>Ed25519 + SHA-256<br>any mismatch aborts the load"]
   engine["Search + rank in the tab<br>keywords + meaning → fuse → personalize"]
   recs["Results and recommendations<br>0 backend calls · works offline"]
@@ -324,7 +324,7 @@ publish a new catalog, never to answer a search.
   the hash of its own bytes, so it can be cached forever and cannot be changed without
   detection. It is a `latest` version pointer plus immutable `manifest/<hash>` and
   `chunk/<hash>` objects. A committed 100,000-product bundle lives in
-  `backend/examples/catalog/` (~36 MB on disk; the starter is 4.7 MB).
+  `backend/examples/catalog/` (~32.6 MB on disk).
 - **edge** is a Caddy reverse proxy (a small static web server standing in for a CDN)
   with the cache policy: immutable chunks cached forever, a short-lived pointer.
 - **browser tier**: the storefront single-page app syncs the bundle (fetches it, checks its

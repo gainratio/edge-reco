@@ -26,10 +26,12 @@
 
 import {
 	type CatalogueSql,
+	importCatalogueSqlFromChunks,
 	openCatalogueSql,
 	retireLegacyVectorPool,
 	type SqlBind,
 	type SqlRow,
+	type SqlStorage,
 } from "./catalogueSql";
 import type { BrowseResponse, Product, SearchResult } from "./domain";
 import type { ScoringWeights } from "./rankingConfig";
@@ -382,6 +384,14 @@ export interface CatalogueStore {
 		options?: CatalogueSwapOptions,
 	): Promise<void>;
 	/**
+	 * Stream a canonical `catalogue.sqlite` database image chunk-by-chunk
+	 * directly into OPFS without materializing a full-file buffer in memory.
+	 */
+	importSqliteFromChunks?(
+		chunks: AsyncIterable<Uint8Array>,
+		options?: CatalogueSwapOptions,
+	): Promise<void>;
+	/**
 	 * Fast path for warm reloads over a durable OPFS database: if the database
 	 * already holds `revisionKey` with `expectedCount` products, re-registers
 	 * `sqlite-vector` in place and returns `true` without re-importing.
@@ -433,11 +443,23 @@ export const openCatalogueStore: CatalogueStoreFactory = async ({
 	return CatalogueDb.open(await openCatalogueSql(), dimension);
 };
 
+export interface CatalogueDbOpenDeps {
+	readonly openSql?: () => Promise<CatalogueSql>;
+	readonly importStream?: (
+		chunks: AsyncIterable<Uint8Array>,
+	) => Promise<SqlStorage>;
+}
+
 /** Catalogue search over one open SQLite database. */
 export class CatalogueDb implements CatalogueStore {
-	readonly #sql: CatalogueSql;
+	#sql: CatalogueSql;
 	readonly #dimension: number;
 	readonly #weights: LexicalWeights;
+	readonly #openSql: () => Promise<CatalogueSql>;
+	readonly #importStream: (
+		chunks: AsyncIterable<Uint8Array>,
+	) => Promise<SqlStorage>;
+	readonly #customImportStream: boolean;
 	#vectorType: "FLOAT32" | "INT8" | null = null;
 	#activeSwap: {
 		readonly done: Promise<void>;
@@ -449,11 +471,15 @@ export class CatalogueDb implements CatalogueStore {
 		dimension: number,
 		weights: LexicalWeights,
 		vectorType: "FLOAT32" | "INT8" | null = null,
+		deps: CatalogueDbOpenDeps = {},
 	) {
 		this.#sql = sql;
 		this.#dimension = dimension;
 		this.#weights = weights;
 		this.#vectorType = vectorType;
+		this.#openSql = deps.openSql ?? openCatalogueSql;
+		this.#importStream = deps.importStream ?? importCatalogueSqlFromChunks;
+		this.#customImportStream = deps.importStream !== undefined;
 	}
 
 	/** Create the schema and register the vector column; closes `sql` on failure. */
@@ -461,6 +487,7 @@ export class CatalogueDb implements CatalogueStore {
 		sql: CatalogueSql,
 		dimension: number,
 		weights: LexicalWeights = DEFAULT_LEXICAL_WEIGHTS,
+		deps: CatalogueDbOpenDeps = {},
 	): Promise<CatalogueDb> {
 		try {
 			if (!Number.isInteger(dimension) || dimension < 1) {
@@ -481,7 +508,7 @@ export class CatalogueDb implements CatalogueStore {
 			await sql.exec(
 				"CREATE TABLE IF NOT EXISTS _sqliteai_vector (tblname TEXT, colname TEXT, key TEXT, value ANY, PRIMARY KEY(tblname, colname, key))",
 			);
-			return new CatalogueDb(sql, dimension, weights, null);
+			return new CatalogueDb(sql, dimension, weights, null, deps);
 		} catch (error) {
 			await sql.close();
 			throw error;
@@ -606,7 +633,9 @@ export class CatalogueDb implements CatalogueStore {
 					},
 				});
 			} finally {
-				await this.#sql.exec("PRAGMA cache_size = -4096; PRAGMA shrink_memory;");
+				await this.#sql.exec(
+					"PRAGMA cache_size = -4096; PRAGMA shrink_memory;",
+				);
 			}
 			const [sample] = await this.#sql.query(
 				"SELECT length(embedding) AS len FROM products LIMIT 1",
@@ -624,6 +653,97 @@ export class CatalogueDb implements CatalogueStore {
 				);
 			}
 		});
+	}
+
+	/**
+	 * Stream a canonical `catalogue.sqlite` image chunk-by-chunk directly into
+	 * the OPFS SQLite database without materializing a full-file JS buffer or an
+	 * in-memory SQLite database.
+	 */
+	public async importSqliteFromChunks(
+		chunks: AsyncIterable<Uint8Array>,
+		options?: CatalogueSwapOptions,
+	): Promise<void> {
+		const timeoutMs = options?.swapTimeoutMs ?? DEFAULT_SWAP_TIMEOUT_MS;
+		const storageReason = (this.#sql.storage as { readonly reason?: string })
+			.reason;
+		const canStreamToOpfs =
+			this.#customImportStream ||
+			this.#sql.storage.persistence === "opfs" ||
+			(storageReason !== "pool-in-use" && typeof Worker === "undefined");
+		if (!canStreamToOpfs) {
+			const parts: Uint8Array[] = [];
+			let total = 0;
+			for await (const chunk of chunks) {
+				parts.push(chunk);
+				total += chunk.byteLength;
+			}
+			const combined = new Uint8Array(total);
+			let offset = 0;
+			for (const part of parts) {
+				combined.set(part, offset);
+				offset += part.byteLength;
+			}
+			await this.importSqlite(combined, options);
+			return;
+		}
+		await this.#withSwapGate(timeoutMs, async () => {
+			await this.#sql.close();
+			let importError: unknown;
+			try {
+				await this.#importStream(chunks);
+			} catch (error) {
+				importError = error;
+			}
+			this.#sql = await this.#openSql();
+			if (importError !== undefined) {
+				throw importError;
+			}
+			await this.#verifyAndActivateImportedCatalogue(options?.revisionKey);
+		});
+	}
+
+	async #verifyAndActivateImportedCatalogue(
+		revisionKey?: string,
+	): Promise<void> {
+		const f32Bytes = this.#dimension * Float32Array.BYTES_PER_ELEMENT;
+		const int8Bytes = this.#dimension;
+		const [schemaRow] = await this.#sql.query(
+			`SELECT
+				(SELECT count(*) = 1 FROM sqlite_schema WHERE type = 'table' AND name = 'products') AS has_products,
+				(SELECT count(*) = 1 FROM sqlite_schema WHERE type = 'table' AND name = 'products_fts') AS has_fts`,
+		);
+		if (
+			Number(schemaRow?.has_products ?? 0) !== 1 ||
+			Number(schemaRow?.has_fts ?? 0) !== 1
+		) {
+			throw new Error(
+				"imported SQLite catalogue is missing required products/products_fts tables",
+			);
+		}
+		const [badLenRow] = await this.#sql.query(
+			`SELECT count(*) AS bad FROM (SELECT length(embedding) AS len FROM products LIMIT 64) WHERE len NOT IN (${f32Bytes}, ${int8Bytes})`,
+		);
+		if (Number(badLenRow?.bad ?? 0) !== 0) {
+			throw new Error(
+				`imported SQLite catalogue has embedding byte length outside (${f32Bytes}, ${int8Bytes})`,
+			);
+		}
+		await this.#sql.exec(
+			"CREATE TABLE IF NOT EXISTS _sqliteai_vector (tblname TEXT, colname TEXT, key TEXT, value ANY, PRIMARY KEY(tblname, colname, key))",
+		);
+		const [sample] = await this.#sql.query(
+			"SELECT length(embedding) AS len FROM products LIMIT 1",
+		);
+		const targetType = Number(sample?.len) === int8Bytes ? "INT8" : "FLOAT32";
+		this.#vectorType = null;
+		await this.#ensureVectorInit(targetType);
+		if (revisionKey !== undefined && revisionKey.length > 0) {
+			await this.#sql.query(
+				"INSERT OR REPLACE INTO _sqliteai_vector (tblname, colname, key, value) VALUES ('_edgereco', 'bundle', 'revision', ?)",
+				[revisionKey],
+			);
+		}
 	}
 
 	/** Number of products in the database. */

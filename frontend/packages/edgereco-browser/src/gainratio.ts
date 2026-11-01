@@ -9,26 +9,35 @@
 // surface inside engine/catalogueSql.ts, the only module that uses it.
 
 export type {
+	ChunkRef,
 	EngineErrorCode,
+	FetchBytes,
+	FileEntry,
 	IndexManifest,
 	SyncResult,
 	VersionPointer,
 } from "@gainratio/browser";
 export {
 	DEFAULT_EMBED_TIMEOUT_MS,
+	decompressAndVerify,
 	EngineClient,
 	fetchBytes,
+	IntegrityError,
 	installNetworkSentinel,
+	MAX_DECOMPRESSED_CHUNK_BYTES,
 	MAX_TRUST_ROOT_BYTES,
+	NetworkError,
 	parseTrustRoot,
 	resolveIndexedDbLayout,
+	SyncCapError,
+	sha256Hex,
 	WorkerCrashError,
 	WorkerTimeoutError,
 } from "@gainratio/browser";
 export {
+	importDatabaseFromStream,
 	type OpfsPoolRemoval,
 	type OpfsRoot,
-	importDatabaseFromStream,
 	openSqlDatabase,
 	removeOpfsPool,
 	type SqlBind,
@@ -38,6 +47,7 @@ export {
 	type SqlStatement,
 	type SqlStorage,
 	type SqlWorkerFactory,
+	sqlDatabasePoolName,
 	sqliteVectorPoolName,
 } from "@gainratio/browser/sql";
 // The library's engine Worker, bundled by Vite as this app's own Worker chunk

@@ -5,7 +5,6 @@ import {
 	BUNDLE_SIZE,
 	LANDING_MEASURED_ON,
 	LANDING_METRICS,
-	STARTER_BUNDLE,
 } from "../metrics/landing-figures";
 import { Landing } from "./Landing";
 
@@ -63,13 +62,9 @@ describe("Landing", () => {
 		// alive in front of users. Split of duties: landing-figures.test.ts asserts
 		// the constant is TRUE against the bundle's bytes; this asserts the footnote
 		// actually renders it.
-		const starterSize = STARTER_BUNDLE.replaceAll(".", "\\.");
 		const bundleSize = BUNDLE_SIZE.replaceAll(".", "\\.");
 		expect(
-			screen.getByText(new RegExp(`~${starterSize} signed starter`)),
-		).toBeInTheDocument();
-		expect(
-			screen.getByText(new RegExp(`full ~${bundleSize}`)),
+			screen.getByText(new RegExp(`~${bundleSize} signed bundle`)),
 		).toBeInTheDocument();
 	});
 

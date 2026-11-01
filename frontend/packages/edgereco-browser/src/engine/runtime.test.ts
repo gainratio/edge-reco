@@ -1,7 +1,10 @@
 import {
 	type IndexManifest,
+	IntegrityError,
+	MAX_DECOMPRESSED_CHUNK_BYTES,
 	MemoryCacheStore,
 	materializeFile,
+	NetworkError,
 	type SyncResult,
 	syncIndex,
 } from "@gainratio/browser";
@@ -13,7 +16,12 @@ import {
 } from "./catalogueDb";
 import type { Embedder } from "./embedder";
 import { catalogFetch } from "./fixtures";
-import { type EnginePort, EngineRuntime, type RuntimeConfig } from "./runtime";
+import {
+	type EnginePort,
+	EngineRuntime,
+	type RuntimeConfig,
+	streamBundleSqliteChunks,
+} from "./runtime";
 
 const config: RuntimeConfig = {
 	bundleBaseUrl: "https://edge.example/bundle",
@@ -406,5 +414,147 @@ describe("EngineRuntime.clearBundleCache — explicit user recovery only", () =>
 		expect(store.activateRevision).toHaveBeenCalledWith("a".repeat(64), 100);
 		expect(readSqlite).not.toHaveBeenCalled();
 		await runtime.dispose();
+	});
+
+	it("streams verified catalogue.sqlite chunks one by one without calling readFile('catalogue.sqlite') or allocating a full-file buffer", async () => {
+		const store = new MemoryCacheStore();
+		const { fetchBytes } = catalogFetch();
+		const synced = await syncIndex({
+			baseUrl: "/cat",
+			store,
+			fetchBytes,
+			verify: () => Promise.resolve(),
+		});
+		const manifest = JSON.parse(
+			new TextDecoder().decode(await store.getManifest(synced.manifestHash)),
+		) as IndexManifest;
+
+		const readPaths: string[] = [];
+		const syncOptionsSeen: unknown[] = [];
+		const port = enginePort({
+			sync: async (_base, _pub, _id, _ch, opts) => {
+				syncOptionsSeen.push(opts);
+				return synced;
+			},
+			readFile: async (path) => {
+				readPaths.push(path);
+				return materializeFile(store, manifest, path);
+			},
+		});
+
+		const chunkSizes: number[] = [];
+		const realCatalogue = await openCatalogueStore({ dimension: 384 });
+		const origImportChunks =
+			realCatalogue.importSqliteFromChunks?.bind(realCatalogue);
+		realCatalogue.importSqliteFromChunks = async (chunks, opts) => {
+			async function* observe() {
+				for await (const chunk of chunks) {
+					chunkSizes.push(chunk.byteLength);
+					yield chunk;
+				}
+			}
+			await origImportChunks?.(observe(), opts);
+		};
+
+		const runtime = new EngineRuntime({
+			spawnEngine: () => port,
+			makeEmbedder: () => ({
+				embed: async () => new Float32Array(384),
+			}),
+			makeCatalogue: async () => realCatalogue,
+			fetchBytes,
+		});
+
+		const engine = await runtime.bootstrap({
+			...config,
+			bundleBaseUrl: "/cat",
+			deferEmbedder: true,
+		});
+		expect(engine.ntotal).toBeGreaterThan(0);
+		expect(readPaths).not.toContain("catalogue.sqlite");
+		expect(syncOptionsSeen[0]).toEqual({
+			wantedPaths: [
+				"catalog_meta.json",
+				"ranking_config.json",
+				"ranking_receipt.json",
+				"cooccurrence.json",
+			],
+		});
+		expect(chunkSizes.length).toBeGreaterThan(1);
+		const totalSqliteBytes = chunkSizes.reduce((acc, n) => acc + n, 0);
+		expect(Math.max(...chunkSizes)).toBeLessThanOrEqual(
+			MAX_DECOMPRESSED_CHUNK_BYTES,
+		);
+		expect(Math.max(...chunkSizes)).toBeLessThan(totalSqliteBytes);
+		await runtime.dispose();
+	});
+
+	it("retries transient NetworkError on chunk fetch and fails closed on tampered manifest or chunk in streamBundleSqliteChunks", async () => {
+		const store = new MemoryCacheStore();
+		const { fetchBytes } = catalogFetch();
+		const synced = await syncIndex({
+			baseUrl: "/cat",
+			store,
+			fetchBytes,
+			verify: () => Promise.resolve(),
+		});
+
+		let flakyCalls = 0;
+		const flakyFetch = async (url: string): Promise<Uint8Array> => {
+			if (url.includes("/chunk/") && flakyCalls === 0) {
+				flakyCalls += 1;
+				throw new NetworkError("transient 502");
+			}
+			return fetchBytes(url);
+		};
+		let totalBytes = 0;
+		for await (const chunk of streamBundleSqliteChunks({
+			baseUrl: "/cat",
+			manifestHash: synced.manifestHash,
+			fetchBytes: flakyFetch,
+		})) {
+			totalBytes += chunk.byteLength;
+		}
+		expect(flakyCalls).toBe(1);
+		expect(totalBytes).toBeGreaterThan(0);
+
+		await expect(async () => {
+			for await (const _ of streamBundleSqliteChunks({
+				baseUrl: "/cat",
+				manifestHash: "not-a-hex-hash",
+				fetchBytes,
+			})) {
+				// unreachable
+			}
+		}).rejects.toBeInstanceOf(IntegrityError);
+
+		await expect(async () => {
+			for await (const _ of streamBundleSqliteChunks({
+				baseUrl: "/cat",
+				manifestHash: "b".repeat(64),
+				fetchBytes: async () => new TextEncoder().encode("{}"),
+			})) {
+				// unreachable
+			}
+		}).rejects.toBeInstanceOf(IntegrityError);
+
+		await expect(async () => {
+			for await (const _ of streamBundleSqliteChunks({
+				baseUrl: "/cat",
+				manifestHash: synced.manifestHash,
+				fetchBytes: async (url: string) => {
+					const bytes = await fetchBytes(url);
+					if (url.includes("/chunk/")) {
+						const corrupted = bytes.slice();
+						const last = corrupted.length - 1;
+						corrupted[last] = (corrupted[last] ?? 0) ^ 0xff;
+						return corrupted;
+					}
+					return bytes;
+				},
+			})) {
+				// unreachable
+			}
+		}).rejects.toThrow();
 	});
 });

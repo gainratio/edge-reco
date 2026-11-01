@@ -8,6 +8,7 @@
 // (sqlBoundary.test.ts and gainratioBoundary.test.ts enforce that).
 
 import {
+	importDatabaseFromStream,
 	type OpfsPoolRemoval,
 	type OpfsRoot,
 	openSqlDatabase,
@@ -19,6 +20,7 @@ import {
 	type SqlStatement,
 	type SqlStorage,
 	type SqlWorkerFactory,
+	sqlDatabasePoolName,
 	sqliteVectorPoolName,
 } from "../gainratio";
 
@@ -71,6 +73,72 @@ export function openCatalogueSql(
 	return openNamedSql(CATALOGUE_DATABASE, "catalogue", deps);
 }
 
+/**
+ * Stream a canonical SQLite database chunk-by-chunk directly into the
+ * catalogue's OPFS database (`edgereco-catalogue`), without materializing a
+ * full-file `Uint8Array` or an in-memory SQLite database.
+ *
+ * The caller must close any active `CatalogueSql` connection to
+ * `edgereco-catalogue` before calling this function and reopen afterward, so
+ * the exclusive OPFS pool lock and `FileSystemSyncAccessHandle`s are free.
+ */
+export async function importCatalogueSqlFromChunks(
+	chunks: AsyncIterable<Uint8Array>,
+	deps: OpenCatalogueSqlDeps = {},
+): Promise<SqlStorage> {
+	let streamError: unknown;
+	const stream = chunksToReadableStream(chunks, (error) => {
+		streamError = error;
+	});
+	try {
+		return await importDatabaseFromStream(CATALOGUE_DATABASE, stream, {
+			memoryProfile: "auto",
+			...deps,
+		});
+	} catch (error) {
+		if (streamError !== undefined) {
+			throw streamError;
+		}
+		throw error;
+	}
+}
+
+function chunksToReadableStream(
+	chunks: AsyncIterable<Uint8Array>,
+	onError?: (error: unknown) => void,
+): ReadableStream<Uint8Array> {
+	const iterator = chunks[Symbol.asyncIterator]();
+	return new ReadableStream<Uint8Array>({
+		async pull(controller) {
+			try {
+				const next = await iterator.next();
+				if (next.done) {
+					controller.close();
+					return;
+				}
+				const chunk = next.value;
+				if (!ArrayBuffer.isView(chunk) || chunk.byteLength === 0) {
+					throw new TypeError(
+						"SQLite chunk stream must yield non-empty Uint8Array chunks",
+					);
+				}
+				const view = chunk as ArrayBufferView;
+				controller.enqueue(
+					chunk instanceof Uint8Array
+						? chunk
+						: new Uint8Array(view.buffer, view.byteOffset, view.byteLength),
+				);
+			} catch (error) {
+				onError?.(error);
+				throw error;
+			}
+		},
+		async cancel(reason) {
+			await iterator.return?.(reason);
+		},
+	});
+}
+
 /** OPFS first, memory when refused or owned elsewhere; logs where it landed. */
 async function openNamedSql(
 	name: string,
@@ -82,11 +150,7 @@ async function openNamedSql(
 			name,
 			persistence: "opfs",
 			fallback: "memory",
-			// The 100k catalogue imports a ~75 MB SQLite image; the iOS
-			// "minimal" profile's 48 MB hard heap makes that import impossible.
-			// "lite" (96 MB hard / 48 MB soft / 16 MB cache) admits it while
-			// keeping the user DB on the smaller auto profile.
-			memoryProfile: label === "catalogue" ? "lite" : "auto",
+			memoryProfile: "auto",
 		},
 		deps,
 	);
@@ -133,6 +197,26 @@ export async function retireLegacyVectorPool(
 	const label = `[edge-reco] legacy vector pool ${LEGACY_VECTOR_INDEX}`;
 	try {
 		const pool = await sqliteVectorPoolName(LEGACY_VECTOR_INDEX);
+		const result = await removeOpfsPool(pool, deps);
+		(deps.log ?? console.info)(`${label}: ${result}`);
+		return result;
+	} catch (error) {
+		console.warn(`${label}: failed`, error);
+		return "failed";
+	}
+}
+
+/**
+ * Remove the disposable `edgereco-catalogue` OPFS SQLite pool while leaving
+ * `edgereco-user` taste data untouched. Used by explicit cache resets and
+ * guarded one-time recovery from a corrupt or interrupted catalogue swap.
+ */
+export async function clearCatalogueSqlStorage(
+	deps: RetireLegacyVectorPoolDeps = {},
+): Promise<LegacyPoolResult> {
+	const label = `[edge-reco] catalogue sql pool ${CATALOGUE_DATABASE}`;
+	try {
+		const pool = await sqlDatabasePoolName(CATALOGUE_DATABASE);
 		const result = await removeOpfsPool(pool, deps);
 		(deps.log ?? console.info)(`${label}: ${result}`);
 		return result;

@@ -26,9 +26,7 @@ export default defineConfig({
 	testDir: "tests/e2e-offline",
 	fullyParallel: false,
 	workers: 1,
-	// The cold-blocked model/cache assertion is timing-sensitive on a fresh
-	// Dagger runner; one retry absorbs that without hiding a real failure.
-	retries: 1,
+	retries: 0,
 	reporter: [["list"]],
 	timeout: 300_000, // a real model download happens once, online
 	expect: { timeout: 60_000 },

@@ -14,11 +14,11 @@ plain keyword search, which misses what shoppers mean: type "something for my ac
 back" and it only finds products whose titles happen to contain the word "back".
 
 EdgeReco does the searching and ranking inside the shopper's browser tab. Your store
-publishes signed catalog bundles: a **4.7 MB starter** for the first paint, then the
-full 100,000-product catalog (about 36 MB) in the background. The browser verifies every
-chunk, searches by meaning as well as by words, and re-ranks recommendations as the
-shopper clicks. No server answers the searches, so the application and inference cost
-does not grow with traffic, and the store keeps working offline.
+publishes one signed catalog bundle, about 32.6 MB for 100,000 products. The browser
+verifies every chunk, streams the SQLite catalog into OPFS, searches by meaning as well
+as by words, and re-ranks recommendations as the shopper clicks. No server answers the
+searches, so the application and inference cost does not grow with traffic, and the
+store keeps working offline.
 
 **Technical docs:** [Architecture](docs/ARCHITECTURE.md) · [Getting started for developers](docs/GETTING_STARTED.md) · [Python library and CLI](docs/USAGE.md) · [Security and privacy](docs/SECURITY-PRIVACY.md) · [Deploy](docs/DEPLOY.md)
 
@@ -55,9 +55,9 @@ hurts most.
 
 1. Open [edge-reco.com](https://edge-reco.com) and click **Launch the live demo**. This
    opens the EdgeReco demo store with 100,000 products across 12 departments. The
-   first launch fetches a 4.7 MB starter, then upgrades to the full catalog and loads
-   the small language model on the first semantic search, so give it a moment. Later
-   visits start from the copy in your browser.
+   first launch streams the 100,000-product catalog into OPFS and loads the small
+   language model on the first semantic search, so give it a moment. Later visits
+   start from the copy in your browser.
 2. Type `something for my aching back` in the search box and press Enter.
 
 ![The EdgeReco demo store after searching "something for my aching back": a neck and back massager is the first result, then a stadium seat with back support. The strip under the search box reads 0 backend calls and 100,000 catalog.](docs/assets/search-aching-back.png)
@@ -120,9 +120,10 @@ a separate, unrelated project (it hides personal data in AI prompts).
   approximate index, and the whole catalog database is downloaded.
 - **Private catalogs.** Every shopper gets the full catalog file, so anything in it is
   public.
-- **Low-memory phones.** A first visit fetches a 4.7 MB starter, then about 36 MB of
-  full catalog plus a ~24 MB model in the background; it needs real memory and has not
-  been measured on physical phones yet.
+- **Private Browsing / disabled local storage.** The 100,000-product catalog streams
+  directly into a file-backed OPFS SQLite database (~32.6 MB on the wire, ~24 MB model on
+  first semantic search) so memory stays bounded on phones and desktops; Private Browsing
+  blocks OPFS and displays a warning to reopen in a normal tab.
 - **A hosted service.** You build the catalog and host the static files yourself.
 - **Merchandising tools.** There is no dashboard, A/B testing or manual boosting. Ranking
   is tuned by editing weights in the signed catalog.

@@ -30,11 +30,14 @@ import { readTasteEvents } from "../signals/tasteLog";
 import {
 	__setRuntimeForTests,
 	bootstrap,
+	bootstrapApp,
 	browse,
+	canUseOpfs,
 	catalog,
 	catalogInfo,
 	clearCatalogCache,
 	isIosPlatform,
+	productById,
 	rankingProofEvidence,
 	recommend,
 	recommendStrategy,
@@ -829,5 +832,142 @@ describe("isIosPlatform", () => {
 			maxTouchPoints: 0,
 		});
 		expect(isIosPlatform()).toBe(false);
+	});
+});
+
+describe("bootstrapApp — synchronized 100k OPFS boot and guarded one-time recovery", () => {
+	afterEach(() => {
+		vi.unstubAllGlobals();
+		__setRuntimeForTests({
+			spawnEngine: () => fakeEnginePort(),
+			makeEmbedder: () => stubEmbedder,
+		});
+	});
+
+	it("recovers once automatically from a local RangeError/catalogue corruption by clearing only catalogue cache, then stops if failure persists", async () => {
+		let syncCalls = 0;
+		const clear = vi.fn(() => Promise.resolve());
+		const deleteFloorDatabase = vi.fn(() => Promise.resolve());
+		const clearCatalogueStorage = vi.fn(() => Promise.resolve("removed"));
+		const base = fakeEnginePort();
+
+		__setRuntimeForTests({
+			spawnEngine: () => ({
+				async sync(...args) {
+					syncCalls += 1;
+					if (syncCalls === 1) {
+						throw new RangeError("Failed to allocate 75124736 bytes");
+					}
+					return base.sync(...args);
+				},
+				readFile: (path) => base.readFile(path),
+				clear,
+			}),
+			makeEmbedder: () => stubEmbedder,
+			deleteFloorDatabase,
+			clearCatalogueStorage,
+		});
+
+		await bootstrapApp();
+		expect(syncCalls).toBe(2);
+		expect(clear).toHaveBeenCalledOnce();
+		expect(deleteFloorDatabase).toHaveBeenCalledOnce();
+		expect(clearCatalogueStorage).toHaveBeenCalledOnce();
+		expect((await catalogInfo()).count).toBeGreaterThan(0);
+
+		// Persistent failure must not loop: clears once, retries once, and rejects.
+		let persistentCalls = 0;
+		const persistentClear = vi.fn(() => Promise.resolve());
+		__setRuntimeForTests({
+			spawnEngine: () => ({
+				async sync() {
+					persistentCalls += 1;
+					throw new RangeError("Failed to allocate 75124736 bytes");
+				},
+				readFile: (path) => base.readFile(path),
+				clear: persistentClear,
+			}),
+			makeEmbedder: () => stubEmbedder,
+			deleteFloorDatabase,
+			clearCatalogueStorage,
+		});
+
+		await expect(bootstrapApp()).rejects.toThrow(
+			/Failed to allocate 75124736 bytes/,
+		);
+		expect(persistentCalls).toBe(2);
+		expect(persistentClear).toHaveBeenCalledOnce();
+	});
+
+	it("boots the full 100k bundle directly when OPFS is available and probes canUseOpfs()", async () => {
+		vi.stubGlobal("navigator", {
+			userAgent:
+				"Mozilla/5.0 (iPhone; CPU iPhone OS 18_0 like Mac OS X) AppleWebKit/605.1.15",
+			storage: {
+				getDirectory: async () => ({
+					getFileHandle: async () => ({}),
+					removeEntry: async () => undefined,
+				}),
+			},
+		});
+		expect(await canUseOpfs()).toBe(true);
+
+		const syncedUrls: string[] = [];
+		const base = fakeEnginePort();
+		__setRuntimeForTests({
+			spawnEngine: () => ({
+				async sync(...args) {
+					syncedUrls.push(args[0]);
+					return base.sync(...args);
+				},
+				readFile: (path) => base.readFile(path),
+			}),
+			makeEmbedder: () => stubEmbedder,
+		});
+
+		await bootstrapApp();
+		expect(syncedUrls).toHaveLength(1);
+		expect(syncedUrls[0]?.endsWith("-starter")).toBe(false);
+		const first = catalog()[0];
+		if (first !== undefined) {
+			expect((await productById(first.id))?.id).toBe(first.id);
+		}
+		expect(await productById("missing-id")).toBeNull();
+
+		vi.stubGlobal("navigator", {
+			userAgent:
+				"Mozilla/5.0 (iPhone; CPU iPhone OS 18_0 like Mac OS X) AppleWebKit/605.1.15",
+			storage: {
+				getDirectory: async () => ({
+					getFileHandle: async () => {
+						throw new Error("no opfs");
+					},
+					removeEntry: async () => undefined,
+				}),
+			},
+		});
+		expect(await canUseOpfs()).toBe(false);
+
+		// When starter is unavailable (404) on limited-OPFS WebKit, falls back to full;
+		// non-recoverable errors (e.g. rollback or string) do not trigger auto-recovery.
+		let callCount = 0;
+		const clear = vi.fn(() => Promise.resolve());
+		__setRuntimeForTests({
+			spawnEngine: () => ({
+				async sync(...args) {
+					callCount += 1;
+					if (callCount === 1) {
+						throw new Error("starter 404");
+					}
+					return base.sync(...args);
+				},
+				readFile: (path) => base.readFile(path),
+				clear,
+			}),
+			makeEmbedder: () => stubEmbedder,
+		});
+		await bootstrapApp();
+		expect(callCount).toBe(2);
+		expect(clear).not.toHaveBeenCalled();
 	});
 });

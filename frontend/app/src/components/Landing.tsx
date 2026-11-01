@@ -6,7 +6,6 @@ import {
 	LANDING_METRICS,
 	MODEL_DOWNLOAD,
 	type RepresentativeMetric,
-	STARTER_BUNDLE,
 } from "../metrics/landing-figures";
 
 interface LandingProps {
@@ -103,7 +102,6 @@ export function Landing({ onLaunch }: LandingProps) {
 							</p>
 							<p className="landing__footnote">
 								{t("footnote", {
-									starterBundle: STARTER_BUNDLE,
 									bundle: BUNDLE_SIZE,
 									model: MODEL_DOWNLOAD,
 								})}

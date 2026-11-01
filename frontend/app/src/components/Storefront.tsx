@@ -8,7 +8,6 @@ import {
 	canUseOpfs,
 	catalog,
 	catalogInfo,
-	isIosPlatform,
 	productById,
 	rankingProofEvidence,
 	recommendStrategy,
@@ -173,7 +172,6 @@ export function Storefront() {
 	const [error, setError] = useState<string | null>(null);
 	const [toast, setToast] = useState<string | null>(null);
 	const [applyingDelta, setApplyingDelta] = useState(false);
-	const [catalogSize, setCatalogSize] = useState(0);
 	const [storageLimited, setStorageLimited] = useState(false);
 	const [syncEpoch, setSyncEpoch] = useState(0);
 	const toastTimer = useRef<number | undefined>(undefined);
@@ -334,7 +332,6 @@ export function Storefront() {
 		record({ backendCalls: 0 });
 		void catalogInfo().then(({ count }) => {
 			record({ productCount: count });
-			setCatalogSize(count);
 		});
 		return stop;
 	}, [syncEpoch]);
@@ -598,7 +595,7 @@ export function Storefront() {
 			)}
 
 			<MetricsStrip
-				{...(isIosPlatform() || catalogSize <= 600 ? {} : { onApplyDelta })}
+				{...(storageLimited ? {} : { onApplyDelta })}
 				applyingDelta={applyingDelta}
 			/>
 

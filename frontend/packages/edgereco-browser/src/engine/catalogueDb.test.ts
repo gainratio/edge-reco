@@ -6,7 +6,7 @@
 // so the CONTRACT CHANGE is visible side by side: FTS5's bm25 has k1=1.2, b=0.75
 // and floors a non-positive IDF to 1e-6 instead of epsilon * mean IDF.
 
-import { beforeEach, describe, expect, it } from "vitest";
+import { beforeEach, describe, expect, it, vi } from "vitest";
 import {
 	CatalogueDb,
 	type CatalogueProduct,
@@ -15,7 +15,7 @@ import {
 	RRF_K,
 	SqlSwapTimeoutError,
 } from "./catalogueDb";
-import { openCatalogueSql } from "./catalogueSql";
+import { importCatalogueSqlFromChunks, openCatalogueSql } from "./catalogueSql";
 import { DEFAULT_RANKING_CONFIG } from "./rankingConfig";
 import { createSearchEngine } from "./searchEngine";
 import { emptyProfile } from "./session";
@@ -605,5 +605,136 @@ describe("openCatalogueStore", () => {
 			sqlite: sqliteBytes,
 		});
 		await engine.dispose();
+	});
+
+	it("streams SQLite chunks via importSqliteFromChunks() with synchronized close -> import -> reopen and bounded chunk size", async () => {
+		const sourceSql = await openCatalogueSql();
+		const sourceDb = await CatalogueDb.open(sourceSql, 2);
+		await sourceDb.replace({ products: PRODUCTS, vectors: VECTORS });
+		const sqliteBytes = await sourceSql.exportDatabase?.();
+		await sourceDb.dispose();
+		if (sqliteBytes === undefined) {
+			throw new Error("expected exportDatabase");
+		}
+
+		const events: string[] = [];
+		let maxChunkBytes = 0;
+		const initialSql = await openCatalogueSql();
+		const origClose = initialSql.close.bind(initialSql);
+		initialSql.close = async () => {
+			events.push("close");
+			await origClose();
+		};
+
+		const targetDb = await CatalogueDb.open(initialSql, 2, undefined, {
+			openSql: async () => {
+				events.push("reopen");
+				return openCatalogueSql();
+			},
+			importStream: async (chunks) => {
+				events.push("import-stream");
+				async function* tracked() {
+					for await (const chunk of chunks) {
+						maxChunkBytes = Math.max(maxChunkBytes, chunk.byteLength);
+						yield chunk;
+					}
+				}
+				return importCatalogueSqlFromChunks(tracked());
+			},
+		});
+
+		async function* sliceChunks(bytes: Uint8Array, chunkSize: number) {
+			for (let offset = 0; offset < bytes.byteLength; offset += chunkSize) {
+				yield bytes.subarray(
+					offset,
+					Math.min(offset + chunkSize, bytes.byteLength),
+				);
+			}
+		}
+
+		await targetDb.importSqliteFromChunks(sliceChunks(sqliteBytes, 256), {
+			revisionKey: "rev-stream-1",
+		});
+		expect(events).toEqual(["close", "import-stream", "reopen"]);
+		expect(maxChunkBytes).toBeLessThanOrEqual(256);
+		expect(await targetDb.count()).toBe(5);
+		expect(await targetDb.activateRevision("rev-stream-1", 5)).toBe(true);
+		expect((await lexical(targetDb, "polo")).map((h) => h.id)).toEqual(["a"]);
+
+		// A failed stream import still reopens the SQL connection and keeps the prior revision searchable.
+		async function* corruptChunks() {
+			yield new Uint8Array([1, 2, 3, 4]);
+		}
+		await expect(
+			targetDb.importSqliteFromChunks(corruptChunks()),
+		).rejects.toThrow(/not a SQLite database/);
+		expect(await targetDb.count()).toBe(5);
+		await targetDb.dispose();
+	});
+
+	it("rejects streamed SQLite images missing required tables or with invalid embedding byte lengths", async () => {
+		const badSql = await openCatalogueSql();
+		await badSql.exec("CREATE TABLE only_other(id TEXT);");
+		const missingTablesBytes = await badSql.exportDatabase?.();
+		await badSql.close();
+		if (missingTablesBytes === undefined) {
+			throw new Error("expected exportDatabase");
+		}
+
+		async function* singleChunk(bytes: Uint8Array) {
+			yield bytes;
+		}
+
+		const db1 = await fresh();
+		await expect(
+			db1.importSqliteFromChunks(singleChunk(missingTablesBytes)),
+		).rejects.toThrow(/missing required products\/products_fts tables/);
+		await db1.dispose();
+
+		const badDimSql = await openCatalogueSql();
+		const badDimDb = await CatalogueDb.open(badDimSql, 4);
+		await badDimDb.replace({
+			products: [product("a", "alpha")],
+			vectors: new Float32Array([1, 0, 0, 0]),
+		});
+		const wrongDimBytes = await badDimSql.exportDatabase?.();
+		await badDimDb.dispose();
+		if (wrongDimBytes === undefined) {
+			throw new Error("expected exportDatabase");
+		}
+
+		const db2 = await fresh(); // dimension = 2 (expects 8 or 2 bytes, not 16)
+		await expect(
+			db2.importSqliteFromChunks(singleChunk(wrongDimBytes)),
+		).rejects.toThrow(/embedding byte length outside/);
+		await db2.dispose();
+	});
+
+	it("falls back to in-memory importSqlite when a secondary tab holds a memory connection and navigator.locks is present", async () => {
+		const sourceSql = await openCatalogueSql();
+		const sourceDb = await CatalogueDb.open(sourceSql, 2);
+		await sourceDb.replace({ products: PRODUCTS, vectors: VECTORS });
+		const sqliteBytes = await sourceSql.exportDatabase?.();
+		await sourceDb.dispose();
+		if (sqliteBytes === undefined) {
+			throw new Error("expected exportDatabase");
+		}
+
+		const secondarySql = await openCatalogueSql();
+		Object.defineProperty(secondarySql, "storage", {
+			value: { persistence: "memory", reason: "pool-in-use" },
+		});
+		const db = await CatalogueDb.open(secondarySql, 2);
+		const spy = vi.spyOn(db, "importSqlite");
+		const firstHalf = sqliteBytes.subarray(0, 100);
+		const secondHalf = sqliteBytes.subarray(100);
+		async function* chunks() {
+			yield firstHalf;
+			yield secondHalf;
+		}
+		await db.importSqliteFromChunks(chunks(), { revisionKey: "rev-mem" });
+		expect(spy).toHaveBeenCalledOnce();
+		expect(await db.count()).toBe(5);
+		await db.dispose();
 	});
 });

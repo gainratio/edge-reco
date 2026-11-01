@@ -17,12 +17,21 @@
 // are offline-capable (a re-sync over a reachable origin fetches zero chunks).
 
 import {
+	type ChunkRef,
+	decompressAndVerify,
 	EngineClient,
 	EngineWorker,
+	type FetchBytes,
+	type FileEntry,
 	fetchBytes,
+	IntegrityError,
+	MAX_DECOMPRESSED_CHUNK_BYTES,
 	MAX_TRUST_ROOT_BYTES,
+	NetworkError,
 	parseTrustRoot,
+	SyncCapError,
 	type SyncResult,
+	sha256Hex,
 } from "../gainratio";
 import { deleteBundleFloorDatabase } from "./cacheFloor";
 import {
@@ -30,6 +39,7 @@ import {
 	type CatalogueStoreFactory,
 	openCatalogueStore,
 } from "./catalogueDb";
+import { clearCatalogueSqlStorage } from "./catalogueSql";
 import { type CooccurrenceMatrix, parseCooccurrence } from "./cooccurrence";
 import { createEmbedder, type Embedder } from "./embedder";
 import { createWorkerEmbedder, spawnEmbedderWorker } from "./embedderClient";
@@ -55,6 +65,22 @@ const RANKING_CONFIG_PATH = "ranking_config.json";
 const RANKING_RECEIPT_PATH = RANKING_RECEIPT_NAME;
 /** The signed co-occurrence matrix; absent on bundles that predate Phase 3. */
 const COOCCURRENCE_PATH = "cooccurrence.json";
+/**
+ * Small JSON metadata files materialized through the sync Worker's chunk store.
+ * The canonical `catalogue.sqlite` is streamed chunk-by-chunk directly into the
+ * SQLite Worker's OPFS database (`streamBundleSqliteChunks`) so neither Worker
+ * ever allocates a 75 MB full-file buffer in memory.
+ */
+const SYNC_METADATA_PATHS: ReadonlyArray<string> = [
+	META_PATH,
+	RANKING_CONFIG_PATH,
+	RANKING_RECEIPT_PATH,
+	COOCCURRENCE_PATH,
+];
+const MAX_MANIFEST_BYTES = 1024 * 1024;
+const MAX_COMPRESSED_CHUNK_BYTES = 2 * MAX_DECOMPRESSED_CHUNK_BYTES + 4096;
+const CHUNK_FETCH_ATTEMPTS = 2;
+const SHA256_HEX_RE = /^[0-9a-f]{64}$/;
 
 /** Any non-empty string warms the ONNX session; content is discarded. */
 const WARMUP_PROMPT = "warm up the model";
@@ -83,6 +109,11 @@ export interface RuntimeConfig {
 	readonly deferEmbedder?: boolean;
 }
 
+/** Optional sync options forwarded to `EngineClient.sync`. */
+export interface EngineSyncOptions {
+	readonly wantedPaths?: ReadonlyArray<string>;
+}
+
 /** The sync-Worker surface bootstrap needs: pull the bundle, read its files. */
 export interface EnginePort {
 	sync(
@@ -90,6 +121,7 @@ export interface EnginePort {
 		pubkeyUrl: string,
 		expectedBundleId?: string,
 		expectedChannel?: string,
+		options?: EngineSyncOptions,
 	): Promise<SyncResult>;
 	readFile(path: string): Promise<Uint8Array>;
 	/**
@@ -122,6 +154,16 @@ export interface RuntimeDeps {
 	 * `deleteBundleFloorDatabase` (cacheFloor.ts).
 	 */
 	readonly deleteFloorDatabase?: () => Promise<void>;
+	/**
+	 * Clear the local catalogue SQLite OPFS pool (`edgereco-catalogue`) while
+	 * preserving `edgereco-user` taste data. Defaults to `clearCatalogueSqlStorage`.
+	 */
+	readonly clearCatalogueStorage?: () => Promise<unknown>;
+	/**
+	 * Optional byte fetcher for streaming verified `catalogue.sqlite` chunks
+	 * directly into the SQLite Worker. Defaults to `@gainratio/browser`'s `fetchBytes`.
+	 */
+	readonly fetchBytes?: FetchBytes;
 }
 
 // `no-store`, matching upstream `loadTrustRoot`: the trust root is where a key is
@@ -153,6 +195,152 @@ export function defaultRuntimeDeps(): RuntimeDeps {
 interface ReadBundleResult {
 	readonly files: VectorIndexFiles;
 	readonly preopenedStore: CatalogueStore | null;
+}
+
+export interface StreamBundleSqliteChunksOptions {
+	readonly baseUrl: string;
+	readonly manifestHash: string;
+	readonly fetchBytes?: FetchBytes;
+	readonly path?: string;
+}
+
+async function fetchWithRetry(
+	fetchFn: FetchBytes,
+	url: string,
+	maxBytes: number,
+): Promise<Uint8Array> {
+	let lastError: unknown;
+	for (let attempt = 1; attempt <= CHUNK_FETCH_ATTEMPTS; attempt += 1) {
+		try {
+			return await fetchFn(url, { maxBytes });
+		} catch (error) {
+			lastError = error;
+			if (!(error instanceof NetworkError) || attempt >= CHUNK_FETCH_ATTEMPTS) {
+				throw error;
+			}
+		}
+	}
+	throw lastError;
+}
+
+function parseManifestFileEntry(
+	manifestBytes: Uint8Array,
+	targetPath: string,
+): FileEntry {
+	let parsed: unknown;
+	try {
+		parsed = JSON.parse(new TextDecoder().decode(manifestBytes));
+	} catch (error) {
+		throw new IntegrityError(
+			`manifest is not valid JSON: ${error instanceof Error ? error.message : String(error)}`,
+		);
+	}
+	if (typeof parsed !== "object" || parsed === null || Array.isArray(parsed)) {
+		throw new IntegrityError("manifest must be a JSON object");
+	}
+	const files = (parsed as { readonly files?: unknown }).files;
+	if (!Array.isArray(files)) {
+		throw new IntegrityError("manifest.files must be an array");
+	}
+	const entry = files.find(
+		(candidate): candidate is FileEntry =>
+			typeof candidate === "object" &&
+			candidate !== null &&
+			(candidate as { readonly path?: unknown }).path === targetPath,
+	);
+	if (entry === undefined) {
+		throw new Error(`file ${targetPath} not in manifest`);
+	}
+	if (
+		typeof entry.size !== "number" ||
+		!Number.isSafeInteger(entry.size) ||
+		entry.size < 0 ||
+		!Array.isArray(entry.chunks)
+	) {
+		throw new IntegrityError(`manifest entry ${targetPath} is malformed`);
+	}
+	let sum = 0;
+	for (const ref of entry.chunks as ReadonlyArray<ChunkRef>) {
+		if (
+			typeof ref !== "object" ||
+			ref === null ||
+			typeof ref.hash !== "string" ||
+			!SHA256_HEX_RE.test(ref.hash) ||
+			typeof ref.size !== "number" ||
+			!Number.isInteger(ref.size) ||
+			ref.size <= 0
+		) {
+			throw new IntegrityError(
+				`manifest entry ${targetPath} has malformed chunk ref`,
+			);
+		}
+		if (ref.size > MAX_DECOMPRESSED_CHUNK_BYTES) {
+			throw new SyncCapError(
+				`chunk ${ref.hash} declares size ${ref.size} > cap ${MAX_DECOMPRESSED_CHUNK_BYTES}`,
+			);
+		}
+		sum += ref.size;
+	}
+	if (sum !== entry.size) {
+		throw new IntegrityError(
+			`manifest entry ${targetPath} chunk sizes sum to ${sum}, expected ${entry.size}`,
+		);
+	}
+	return entry;
+}
+
+/**
+ * Stream verified `catalogue.sqlite` chunks one at a time directly from the
+ * bundle origin. The manifest is hash-verified against `manifestHash` (which
+ * the sync Worker already verified against the signed `latest` pointer), and
+ * each chunk is zstd-decompressed and SHA-256 + byte-length verified via
+ * `decompressAndVerify` before yielding. Peak JS heap is bounded to one chunk
+ * (~60 KB) at a time.
+ */
+export async function* streamBundleSqliteChunks(
+	options: StreamBundleSqliteChunksOptions,
+): AsyncGenerator<Uint8Array> {
+	const fetchFn = options.fetchBytes ?? fetchBytes;
+	const base = options.baseUrl.replace(/\/+$/, "");
+	const targetPath = options.path ?? SQLITE_PATH;
+	if (!SHA256_HEX_RE.test(options.manifestHash)) {
+		throw new IntegrityError(
+			`invalid manifestHash for streamed SQLite bundle: ${options.manifestHash}`,
+		);
+	}
+	const manifestBytes = await fetchWithRetry(
+		fetchFn,
+		`${base}/manifest/${options.manifestHash}`,
+		MAX_MANIFEST_BYTES,
+	);
+	const actualManifestHash = await sha256Hex(manifestBytes);
+	if (actualManifestHash !== options.manifestHash) {
+		throw new IntegrityError(
+			`manifest sha256 mismatch: expected ${options.manifestHash}, got ${actualManifestHash}`,
+		);
+	}
+	const entry = parseManifestFileEntry(manifestBytes, targetPath);
+	for (const ref of entry.chunks) {
+		const compressed = await fetchWithRetry(
+			fetchFn,
+			`${base}/chunk/${ref.hash}`,
+			MAX_COMPRESSED_CHUNK_BYTES,
+		);
+		const plain = await decompressAndVerify(ref.hash, compressed, ref.size);
+		yield plain;
+	}
+}
+
+async function* sliceBytes(
+	bytes: Uint8Array,
+	chunkSize = 65_536,
+): AsyncGenerator<Uint8Array> {
+	for (let offset = 0; offset < bytes.byteLength; offset += chunkSize) {
+		yield bytes.subarray(
+			offset,
+			Math.min(offset + chunkSize, bytes.byteLength),
+		);
+	}
 }
 
 function tryParseMetaCounts(metaBytes: Uint8Array): {
@@ -189,8 +377,57 @@ async function readBundleFiles(
 	options?: {
 		readonly revisionKey?: string;
 		readonly makeCatalogue?: CatalogueStoreFactory;
+		readonly streamedSqlite?: StreamBundleSqliteChunksOptions;
 	},
 ): Promise<ReadBundleResult> {
+	if (options?.streamedSqlite !== undefined) {
+		const meta = await engine.readFile(META_PATH);
+		const parsedMeta = tryParseMetaCounts(meta);
+		const revisionKey = options.revisionKey ?? parsedMeta?.rev;
+		let preopenedStore: CatalogueStore | null = null;
+		if (parsedMeta !== null && options.makeCatalogue !== undefined) {
+			try {
+				preopenedStore = await options.makeCatalogue({
+					dimension: parsedMeta.dim,
+				});
+				if (
+					revisionKey !== undefined &&
+					preopenedStore.activateRevision !== undefined &&
+					(await preopenedStore.activateRevision(revisionKey, parsedMeta.count))
+				) {
+					return {
+						files: {
+							meta,
+							state: new Uint8Array(0),
+							embeddings: new Uint8Array(0),
+							products: new Uint8Array(0),
+							revisionKey,
+							sqliteAlreadyActive: true,
+						},
+						preopenedStore,
+					};
+				}
+			} catch {
+				if (preopenedStore !== null) {
+					await preopenedStore.dispose();
+					preopenedStore = null;
+				}
+			}
+		}
+		const streamOpts = options.streamedSqlite;
+		return {
+			files: {
+				meta,
+				state: new Uint8Array(0),
+				embeddings: new Uint8Array(0),
+				products: new Uint8Array(0),
+				sqliteChunks: () => streamBundleSqliteChunks(streamOpts),
+				...(revisionKey !== undefined ? { revisionKey } : {}),
+			},
+			preopenedStore,
+		};
+	}
+
 	const [meta, state, embeddings, products] = await Promise.all([
 		engine.readFile(META_PATH),
 		readOptionalBundleFile(engine, STATE_PATH),
@@ -244,6 +481,7 @@ async function readBundleFiles(
 						embeddings: new Uint8Array(0),
 						products: new Uint8Array(0),
 						sqlite,
+						sqliteChunks: () => sliceBytes(sqlite),
 						...(revisionKey !== undefined ? { revisionKey } : {}),
 					},
 					preopenedStore,
@@ -278,7 +516,9 @@ async function readBundleFiles(
 			state,
 			embeddings,
 			products,
-			...(sqlite !== undefined ? { sqlite } : {}),
+			...(sqlite !== undefined
+				? { sqlite, sqliteChunks: () => sliceBytes(sqlite) }
+				: {}),
 			...(options?.revisionKey !== undefined
 				? { revisionKey: options.revisionKey }
 				: {}),
@@ -466,12 +706,23 @@ export class EngineRuntime {
 		this.#enginePort = engineClient;
 		try {
 			onStage({ kind: "syncing" });
-			const result = await engineClient.sync(
-				config.bundleBaseUrl,
-				config.pubkeyUrl,
-				config.expectedBundleId,
-				config.expectedChannel,
-			);
+			const useStreamedSqlite =
+				engineClient instanceof EngineClient ||
+				this.#deps.fetchBytes !== undefined;
+			const result = useStreamedSqlite
+				? await engineClient.sync(
+						config.bundleBaseUrl,
+						config.pubkeyUrl,
+						config.expectedBundleId,
+						config.expectedChannel,
+						{ wantedPaths: SYNC_METADATA_PATHS },
+					)
+				: await engineClient.sync(
+						config.bundleBaseUrl,
+						config.pubkeyUrl,
+						config.expectedBundleId,
+						config.expectedChannel,
+					);
 			this.#assertCurrent(generation);
 			if (result.manifestHash === this.#manifestHash) {
 				return null;
@@ -479,7 +730,20 @@ export class EngineRuntime {
 			onStage({ kind: "synced", result });
 			onStage({ kind: "reassembling" });
 			const [{ files }, rankingConfig, cooccurrence] = await Promise.all([
-				readBundleFiles(engineClient, { revisionKey: result.manifestHash }),
+				readBundleFiles(engineClient, {
+					revisionKey: result.manifestHash,
+					...(useStreamedSqlite
+						? {
+								streamedSqlite: {
+									baseUrl: config.bundleBaseUrl,
+									manifestHash: result.manifestHash,
+									...(this.#deps.fetchBytes !== undefined
+										? { fetchBytes: this.#deps.fetchBytes }
+										: {}),
+								},
+							}
+						: {}),
+				}),
 				readRankingConfig(engineClient),
 				readCooccurrence(engineClient),
 			]);
@@ -512,12 +776,23 @@ export class EngineRuntime {
 			engineClient = this.#deps.spawnEngine();
 			this.#enginePort = engineClient;
 			onStage({ kind: "syncing" });
-			const result = await engineClient.sync(
-				config.bundleBaseUrl,
-				config.pubkeyUrl,
-				config.expectedBundleId,
-				config.expectedChannel,
-			);
+			const useStreamedSqlite =
+				engineClient instanceof EngineClient ||
+				this.#deps.fetchBytes !== undefined;
+			const result = useStreamedSqlite
+				? await engineClient.sync(
+						config.bundleBaseUrl,
+						config.pubkeyUrl,
+						config.expectedBundleId,
+						config.expectedChannel,
+						{ wantedPaths: SYNC_METADATA_PATHS },
+					)
+				: await engineClient.sync(
+						config.bundleBaseUrl,
+						config.pubkeyUrl,
+						config.expectedBundleId,
+						config.expectedChannel,
+					);
 			this.#assertCurrent(generation);
 			onStage({ kind: "synced", result });
 
@@ -526,6 +801,17 @@ export class EngineRuntime {
 				readBundleFiles(engineClient, {
 					revisionKey: result.manifestHash,
 					makeCatalogue: this.#deps.makeCatalogue ?? openCatalogueStore,
+					...(useStreamedSqlite
+						? {
+								streamedSqlite: {
+									baseUrl: config.bundleBaseUrl,
+									manifestHash: result.manifestHash,
+									...(this.#deps.fetchBytes !== undefined
+										? { fetchBytes: this.#deps.fetchBytes }
+										: {}),
+								},
+							}
+						: {}),
 				}),
 				readRankingConfig(engineClient),
 				readCooccurrence(engineClient),
@@ -660,6 +946,7 @@ export class EngineRuntime {
 			disposeResource(port);
 		}
 		await (this.#deps.deleteFloorDatabase ?? deleteBundleFloorDatabase)();
+		await (this.#deps.clearCatalogueStorage ?? clearCatalogueSqlStorage)();
 	}
 
 	/**

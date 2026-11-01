@@ -14,13 +14,13 @@ async function reset() {
 			const names = await caches.keys();
 			await Promise.all(names.map((name) => caches.delete(name)));
 		}
-		// The old OPFS catalogue/delta state is what triggers the iOS memory
-		// failure; clear it as part of the reset. This also clears the local
-		// taste log — acceptable for a full recovery.
+		// Clear only the disposable OPFS catalogue and sync chunk stores while
+		// preserving the user's on-device taste database (`edgereco-user`).
 		if (navigator.storage?.getDirectory) {
 			const root = await navigator.storage.getDirectory();
+			const userPool = ".edgeproc-sql-52599d7379eb37c73d8f1de4886b1cd0";
 			for await (const [name, handle] of root.entries()) {
-				if (handle.kind === "directory") {
+				if (handle.kind === "directory" && name !== userPool) {
 					await root.removeEntry(name, { recursive: true });
 				}
 			}
