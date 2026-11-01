@@ -27,7 +27,7 @@
 		"measure:live": "node scripts/measure-live-boot.mjs"
 	},
 	"dependencies": {
-		"@gainratio/browser": "^0.4.2",
+		"@gainratio/browser": "^0.4.4",
 		"@edgereco/browser": "workspace:*",
 		"@gainratio/errors": "^0.3.1",
 		"@huggingface/transformers": "^4.2.0",
