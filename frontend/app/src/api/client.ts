@@ -675,12 +675,12 @@ export async function bootstrapApp(onStage?: OnStage): Promise<void> {
 	// hot-swap then exhausts the tab; keep the verified starter instead. Real
 	// Safari has OPFS and still upgrades; Playwright's WebKit does not.
 	void canUseOpfs().then((available) => {
-		// Chromium's OPFS is reliable; only suppress the upgrade when WebKit
-		// cannot persist (its SQLite fallback would otherwise become an
-		// in-memory 100k catalogue). Real Safari with OPFS still upgrades.
-		if (!available && isWebKit()) {
+		// iOS Safari has OPFS, but its process memory budget cannot hold the
+		// 100k hot-swap plus the model. Keep the 504-product starter on iOS;
+		// desktop Safari/Chromium still upgrade when OPFS is available.
+		if (isIos() || (!available && isWebKit())) {
 			console.info(
-				"[edge-reco] WebKit has no OPFS; full catalog upgrade skipped and starter catalog stays active",
+				"[edge-reco] iOS/limited OPFS: full catalog upgrade skipped and starter catalog stays active",
 			);
 			return;
 		}
@@ -699,6 +699,13 @@ export async function bootstrapApp(onStage?: OnStage): Promise<void> {
 		};
 		upgrade(0);
 	});
+}
+
+function isIos(): boolean {
+	if (typeof navigator === "undefined") return false;
+	if (/iPhone|iPad|iPod/i.test(navigator.userAgent)) return true;
+	// iPadOS reports as Macintosh; touch points distinguish it from a Mac.
+	return navigator.platform === "MacIntel" && navigator.maxTouchPoints > 1;
 }
 
 function isWebKit(): boolean {
