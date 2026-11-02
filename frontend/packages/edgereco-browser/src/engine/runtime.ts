@@ -766,7 +766,6 @@ export class EngineRuntime {
 	#enginePort: EnginePort | null = null;
 	#embedder: Embedder | null = null;
 	#chunkBaseUrlByHash = new Map<string, string>();
-	#seedChunkBaseUrlByHash = new Map<string, string>();
 	#generation = 0;
 
 	public constructor(deps: RuntimeDeps = defaultDeps) {
@@ -946,9 +945,6 @@ export class EngineRuntime {
 						result: rawResult,
 						previousChunkBaseUrls: this.#chunkBaseUrlByHash,
 					};
-			if (this.#seedChunkBaseUrlByHash.size === 0) {
-				this.#seedChunkBaseUrlByHash = new Map(this.#chunkBaseUrlByHash);
-			}
 			this.#assertCurrent(generation);
 			onStage({ kind: "synced", result });
 
@@ -1044,7 +1040,6 @@ export class EngineRuntime {
 		this.#enginePromise = null;
 		this.#manifestHash = null;
 		this.#chunkBaseUrlByHash.clear();
-		this.#seedChunkBaseUrlByHash.clear();
 		const ready = this.#ready;
 		this.#ready = null;
 		if (ready !== null) {
@@ -1107,7 +1102,6 @@ export class EngineRuntime {
 		await (this.#deps.deleteFloorDatabase ?? deleteBundleFloorDatabase)();
 		await (this.#deps.clearCatalogueStorage ?? clearCatalogueSqlStorage)();
 		this.#chunkBaseUrlByHash.clear();
-		this.#seedChunkBaseUrlByHash.clear();
 	}
 
 	/**
@@ -1128,7 +1122,7 @@ export class EngineRuntime {
 		}
 		await (this.#deps.deleteFloorDatabase ?? deleteBundleFloorDatabase)();
 		this.#manifestHash = null;
-		this.#chunkBaseUrlByHash = new Map(this.#seedChunkBaseUrlByHash);
+		this.#chunkBaseUrlByHash.clear();
 	}
 
 	/** Release any sync/embedder worker still held while no boot is running. */
