@@ -262,6 +262,53 @@ export function createDataClient(deps: ClientDeps = {}): DataClient {
 	let interactionWeights: InteractionWeights | undefined;
 	// Explicit signals restored from the durable log by the last bootstrap.
 	let replayedSignals = 0;
+	let syncMutex: Promise<unknown> = Promise.resolve();
+
+	function enqueueSync<T>(task: () => Promise<T>): Promise<T> {
+		const next = syncMutex.then(task, task);
+		syncMutex = next.then(
+			() => undefined,
+			() => undefined,
+		);
+		return next;
+	}
+
+	async function runSyncUpdate(
+		onStage: OnStage = () => {},
+		config: RuntimeConfig = appRuntimeConfig(),
+	): Promise<SyncResult | null> {
+		let syncedStage: SyncResult | null = null;
+		const updated = await runtime.syncUpdate(config, (stage) => {
+			warnIfExpired(stage);
+			if (stage.kind === "synced") {
+				syncedStage = stage.result;
+			}
+			onStage(stage);
+		});
+		const statsSource = updated ?? syncedStage;
+		if (statsSource !== null) {
+			record({
+				syncStats: {
+					version: statsSource.version,
+					chunksFetched: statsSource.chunksFetched,
+					chunksReused: statsSource.chunksReused,
+					bytesFetched: statsSource.bytesFetched,
+				},
+			});
+		}
+		const engine = runtime.engine();
+		if (updated !== null && engine !== null) {
+			const catalogList = engine.catalog();
+			if (catalogList.length > 0) {
+				productById = new Map(catalogList.map((p) => [p.id, p]));
+			} else if (productById.size > 0 && engine.productsByIds !== undefined) {
+				productById = await engine.productsByIds([...productById.keys()]);
+			}
+			interactionWeights = engine.interactionWeights();
+			record({ productCount: engine.ntotal });
+		}
+		return updated;
+	}
 
 	function requireEngine(): SearchEngine {
 		const engine = runtime.engine();
@@ -381,65 +428,40 @@ export function createDataClient(deps: ClientDeps = {}): DataClient {
 				(event) => event.type !== "view" && productById.has(event.productId),
 			).length;
 		},
-		async syncUpdate(
+		syncUpdate(
 			onStage: OnStage = () => {},
 			config: RuntimeConfig = appRuntimeConfig(),
 		): Promise<SyncResult | null> {
-			const updated = await runtime.syncUpdate(config, (stage) => {
-				warnIfExpired(stage);
-				if (stage.kind === "synced") {
-					record({
-						syncStats: {
-							version: stage.result.version,
-							chunksFetched: stage.result.chunksFetched,
-							chunksReused: stage.result.chunksReused,
-							bytesFetched: stage.result.bytesFetched,
-						},
-					});
-				}
-				onStage(stage);
-			});
-			const engine = runtime.engine();
-			if (updated !== null && engine !== null) {
-				const catalogList = engine.catalog();
-				if (catalogList.length > 0) {
-					productById = new Map(catalogList.map((p) => [p.id, p]));
-				} else if (productById.size > 0 && engine.productsByIds !== undefined) {
-					productById = await engine.productsByIds([...productById.keys()]);
-				}
-				interactionWeights = engine.interactionWeights();
-				record({ productCount: engine.ntotal });
-			}
-			return updated;
+			return enqueueSync(() => runSyncUpdate(onStage, config));
 		},
-		async applyDeltaPatch(
-			onStage: OnStage = () => {},
-		): Promise<SyncResult | null> {
-			const envConfig = configFromEnv();
-			if (isDeltaBundleChannel()) {
-				setDeltaBundleChannel(false);
-				if (runtime.resetBundleCacheForUpdate !== undefined) {
-					await runtime.resetBundleCacheForUpdate();
-				} else {
-					await runtime.clearBundleCache();
+		applyDeltaPatch(onStage: OnStage = () => {}): Promise<SyncResult | null> {
+			return enqueueSync(async () => {
+				const envConfig = configFromEnv();
+				if (isDeltaBundleChannel()) {
+					setDeltaBundleChannel(false);
+					if (runtime.resetBundleCacheForUpdate !== undefined) {
+						await runtime.resetBundleCacheForUpdate();
+					} else {
+						await runtime.clearBundleCache();
+					}
+					await runtime.syncUpdate(
+						{
+							...envConfig,
+							bundleBaseUrl: resolveBaseBundleUrl(),
+						},
+						undefined,
+						{ skipReload: true },
+					);
 				}
-				await runtime.syncUpdate(
-					{
-						...envConfig,
-						bundleBaseUrl: resolveBaseBundleUrl(),
-					},
-					undefined,
-					{ skipReload: true },
-				);
-			}
-			const updated = await this.syncUpdate(onStage, {
-				...envConfig,
-				bundleBaseUrl: resolveDeltaBundleUrl(),
+				const updated = await runSyncUpdate(onStage, {
+					...envConfig,
+					bundleBaseUrl: resolveDeltaBundleUrl(),
+				});
+				if (updated !== null) {
+					setDeltaBundleChannel(true);
+				}
+				return updated;
 			});
-			if (updated !== null) {
-				setDeltaBundleChannel(true);
-			}
-			return updated;
 		},
 		async clearCatalogCache(): Promise<void> {
 			setDeltaBundleChannel(false);

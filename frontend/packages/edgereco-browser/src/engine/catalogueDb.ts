@@ -40,6 +40,9 @@ import type { SessionProfile } from "./session";
 /** Default gate timeout (ms) while an atomic catalogue swap is in flight. */
 export const DEFAULT_SWAP_TIMEOUT_MS = 150;
 
+/** Default gate timeout (ms) while streaming a multi-MB SQLite image to OPFS. */
+const DEFAULT_STREAM_SWAP_TIMEOUT_MS = 60_000;
+
 export interface CatalogueSwapOptions {
 	/**
 	 * Maximum time in milliseconds a concurrent query may wait behind an active
@@ -700,7 +703,7 @@ export class CatalogueDb implements CatalogueStore {
 		chunks: AsyncIterable<Uint8Array>,
 		options?: CatalogueSwapOptions,
 	): Promise<void> {
-		const timeoutMs = options?.swapTimeoutMs ?? DEFAULT_SWAP_TIMEOUT_MS;
+		const timeoutMs = options?.swapTimeoutMs ?? DEFAULT_STREAM_SWAP_TIMEOUT_MS;
 		const storageReason = (this.#sql.storage as { readonly reason?: string })
 			.reason;
 		const canStreamToOpfs =
