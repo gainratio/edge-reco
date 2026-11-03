@@ -1,0 +1,32 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>On-Device Search & Recommendations — No Backend | EdgeReco</title>
+<meta name="description" content="Run product search and recommendations entirely in the shopper's browser. Signed catalog bundles, SQLite vector search, zero backend calls after sync." />
+<link rel="canonical" href="https://edge-reco.com/on-device-search" />
+<meta name="robots" content="index,follow" />
+<meta property="og:type" content="article" />
+<meta property="og:title" content="On-Device Search & Recommendations — No Backend" />
+<meta property="og:description" content="Product search and recommendations that run in the browser, not on a paid server." />
+<meta property="og:url" content="https://edge-reco.com/on-device-search" />
+<style>body{font:16px/1.6 system-ui,sans-serif;max-width:760px;margin:4rem auto;padding:0 1.25rem;color:#171717}h1{font-size:2.2rem;line-height:1.2}a{color:#c2410c}</style>
+<script type="application/ld+json">{"@context":"https://schema.org","@type":"WebPage","name":"On-Device Search & Recommendations","url":"https://edge-reco.com/on-device-search","isPartOf":{"@type":"WebSite","name":"EdgeReco","url":"https://edge-reco.com/"},"about":{"@type":"SoftwareApplication","name":"EdgeReco","applicationCategory":"BusinessApplication","operatingSystem":"Web browser"}}</script>
+</head>
+<body>
+<p><a href="/">EdgeReco</a></p>
+<h1>On-device search and recommendations</h1>
+<p>EdgeReco moves product search, ranking, and recommendations out of a paid backend and into each shopper's browser. A store publishes one signed catalog bundle; the browser verifies it, stores it locally, and answers queries from SQLite with FTS5 and vector search.</p>
+<h2>What runs locally</h2>
+<ul>
+<li>Keyword search with SQLite FTS5</li>
+<li>Vector similarity with sqlite-vector</li>
+<li>Session-aware ranking and recommendations</li>
+<li>Offline operation after the first sync</li>
+</ul>
+<h2>Why it matters</h2>
+<p>No per-query server cost, no catalog API latency, and no upload of shopper behavior. The engine is open source and the bundle is content-addressed and signature-verified.</p>
+<p><a href="/">Try the live storefront</a> · <a href="https://github.com/gainratio/edge-reco">Source on GitHub</a></p>
+</body>
+</html>
