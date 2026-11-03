@@ -28,6 +28,12 @@ export function Footer() {
 			<nav className="nimbus-footer__links" aria-label={t("footer.navLabel")}>
 				<a
 					className="nimbus-footer__link"
+					href="https://open-source.gainratio.com/edge-reco/"
+				>
+					Open-source project page
+				</a>
+				<a
+					className="nimbus-footer__link"
 					href="https://github.com/gainratio/edge-reco"
 				>
 					{t("footer.links.repo")}
