@@ -24,13 +24,13 @@
 		"@huggingface/transformers": "^4.2.0"
 	},
 	"devDependencies": {
-		"@biomejs/biome": "^2.5.15",
-		"@types/node": "^26.6.4",
+		"@biomejs/biome": "^2.6.3",
+		"@types/node": "^26.6.5",
 		"@vitejs/plugin-react": "^6.1.2",
-		"@vitest/coverage-v8": "^5.0.3",
-		"jsdom": "^30.1.2",
+		"@vitest/coverage-v8": "^5.0.5",
+		"jsdom": "^30.1.3",
 		"typescript": "~7.0.2",
-		"vite": "^8.3.3",
-		"vitest": "^5.0.3"
+		"vite": "^8.3.5",
+		"vitest": "^5.0.5"
 	}
 }
