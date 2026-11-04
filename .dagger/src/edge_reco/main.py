@@ -455,8 +455,7 @@ class EdgeReco:
     def _python(self, source: dagger.Directory) -> dagger.Container:
         base = self._python_toolchain().with_directory("/src", source).with_workdir("/src/backend")
         base = base.with_env_variable("UV_PROJECT_ENVIRONMENT", "/opt/venv")
-        base = base.with_mounted_cache("/root/.cache/uv", dag.cache_volume("edge-reco-uv"))
-        return base.with_exec(["uv", "sync", "--group", "dev"]).with_exec(list(ASSAY_INSTALL))
+        return base.with_exec(["uv", "sync", "--no-cache", "--group", "dev"]).with_exec(list(ASSAY_INSTALL))
 
     def _python_toolchain(self) -> dagger.Container:
         base = dag.container().from_(PYTHON_IMAGE).with_exec(["apt-get", "update"])

@@ -16,6 +16,7 @@ const ROUTES = [
 	{ path: "/edgeproc", file: "edgeproc.html" },
 	{ path: "/github", file: "github.html" },
 	{ path: "/faq", file: "faq.html" },
+	{ path: "/on-device-search", file: "on-device-search.html" },
 ];
 
 const SOCIAL_ROUTES = ROUTES.filter(({ path }) => path !== "/");
