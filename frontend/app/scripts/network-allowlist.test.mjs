@@ -51,6 +51,7 @@ const ALLOWED_URL_HOSTS = new Map([
 	["edge-reco.invalid", "a reserved placeholder origin for URL parsing"],
 	["aml-filter.com", "sibling-site link"],
 	["almamesh.com", "sibling-site link"],
+	["open-source.gainratio.com", "open-source hub link"],
 	[
 		"schema.org",
 		"JSON-LD @context identifier in the static pages, not a request",
