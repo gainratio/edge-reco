@@ -297,6 +297,12 @@ function parseManifestFileEntry(
 	return entry;
 }
 
+function trimTrailingSlashes(value: string): string {
+	let end = value.length;
+	while (end > 0 && value.charCodeAt(end - 1) === 47) end -= 1;
+	return end === value.length ? value : value.slice(0, end);
+}
+
 async function applyManifestChunkAccounting(
 	rawResult: SyncResult,
 	baseUrl: string,
@@ -307,7 +313,7 @@ async function applyManifestChunkAccounting(
 	readonly previousChunkBaseUrls: ReadonlyMap<string, string>;
 }> {
 	const previousChunkBaseUrls = new Map(chunkBaseUrlByHash);
-	const base = baseUrl.replace(/\/+$/, "");
+	const base = trimTrailingSlashes(baseUrl);
 	if (!SHA256_HEX_RE.test(rawResult.manifestHash)) {
 		return { result: rawResult, previousChunkBaseUrls };
 	}
@@ -381,7 +387,9 @@ async function fetchAndVerifyChunk(
 	fetchFn: FetchBytes,
 	cachedChunkBaseUrls?: ReadonlyMap<string, string>,
 ): Promise<Uint8Array> {
-	const cachedBase = cachedChunkBaseUrls?.get(ref.hash)?.replace(/\/+$/, "");
+	const cachedUrl = cachedChunkBaseUrls?.get(ref.hash);
+	const cachedBase =
+		cachedUrl === undefined ? undefined : trimTrailingSlashes(cachedUrl);
 	let compressed: Uint8Array;
 	if (cachedBase !== undefined && cachedBase !== base) {
 		try {
@@ -416,7 +424,7 @@ export async function* streamBundleSqliteChunks(
 	options: StreamBundleSqliteChunksOptions,
 ): AsyncGenerator<Uint8Array> {
 	const fetchFn = options.fetchBytes ?? fetchBytes;
-	const base = options.baseUrl.replace(/\/+$/, "");
+	const base = trimTrailingSlashes(options.baseUrl);
 	const targetPath = options.path ?? SQLITE_PATH;
 	if (!SHA256_HEX_RE.test(options.manifestHash)) {
 		throw new IntegrityError(
