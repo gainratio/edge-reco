@@ -226,7 +226,8 @@ const BROWSE_CATEGORIES_SQL = `
 const MIN_TURBOQUANT_ROWS = 256;
 
 const FULL_SCAN_PREFIX = "vector_full_scan('products', 'embedding'";
-const QUANTIZE_SCAN_PREFIX = "vector_quantize_scan('products', 'embedding'";
+const QUANTIZE_SCAN_PREFIX =
+	"vector_quantize_scan_stream('products', 'embedding'";
 
 const HYBRID_SQL = `
 	WITH lexical AS (
@@ -1098,21 +1099,40 @@ export class CatalogueDb implements CatalogueStore {
 			);
 			const rowCount = Number(meta?.n ?? 0);
 			const hasQuantizedTable = Number(meta?.has_q ?? 0) === 1;
-			if (rowCount >= MIN_TURBOQUANT_ROWS && hasQuantizedTable) {
-				const [qMeta] = await this.#sql.query(
-					"SELECT COALESCE(SUM(counter), 0) AS qn FROM vector0_products_embedding",
-				);
-				if (Number(qMeta?.qn ?? 0) === rowCount) {
+			if (rowCount >= MIN_TURBOQUANT_ROWS) {
+				try {
+					let reuseExisting = false;
+					if (hasQuantizedTable) {
+						const [qMeta] = await this.#sql.query(
+							"SELECT COALESCE(SUM(counter), 0) AS qn, COALESCE(MAX(length(data)), 0) AS max_bytes FROM vector0_products_embedding",
+						);
+						reuseExisting =
+							Number(qMeta?.qn ?? 0) === rowCount &&
+							Number(qMeta?.max_bytes ?? 0) <= 2_097_152;
+					}
+					if (!reuseExisting) {
+						await this.#sql.exec(
+							"DELETE FROM _sqliteai_vector WHERE tblname = 'products' AND colname = 'embedding'; DROP TABLE IF EXISTS vector0_products_embedding; PRAGMA shrink_memory;",
+						);
+					}
 					await this.#sql.query(
 						"SELECT vector_init('products', 'embedding', ?) AS initialized",
 						[
-							`dimension=${this.#dimension},type=INT8,distance=COSINE,qtype=TURBOQUANT,qbits=4`,
+							`dimension=${this.#dimension},type=INT8,distance=COSINE,qtype=TURBOQUANT,qbits=4,max_memory=1MB`,
 						],
 					);
+					if (!reuseExisting) {
+						await this.#sql.query(
+							"SELECT vector_quantize('products', 'embedding') AS quantized",
+						);
+					}
 					await this.#sql.exec("PRAGMA shrink_memory;");
 					this.#vectorType = targetType;
 					this.#quantized = true;
 					return;
+				} catch {
+					// If an in-memory fallback DB hits hard_heap_limit during quantization,
+					// clean up and fall through to streaming vector_full_scan.
 				}
 			}
 		}
@@ -1121,7 +1141,9 @@ export class CatalogueDb implements CatalogueStore {
 		);
 		await this.#sql.query(
 			"SELECT vector_init('products', 'embedding', ?) AS initialized",
-			[`dimension=${this.#dimension},type=${targetType},distance=COSINE`],
+			[
+				`dimension=${this.#dimension},type=${targetType},distance=COSINE,max_memory=1MB`,
+			],
 		);
 		this.#vectorType = targetType;
 		this.#quantized = false;
