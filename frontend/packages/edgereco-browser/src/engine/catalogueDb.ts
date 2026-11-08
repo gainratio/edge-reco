@@ -1088,7 +1088,7 @@ export class CatalogueDb implements CatalogueStore {
 			return;
 		}
 		await this.#sql.exec(
-			"CREATE TABLE IF NOT EXISTS _sqliteai_vector (tblname TEXT, colname TEXT, key TEXT, value ANY, PRIMARY KEY(tblname, colname, key));",
+			"PRAGMA cache_size = -4096; CREATE TABLE IF NOT EXISTS _sqliteai_vector (tblname TEXT, colname TEXT, key TEXT, value ANY, PRIMARY KEY(tblname, colname, key));",
 		);
 		if (targetType === "INT8") {
 			const [meta] = await this.#sql.query(
@@ -1098,33 +1098,26 @@ export class CatalogueDb implements CatalogueStore {
 			);
 			const rowCount = Number(meta?.n ?? 0);
 			const hasQuantizedTable = Number(meta?.has_q ?? 0) === 1;
-			if (rowCount >= MIN_TURBOQUANT_ROWS) {
-				if (!hasQuantizedTable) {
-					await this.#sql.exec(
-						"DELETE FROM _sqliteai_vector WHERE tblname = 'products' AND colname = 'embedding';",
-					);
-				}
-				await this.#sql.query(
-					"SELECT vector_init('products', 'embedding', ?) AS initialized",
-					[
-						`dimension=${this.#dimension},type=INT8,distance=COSINE,qtype=TURBOQUANT,qbits=4`,
-					],
+			if (rowCount >= MIN_TURBOQUANT_ROWS && hasQuantizedTable) {
+				const [qMeta] = await this.#sql.query(
+					"SELECT COALESCE(SUM(counter), 0) AS qn FROM vector0_products_embedding",
 				);
-				if (!hasQuantizedTable) {
+				if (Number(qMeta?.qn ?? 0) === rowCount) {
 					await this.#sql.query(
-						"SELECT vector_quantize('products', 'embedding') AS quantized",
+						"SELECT vector_init('products', 'embedding', ?) AS initialized",
+						[
+							`dimension=${this.#dimension},type=INT8,distance=COSINE,qtype=TURBOQUANT,qbits=4`,
+						],
 					);
+					await this.#sql.exec("PRAGMA shrink_memory;");
+					this.#vectorType = targetType;
+					this.#quantized = true;
+					return;
 				}
-				await this.#sql.query(
-					"SELECT vector_quantize_preload('products', 'embedding') AS preloaded",
-				);
-				this.#vectorType = targetType;
-				this.#quantized = true;
-				return;
 			}
 		}
 		await this.#sql.exec(
-			"DELETE FROM _sqliteai_vector WHERE tblname = 'products' AND colname = 'embedding'; DROP TABLE IF EXISTS vector0_products_embedding;",
+			"DELETE FROM _sqliteai_vector WHERE tblname = 'products' AND colname = 'embedding'; DROP TABLE IF EXISTS vector0_products_embedding; PRAGMA shrink_memory;",
 		);
 		await this.#sql.query(
 			"SELECT vector_init('products', 'embedding', ?) AS initialized",
