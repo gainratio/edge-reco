@@ -222,6 +222,12 @@ const BROWSE_CATEGORIES_SQL = `
 	ORDER BY category ASC
 `;
 
+/** Minimum catalogue row count before building a 4-bit TurboQuant preloaded index. */
+const MIN_TURBOQUANT_ROWS = 256;
+
+const FULL_SCAN_PREFIX = "vector_full_scan('products', 'embedding'";
+const QUANTIZE_SCAN_PREFIX = "vector_quantize_scan('products', 'embedding'";
+
 const HYBRID_SQL = `
 	WITH lexical AS (
 		SELECT rowid, -bm25(products_fts, ?1, ?2, ?3, ?4) AS score
@@ -253,6 +259,11 @@ const HYBRID_SQL = `
 	ORDER BY f.fused DESC, k.rank IS NULL, k.rank, s.rank
 `;
 
+const HYBRID_QUANTIZED_SQL = HYBRID_SQL.replaceAll(
+	FULL_SCAN_PREFIX,
+	QUANTIZE_SCAN_PREFIX,
+);
+
 const LEXICAL_HYBRID_SQL = `
 	WITH lexical AS (
 		SELECT rowid, -bm25(products_fts, ?1, ?2, ?3, ?4) AS score
@@ -283,12 +294,22 @@ const NEAREST_SQL = `
 	ORDER BY scan.distance, p.rowid LIMIT ?2
 `;
 
+const NEAREST_QUANTIZED_SQL = NEAREST_SQL.replaceAll(
+	FULL_SCAN_PREFIX,
+	QUANTIZE_SCAN_PREFIX,
+);
+
 const VECTOR_SQL = `
 	SELECT p.id AS id, 1.0 - scan.distance AS score
 	FROM vector_full_scan('products', 'embedding', ?1, max(?2 * 4, 256)) AS scan
 	JOIN products AS p ON p.rowid = scan.rowid
 	ORDER BY scan.distance, p.rowid LIMIT ?2
 `;
+
+const VECTOR_QUANTIZED_SQL = VECTOR_SQL.replaceAll(
+	FULL_SCAN_PREFIX,
+	QUANTIZE_SCAN_PREFIX,
+);
 
 /**
  * Turn a user query into an FTS5 MATCH expression: every whitespace-separated
@@ -500,6 +521,7 @@ export class CatalogueDb implements CatalogueStore {
 	) => Promise<SqlStorage>;
 	readonly #customImportStream: boolean;
 	#vectorType: "FLOAT32" | "INT8" | null = null;
+	#quantized = false;
 	#activeSwap: {
 		readonly done: Promise<void>;
 		readonly timeoutMs: number;
@@ -655,7 +677,7 @@ export class CatalogueDb implements CatalogueStore {
 		await this.#withSwapGate(timeoutMs, async () => {
 			if (bytes.byteLength > 1_000_000) {
 				await this.#sql.exec(
-					"DROP TABLE IF EXISTS products_fts; DROP TABLE IF EXISTS products; DELETE FROM _sqliteai_vector; VACUUM;",
+					"DROP TABLE IF EXISTS products_fts; DROP TABLE IF EXISTS vector0_products_embedding; DROP TABLE IF EXISTS products; DELETE FROM _sqliteai_vector; VACUUM;",
 				);
 			}
 			await this.#sql.exec("PRAGMA shrink_memory;");
@@ -993,16 +1015,19 @@ export class CatalogueDb implements CatalogueStore {
 			if (this.#vectorType === null) {
 				await this.#ensureVectorInit("FLOAT32");
 			}
-			const rows = await this.#sql.query(HYBRID_SQL, [
-				w.title,
-				w.category,
-				w.tags,
-				w.brand,
-				matchExpression(query) ?? MATCH_NOTHING,
-				Math.max(0, k),
-				this.#encodeQueryVector(vector),
-				RRF_K,
-			]);
+			const rows = await this.#sql.query(
+				this.#quantized ? HYBRID_QUANTIZED_SQL : HYBRID_SQL,
+				[
+					w.title,
+					w.category,
+					w.tags,
+					w.brand,
+					matchExpression(query) ?? MATCH_NOTHING,
+					Math.max(0, k),
+					this.#encodeQueryVector(vector),
+					RRF_K,
+				],
+			);
 			return rows.map((row) => ({
 				id: String(row.id),
 				fused: Number(row.fused),
@@ -1024,7 +1049,7 @@ export class CatalogueDb implements CatalogueStore {
 			if (this.#vectorType === null) {
 				await this.#ensureVectorInit("FLOAT32");
 			}
-			return this.#scored(VECTOR_SQL, [
+			return this.#scored(this.#quantized ? VECTOR_QUANTIZED_SQL : VECTOR_SQL, [
 				this.#encodeQueryVector(vector),
 				Math.max(0, k),
 			]);
@@ -1047,7 +1072,10 @@ export class CatalogueDb implements CatalogueStore {
 			if (known.length === 0) {
 				throw new Error(`unknown product id: ${id}`);
 			}
-			return this.#scored(NEAREST_SQL, [id, Math.max(0, k)]);
+			return this.#scored(
+				this.#quantized ? NEAREST_QUANTIZED_SQL : NEAREST_SQL,
+				[id, Math.max(0, k)],
+			);
 		});
 	}
 
@@ -1060,13 +1088,50 @@ export class CatalogueDb implements CatalogueStore {
 			return;
 		}
 		await this.#sql.exec(
-			"CREATE TABLE IF NOT EXISTS _sqliteai_vector (tblname TEXT, colname TEXT, key TEXT, value ANY, PRIMARY KEY(tblname, colname, key)); DELETE FROM _sqliteai_vector WHERE tblname = 'products' AND colname = 'embedding';",
+			"CREATE TABLE IF NOT EXISTS _sqliteai_vector (tblname TEXT, colname TEXT, key TEXT, value ANY, PRIMARY KEY(tblname, colname, key));",
+		);
+		if (targetType === "INT8") {
+			const [meta] = await this.#sql.query(
+				`SELECT
+					(SELECT count(*) FROM products) AS n,
+					(SELECT count(*) FROM sqlite_schema WHERE type = 'table' AND name = 'vector0_products_embedding') AS has_q`,
+			);
+			const rowCount = Number(meta?.n ?? 0);
+			const hasQuantizedTable = Number(meta?.has_q ?? 0) === 1;
+			if (rowCount >= MIN_TURBOQUANT_ROWS) {
+				if (!hasQuantizedTable) {
+					await this.#sql.exec(
+						"DELETE FROM _sqliteai_vector WHERE tblname = 'products' AND colname = 'embedding';",
+					);
+				}
+				await this.#sql.query(
+					"SELECT vector_init('products', 'embedding', ?) AS initialized",
+					[
+						`dimension=${this.#dimension},type=INT8,distance=COSINE,qtype=TURBOQUANT,qbits=4`,
+					],
+				);
+				if (!hasQuantizedTable) {
+					await this.#sql.query(
+						"SELECT vector_quantize('products', 'embedding') AS quantized",
+					);
+				}
+				await this.#sql.query(
+					"SELECT vector_quantize_preload('products', 'embedding') AS preloaded",
+				);
+				this.#vectorType = targetType;
+				this.#quantized = true;
+				return;
+			}
+		}
+		await this.#sql.exec(
+			"DELETE FROM _sqliteai_vector WHERE tblname = 'products' AND colname = 'embedding'; DROP TABLE IF EXISTS vector0_products_embedding;",
 		);
 		await this.#sql.query(
 			"SELECT vector_init('products', 'embedding', ?) AS initialized",
 			[`dimension=${this.#dimension},type=${targetType},distance=COSINE`],
 		);
 		this.#vectorType = targetType;
+		this.#quantized = false;
 	}
 
 	async #withSwapGate<T>(
