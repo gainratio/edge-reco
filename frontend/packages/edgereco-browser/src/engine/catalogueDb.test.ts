@@ -737,4 +737,71 @@ describe("openCatalogueStore", () => {
 		expect(await db.count()).toBe(5);
 		await db.dispose();
 	});
+
+	it("activates preloaded 4-bit TurboQuant scan on INT8 catalogues with >= 256 products", async () => {
+		const sourceSql = await openCatalogueSql();
+		const sourceDb = await CatalogueDb.open(sourceSql, 4);
+		const products: CatalogueProduct[] = [];
+		const vectors = new Float32Array(260 * 4);
+		for (let i = 0; i < 260; i++) {
+			products.push({
+				id: `p-${i}`,
+				title: i === 0 ? "Turbo Jacket" : `Item ${i}`,
+				category: "apparel",
+				tags: ["turbo"],
+				brand: "Arc",
+			});
+			vectors[i * 4] = i === 0 ? 1 : 0;
+			vectors[i * 4 + 1] = i === 0 ? 0 : 1;
+		}
+		await sourceDb.replace({ products, vectors });
+		await sourceSql.exec("UPDATE products SET embedding = ? WHERE id = 'p-0'", [
+			new Uint8Array(new Int8Array([127, 0, 0, 0]).buffer),
+		]);
+		await sourceSql.exec(
+			"UPDATE products SET embedding = ? WHERE id <> 'p-0'",
+			[new Uint8Array(new Int8Array([0, 127, 0, 0]).buffer)],
+		);
+		const sqliteBytes = await sourceSql.exportDatabase?.();
+		await sourceDb.dispose();
+		if (sqliteBytes === undefined) {
+			throw new Error("expected exportDatabase");
+		}
+
+		const targetSql = await openCatalogueSql();
+		const targetDb = await CatalogueDb.open(targetSql, 4);
+		await targetDb.importSqlite(sqliteBytes, { revisionKey: "rev-tq-260" });
+
+		const [qTable] = await targetSql.query(
+			"SELECT count(*) AS c FROM sqlite_schema WHERE type = 'table' AND name = 'vector0_products_embedding'",
+		);
+		expect(Number(qTable?.c ?? 0)).toBe(1);
+
+		const vHits = await targetDb.vectorSearch(
+			new Float32Array([1, 0, 0, 0]),
+			3,
+		);
+		expect(vHits[0]?.id).toBe("p-0");
+		expect(vHits[0]?.score).toBeGreaterThan(0.95);
+
+		const hHits = await targetDb.hybrid(
+			"Turbo Jacket",
+			new Float32Array([1, 0, 0, 0]),
+			3,
+		);
+		expect(hHits[0]?.id).toBe("p-0");
+
+		const nHits = await targetDb.nearest("p-0", 2);
+		expect(nHits.length).toBe(2);
+		expect(nHits.every((h) => h.id !== "p-0")).toBe(true);
+
+		// Warm reload via activateRevision reuses existing vector0_products_embedding table.
+		expect(await targetDb.activateRevision("rev-tq-260", 260)).toBe(true);
+		const warmHits = await targetDb.vectorSearch(
+			new Float32Array([1, 0, 0, 0]),
+			1,
+		);
+		expect(warmHits[0]?.id).toBe("p-0");
+		await targetDb.dispose();
+	});
 });

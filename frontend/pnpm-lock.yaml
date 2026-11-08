@@ -37,8 +37,8 @@ importers:
         specifier: workspace:*
         version: link:../packages/edgereco-browser
       '@gainratio/browser':
-        specifier: ^0.4.4
-        version: 0.4.4
+        specifier: ^0.4.5
+        version: 0.4.5
       '@gainratio/errors':
         specifier: ^0.4.0
         version: 0.4.0
@@ -122,8 +122,8 @@ importers:
         specifier: ^0.5.3
         version: 0.5.3
       '@gainratio/browser':
-        specifier: ^0.4.4
-        version: 0.4.4
+        specifier: ^0.4.5
+        version: 0.4.5
       '@huggingface/transformers':
         specifier: ^4.2.0
         version: 4.2.0(@types/node@26.6.4)
@@ -1014,8 +1014,8 @@ packages:
     resolution: {integrity: sha512-EeIvZ2xkXDiLpJRhVyODbTNscURy0Xqnzxucbkn9UfZSUIuSqwDfG/EvfSl0AcOLnJQ8PNMM2s2Oq41ACC8uqQ==}
     engines: {node: '>=22.13'}
 
-  '@gainratio/browser@0.4.4':
-    resolution: {integrity: sha512-gIbHEcKqj1K95jwz25J78kC8qfRGWmUJdcvsFWtH6rYaa06B/cfrKVQYHQW3NdIpScNhMMtHWwqI2hbrZlhcLg==}
+  '@gainratio/browser@0.4.5':
+    resolution: {integrity: sha512-TpqJt4DRHb5IaKydvusdzZPCf9mxE7edR9AwkiFyLENBV/AjfdZiQ0O6zh5VrdE8AaeUZBj2uyoCRo015FQyHw==}
     engines: {node: '>=22.13'}
 
   '@gainratio/errors@0.4.0':
@@ -4147,7 +4147,7 @@ snapshots:
       '@noble/ed25519': 3.2.0
       canonicalize: 3.0.0
 
-  '@gainratio/browser@0.4.4':
+  '@gainratio/browser@0.4.5':
     dependencies:
       '@hpcc-js/wasm-zstd': 1.16.2
       '@noble/ed25519': 3.2.0
