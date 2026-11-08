@@ -803,6 +803,10 @@ describe("openCatalogueStore", () => {
 			3,
 		);
 		expect(hHits[0]?.id).toBe("p-0");
+		executedSql.length = 0;
+		const cachedProducts = await targetDb.productsByIds(hHits.map((h) => h.id));
+		expect(cachedProducts.get("p-0")?.title).toBe("Turbo Jacket");
+		expect(executedSql).toEqual([]);
 
 		const nHits = await targetDb.nearest("p-0", 2);
 		expect(nHits.length).toBe(2);
@@ -822,7 +826,33 @@ describe("openCatalogueStore", () => {
 		expect(warmHits[0]?.id).toBe("p-0");
 		await targetDb.dispose();
 
-		// 2. If vector_quantize throws SQLITE_NOMEM, falls back cleanly to vector_full_scan.
+		// 2. Under iOS minimal memory profile (hard_heap_limit = 48 MiB), sizes page cache to 16 MiB and soft_heap_limit to 24 MiB.
+		const iosSql = await openCatalogueSql();
+		const origIosQuery = iosSql.query.bind(iosSql);
+		const iosExecSql: string[] = [];
+		const origIosExec = iosSql.exec.bind(iosSql);
+		iosSql.exec = async (sql, bind) => {
+			iosExecSql.push(sql);
+			return origIosExec(sql, bind);
+		};
+		iosSql.query = async (sql, bind) => {
+			if (sql.includes("pragma_hard_heap_limit")) {
+				return [{ hard_limit: 50_331_648, cache_kib: -4096 }];
+			}
+			return origIosQuery(sql, bind);
+		};
+		const iosDb = await CatalogueDb.open(iosSql, 4);
+		await iosDb.importSqlite(sqliteBytes, { revisionKey: "rev-ios-260" });
+		expect(
+			iosExecSql.some(
+				(s) =>
+					s.includes("PRAGMA cache_size = -16384") &&
+					s.includes("PRAGMA soft_heap_limit = 25165824"),
+			),
+		).toBe(true);
+		await iosDb.dispose();
+
+		// 3. If vector_quantize throws SQLITE_NOMEM, falls back cleanly to vector_full_scan.
 		const fallbackSql = await openCatalogueSql();
 		const origFallbackQuery = fallbackSql.query.bind(fallbackSql);
 		fallbackSql.query = async (sql, bind) => {

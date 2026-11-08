@@ -222,8 +222,11 @@ const BROWSE_CATEGORIES_SQL = `
 	ORDER BY category ASC
 `;
 
-/** Minimum catalogue row count before building a 4-bit TurboQuant preloaded index. */
+/** Minimum catalogue row count before building a 2-bit TurboQuant index. */
 const MIN_TURBOQUANT_ROWS = 256;
+
+/** Maximum recently-hydrated products kept in memory to avoid a second Worker round-trip after hybrid/nearest/vectorSearch. */
+const MAX_RECENT_PRODUCTS = 512;
 
 const FULL_SCAN_PREFIX = "vector_full_scan('products', 'embedding'";
 const QUANTIZE_SCAN_PREFIX = "vector_quantize_scan('products', 'embedding'";
@@ -249,7 +252,11 @@ const HYBRID_SQL = `
 		FROM (SELECT rowid, rank FROM keyword UNION ALL SELECT rowid, rank FROM semantic)
 		GROUP BY rowid
 	)
-	SELECT p.id AS id, f.fused AS fused,
+	SELECT p.id AS id, p.title AS title, p.description AS description,
+		p.category AS category, p.tags_json AS tags_json, p.brand AS brand,
+		p.price AS price, p.popularity_score AS popularity_score,
+		p.freshness_score AS freshness_score, p.image_url AS image_url,
+		f.fused AS fused,
 		k.score AS lexical_score, k.rank AS lexical_rank,
 		s.score AS semantic_score, s.rank AS semantic_rank
 	FROM fused AS f
@@ -274,7 +281,11 @@ const LEXICAL_HYBRID_SQL = `
 		SELECT rowid, score, row_number() OVER (ORDER BY score DESC, rowid) AS rank
 		FROM lexical
 	)
-	SELECT p.id AS id, (1.0 / (?7 + k.rank)) AS fused,
+	SELECT p.id AS id, p.title AS title, p.description AS description,
+		p.category AS category, p.tags_json AS tags_json, p.brand AS brand,
+		p.price AS price, p.popularity_score AS popularity_score,
+		p.freshness_score AS freshness_score, p.image_url AS image_url,
+		(1.0 / (?7 + k.rank)) AS fused,
 		k.score AS lexical_score, k.rank AS lexical_rank,
 		NULL AS semantic_score, NULL AS semantic_rank
 	FROM keyword AS k
@@ -286,7 +297,11 @@ const LEXICAL_HYBRID_SQL = `
 const MATCH_NOTHING = '""';
 
 const NEAREST_SQL = `
-	SELECT p.id AS id, 1.0 - scan.distance AS score
+	SELECT p.id AS id, p.title AS title, p.description AS description,
+		p.category AS category, p.tags_json AS tags_json, p.brand AS brand,
+		p.price AS price, p.popularity_score AS popularity_score,
+		p.freshness_score AS freshness_score, p.image_url AS image_url,
+		1.0 - scan.distance AS score
 	FROM vector_full_scan('products', 'embedding',
 		(SELECT embedding FROM products WHERE id = ?1), max(?2 + 1, 64)) AS scan
 	JOIN products AS p ON p.rowid = scan.rowid
@@ -300,7 +315,11 @@ const NEAREST_QUANTIZED_SQL = NEAREST_SQL.replaceAll(
 );
 
 const VECTOR_SQL = `
-	SELECT p.id AS id, 1.0 - scan.distance AS score
+	SELECT p.id AS id, p.title AS title, p.description AS description,
+		p.category AS category, p.tags_json AS tags_json, p.brand AS brand,
+		p.price AS price, p.popularity_score AS popularity_score,
+		p.freshness_score AS freshness_score, p.image_url AS image_url,
+		1.0 - scan.distance AS score
 	FROM vector_full_scan('products', 'embedding', ?1, max(?2 * 4, 256)) AS scan
 	JOIN products AS p ON p.rowid = scan.rowid
 	ORDER BY scan.distance, p.rowid LIMIT ?2
@@ -520,6 +539,7 @@ export class CatalogueDb implements CatalogueStore {
 		chunks: AsyncIterable<Uint8Array>,
 	) => Promise<SqlStorage>;
 	readonly #customImportStream: boolean;
+	readonly #recentProducts = new Map<string, Product>();
 	#vectorType: "FLOAT32" | "INT8" | null = null;
 	#quantized = false;
 	#activeSwap: {
@@ -611,6 +631,7 @@ export class CatalogueDb implements CatalogueStore {
 		]);
 		const timeoutMs = options?.swapTimeoutMs ?? DEFAULT_SWAP_TIMEOUT_MS;
 		await this.#withSwapGate(timeoutMs, async () => {
+			this.#recentProducts.clear();
 			await this.#ensureVectorInit("FLOAT32");
 			await this.#sql.transaction([
 				{ sql: "DELETE FROM products" },
@@ -675,27 +696,24 @@ export class CatalogueDb implements CatalogueStore {
 		const f32Bytes = this.#dimension * Float32Array.BYTES_PER_ELEMENT;
 		const int8Bytes = this.#dimension;
 		await this.#withSwapGate(timeoutMs, async () => {
+			this.#recentProducts.clear();
 			if (bytes.byteLength > 1_000_000) {
 				await this.#sql.exec(
 					"DROP TABLE IF EXISTS products_fts; DROP TABLE IF EXISTS vector0_products_embedding; DROP TABLE IF EXISTS products; DELETE FROM _sqliteai_vector; VACUUM;",
 				);
 			}
 			await this.#sql.exec("PRAGMA shrink_memory;");
-			try {
-				await importDatabase.call(this.#sql, bytes, {
-					virtualTableModules: ["fts5"],
-					swapTimeoutMs: timeoutMs,
-					expectedSchema: {
-						checks: [
-							"SELECT count(*) = 1 FROM sqlite_schema WHERE type = 'table' AND name = 'products'",
-							"SELECT count(*) = 1 FROM sqlite_schema WHERE type = 'table' AND name = 'products_fts'",
-							`SELECT count(*) = 0 FROM (SELECT length(embedding) AS len FROM products LIMIT 64) WHERE len NOT IN (${f32Bytes}, ${int8Bytes})`,
-						],
-					},
-				});
-			} finally {
-				await this.#sql.exec("PRAGMA cache_size = -12288;");
-			}
+			await importDatabase.call(this.#sql, bytes, {
+				virtualTableModules: ["fts5"],
+				swapTimeoutMs: timeoutMs,
+				expectedSchema: {
+					checks: [
+						"SELECT count(*) = 1 FROM sqlite_schema WHERE type = 'table' AND name = 'products'",
+						"SELECT count(*) = 1 FROM sqlite_schema WHERE type = 'table' AND name = 'products_fts'",
+						`SELECT count(*) = 0 FROM (SELECT length(embedding) AS len FROM products LIMIT 64) WHERE len NOT IN (${f32Bytes}, ${int8Bytes})`,
+					],
+				},
+			});
 			const [sample] = await this.#sql.query(
 				"SELECT length(embedding) AS len FROM products LIMIT 1",
 			);
@@ -747,6 +765,7 @@ export class CatalogueDb implements CatalogueStore {
 			return;
 		}
 		await this.#withSwapGate(timeoutMs, async () => {
+			this.#recentProducts.clear();
 			await this.#sql.close();
 			let importError: unknown;
 			try {
@@ -822,14 +841,26 @@ export class CatalogueDb implements CatalogueStore {
 		}
 		return this.#readThroughGate(async () => {
 			const unique = [...new Set(ids)];
-			const placeholders = unique.map((_, i) => `?${i + 1}`).join(", ");
+			const out = new Map<string, Product>();
+			const missing: string[] = [];
+			for (const id of unique) {
+				const cached = this.#recentProducts.get(id);
+				if (cached !== undefined) {
+					out.set(id, cached);
+				} else {
+					missing.push(id);
+				}
+			}
+			if (missing.length === 0) {
+				return out;
+			}
+			const placeholders = missing.map((_, i) => `?${i + 1}`).join(", ");
 			const rows = await this.#sql.query(
 				`SELECT ${PRODUCT_COLUMNS} FROM products WHERE id IN (${placeholders})`,
-				unique,
+				missing,
 			);
-			const out = new Map<string, Product>();
 			for (const row of rows) {
-				const product = hydrateProductRow(row);
+				const product = this.#cacheHydratedRow(row);
 				out.set(product.id, product);
 			}
 			return out;
@@ -1000,14 +1031,17 @@ export class CatalogueDb implements CatalogueStore {
 					Math.max(0, k),
 					RRF_K,
 				]);
-				return rows.map((row) => ({
-					id: String(row.id),
-					fused: Number(row.fused),
-					lexicalScore: asNumberOrNull(row.lexical_score),
-					lexicalRank: asNumberOrNull(row.lexical_rank),
-					semanticScore: null,
-					semanticRank: null,
-				}));
+				return rows.map((row) => {
+					this.#cacheHydratedRow(row);
+					return {
+						id: String(row.id),
+						fused: Number(row.fused),
+						lexicalScore: asNumberOrNull(row.lexical_score),
+						lexicalRank: asNumberOrNull(row.lexical_rank),
+						semanticScore: null,
+						semanticRank: null,
+					};
+				});
 			}
 			if (this.#vectorType === null) {
 				await this.#ensureVectorInit("FLOAT32");
@@ -1025,14 +1059,17 @@ export class CatalogueDb implements CatalogueStore {
 					RRF_K,
 				],
 			);
-			return rows.map((row) => ({
-				id: String(row.id),
-				fused: Number(row.fused),
-				lexicalScore: asNumberOrNull(row.lexical_score),
-				lexicalRank: asNumberOrNull(row.lexical_rank),
-				semanticScore: asNumberOrNull(row.semantic_score),
-				semanticRank: asNumberOrNull(row.semantic_rank),
-			}));
+			return rows.map((row) => {
+				this.#cacheHydratedRow(row);
+				return {
+					id: String(row.id),
+					fused: Number(row.fused),
+					lexicalScore: asNumberOrNull(row.lexical_score),
+					lexicalRank: asNumberOrNull(row.lexical_rank),
+					semanticScore: asNumberOrNull(row.semantic_score),
+					semanticRank: asNumberOrNull(row.semantic_rank),
+				};
+			});
 		});
 	}
 
@@ -1084,8 +1121,19 @@ export class CatalogueDb implements CatalogueStore {
 		if (this.#vectorType === targetType) {
 			return;
 		}
+		const [pragmaRow] = await this.#sql.query(
+			"SELECT (SELECT hard_heap_limit FROM pragma_hard_heap_limit) AS hard_limit, (SELECT cache_size FROM pragma_cache_size) AS cache_kib",
+		);
+		const hardLimit = Number(pragmaRow?.hard_limit ?? 0);
+		const currentCacheKiB = Math.abs(Number(pragmaRow?.cache_kib ?? 0));
+		const cacheSql =
+			hardLimit > 0 && hardLimit <= 67_108_864
+				? "PRAGMA cache_size = -16384; PRAGMA soft_heap_limit = 25165824;"
+				: currentCacheKiB < 32_768
+					? "PRAGMA cache_size = -32768;"
+					: "";
 		await this.#sql.exec(
-			"PRAGMA cache_size = -12288; CREATE TABLE IF NOT EXISTS _sqliteai_vector (tblname TEXT, colname TEXT, key TEXT, value ANY, PRIMARY KEY(tblname, colname, key));",
+			`${cacheSql} CREATE TABLE IF NOT EXISTS _sqliteai_vector (tblname TEXT, colname TEXT, key TEXT, value ANY, PRIMARY KEY(tblname, colname, key));`,
 		);
 		if (targetType === "INT8") {
 			const [meta] = await this.#sql.query(
@@ -1177,10 +1225,28 @@ export class CatalogueDb implements CatalogueStore {
 
 	async #scored(sql: string, bind: SqlBind): Promise<ReadonlyArray<ScoredId>> {
 		const rows: ReadonlyArray<SqlRow> = await this.#sql.query(sql, bind);
-		return rows.map((row) => ({
-			id: String(row.id),
-			score: Number(row.score),
-		}));
+		return rows.map((row) => {
+			this.#cacheHydratedRow(row);
+			return {
+				id: String(row.id),
+				score: Number(row.score),
+			};
+		});
+	}
+
+	#cacheHydratedRow(row: SqlRow): Product {
+		const product = hydrateProductRow(row);
+		if (
+			this.#recentProducts.size >= MAX_RECENT_PRODUCTS &&
+			!this.#recentProducts.has(product.id)
+		) {
+			const oldest = this.#recentProducts.keys().next().value;
+			if (oldest !== undefined) {
+				this.#recentProducts.delete(oldest);
+			}
+		}
+		this.#recentProducts.set(product.id, product);
+		return product;
 	}
 
 	#encodeQueryVector(vector: Float32Array): Uint8Array {
