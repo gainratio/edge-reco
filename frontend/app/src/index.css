@@ -317,11 +317,6 @@ input {
 	gap: clamp(24px, 3vw, 40px);
 }
 
-/* A horizontally-scrolling rail variant (home stack + PDP rails). */
-.rail--row {
-	position: static;
-}
-
 .rail__track {
 	padding: 14px;
 	overflow-x: auto;
@@ -836,6 +831,11 @@ input {
 	background: var(--paper-raise);
 	box-shadow: var(--shadow-card);
 	overflow: hidden;
+}
+
+/* A horizontally-scrolling rail variant (home stack + PDP rails). */
+.rail--row {
+	position: static;
 }
 
 .rail__head {
