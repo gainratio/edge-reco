@@ -912,11 +912,16 @@ describe("bootstrapApp — synchronized 100k OPFS boot and guarded one-time reco
 			storage: {
 				getDirectory: async () => ({
 					getFileHandle: async () => ({}),
-					removeEntry: async () => undefined,
+					removeEntry: async () => {
+						throw new Error("NotFoundError");
+					},
 				}),
 			},
 		});
-		expect(await canUseOpfs()).toBe(true);
+		expect(await Promise.all([canUseOpfs(), canUseOpfs()])).toEqual([
+			true,
+			true,
+		]);
 
 		const syncedUrls: string[] = [];
 		const base = fakeEnginePort();

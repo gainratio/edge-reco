@@ -783,22 +783,33 @@ function isWebKit(): boolean {
 	);
 }
 
-export async function canUseOpfs(): Promise<boolean> {
+let opfsProbeInFlight: Promise<boolean> | null = null;
+
+export function canUseOpfs(): Promise<boolean> {
 	if (
 		typeof navigator === "undefined" ||
 		navigator.storage?.getDirectory === undefined
 	) {
-		return false;
+		return Promise.resolve(false);
+	}
+	if (opfsProbeInFlight !== null) {
+		return opfsProbeInFlight;
 	}
 	const name = ".edge-reco-opfs-probe";
-	try {
-		const root = await navigator.storage.getDirectory();
-		await root.getFileHandle(name, { create: true });
-		await root.removeEntry(name);
-		return true;
-	} catch {
-		return false;
-	}
+	const probe = (async (): Promise<boolean> => {
+		try {
+			const root = await navigator.storage.getDirectory();
+			await root.getFileHandle(name, { create: true });
+			await root.removeEntry(name).catch(() => undefined);
+			return true;
+		} catch {
+			return false;
+		} finally {
+			opfsProbeInFlight = null;
+		}
+	})();
+	opfsProbeInFlight = probe;
+	return probe;
 }
 
 export function syncUpdate(
