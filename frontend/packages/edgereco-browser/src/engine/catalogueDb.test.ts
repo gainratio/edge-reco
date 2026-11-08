@@ -738,7 +738,7 @@ describe("openCatalogueStore", () => {
 		await db.dispose();
 	});
 
-	it("activates preloaded 4-bit TurboQuant scan on INT8 catalogues with >= 256 products", async () => {
+	it("uses bounded max_memory=1MB TurboQuant with vector_quantize_scan_stream (never preload) and falls back to vector_full_scan on SQLITE_NOMEM", async () => {
 		const sourceSql = await openCatalogueSql();
 		const sourceDb = await CatalogueDb.open(sourceSql, 4);
 		const products: CatalogueProduct[] = [];
@@ -768,10 +768,20 @@ describe("openCatalogueStore", () => {
 			throw new Error("expected exportDatabase");
 		}
 
+		// 1. Bounded 1MB TurboQuant quantization + vector_quantize_scan_stream without preload.
 		const targetSql = await openCatalogueSql();
+		const origQuery = targetSql.query.bind(targetSql);
+		const executedSql: string[] = [];
+		targetSql.query = async (sql, bind) => {
+			executedSql.push(sql);
+			return origQuery(sql, bind);
+		};
 		const targetDb = await CatalogueDb.open(targetSql, 4);
 		await targetDb.importSqlite(sqliteBytes, { revisionKey: "rev-tq-260" });
 
+		expect(executedSql.some((s) => s.includes("vector_quantize_preload"))).toBe(
+			false,
+		);
 		const [qTable] = await targetSql.query(
 			"SELECT count(*) AS c FROM sqlite_schema WHERE type = 'table' AND name = 'vector0_products_embedding'",
 		);
@@ -783,6 +793,9 @@ describe("openCatalogueStore", () => {
 		);
 		expect(vHits[0]?.id).toBe("p-0");
 		expect(vHits[0]?.score).toBeGreaterThan(0.95);
+		expect(executedSql.some((s) => s.includes("vector_quantize_scan("))).toBe(
+			true,
+		);
 
 		const hHits = await targetDb.hybrid(
 			"Turbo Jacket",
@@ -795,13 +808,38 @@ describe("openCatalogueStore", () => {
 		expect(nHits.length).toBe(2);
 		expect(nHits.every((h) => h.id !== "p-0")).toBe(true);
 
-		// Warm reload via activateRevision reuses existing vector0_products_embedding table.
+		// Warm reload via activateRevision reuses existing vector0_products_embedding table on disk without re-quantizing.
+		executedSql.length = 0;
 		expect(await targetDb.activateRevision("rev-tq-260", 260)).toBe(true);
+		expect(executedSql.some((s) => s.includes("vector_quantize("))).toBe(false);
+		expect(executedSql.some((s) => s.includes("vector_quantize_preload"))).toBe(
+			false,
+		);
 		const warmHits = await targetDb.vectorSearch(
 			new Float32Array([1, 0, 0, 0]),
 			1,
 		);
 		expect(warmHits[0]?.id).toBe("p-0");
 		await targetDb.dispose();
+
+		// 2. If vector_quantize throws SQLITE_NOMEM, falls back cleanly to vector_full_scan.
+		const fallbackSql = await openCatalogueSql();
+		const origFallbackQuery = fallbackSql.query.bind(fallbackSql);
+		fallbackSql.query = async (sql, bind) => {
+			if (sql.includes("vector_quantize(")) {
+				throw new Error("SQLITE_NOMEM: sqlite3 result code 7: out of memory");
+			}
+			return origFallbackQuery(sql, bind);
+		};
+		const fallbackDb = await CatalogueDb.open(fallbackSql, 4);
+		await fallbackDb.importSqlite(sqliteBytes, {
+			revisionKey: "rev-fallback-260",
+		});
+		const fbHits = await fallbackDb.vectorSearch(
+			new Float32Array([1, 0, 0, 0]),
+			2,
+		);
+		expect(fbHits[0]?.id).toBe("p-0");
+		await fallbackDb.dispose();
 	});
 });

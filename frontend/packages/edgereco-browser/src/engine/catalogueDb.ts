@@ -694,9 +694,7 @@ export class CatalogueDb implements CatalogueStore {
 					},
 				});
 			} finally {
-				await this.#sql.exec(
-					"PRAGMA cache_size = -4096; PRAGMA shrink_memory;",
-				);
+				await this.#sql.exec("PRAGMA cache_size = -12288;");
 			}
 			const [sample] = await this.#sql.query(
 				"SELECT length(embedding) AS len FROM products LIMIT 1",
@@ -805,7 +803,6 @@ export class CatalogueDb implements CatalogueStore {
 				[revisionKey],
 			);
 		}
-		await this.#sql.exec("PRAGMA shrink_memory;");
 	}
 
 	/** Number of products in the database. */
@@ -1088,7 +1085,7 @@ export class CatalogueDb implements CatalogueStore {
 			return;
 		}
 		await this.#sql.exec(
-			"CREATE TABLE IF NOT EXISTS _sqliteai_vector (tblname TEXT, colname TEXT, key TEXT, value ANY, PRIMARY KEY(tblname, colname, key));",
+			"PRAGMA cache_size = -12288; CREATE TABLE IF NOT EXISTS _sqliteai_vector (tblname TEXT, colname TEXT, key TEXT, value ANY, PRIMARY KEY(tblname, colname, key));",
 		);
 		if (targetType === "INT8") {
 			const [meta] = await this.#sql.query(
@@ -1099,36 +1096,50 @@ export class CatalogueDb implements CatalogueStore {
 			const rowCount = Number(meta?.n ?? 0);
 			const hasQuantizedTable = Number(meta?.has_q ?? 0) === 1;
 			if (rowCount >= MIN_TURBOQUANT_ROWS) {
-				if (!hasQuantizedTable) {
-					await this.#sql.exec(
-						"DELETE FROM _sqliteai_vector WHERE tblname = 'products' AND colname = 'embedding';",
-					);
-				}
-				await this.#sql.query(
-					"SELECT vector_init('products', 'embedding', ?) AS initialized",
-					[
-						`dimension=${this.#dimension},type=INT8,distance=COSINE,qtype=TURBOQUANT,qbits=4`,
-					],
-				);
-				if (!hasQuantizedTable) {
+				try {
+					let reuseExisting = false;
+					if (hasQuantizedTable) {
+						const [qMeta] = await this.#sql.query(
+							"SELECT COALESCE(SUM(counter), 0) AS qn, COALESCE(MAX(length(data)), 0) AS max_bytes, COALESCE(SUM(length(data)), 0) AS total_bytes FROM vector0_products_embedding",
+						);
+						reuseExisting =
+							Number(qMeta?.qn ?? 0) === rowCount &&
+							Number(qMeta?.max_bytes ?? 0) <= 2_097_152 &&
+							Number(qMeta?.total_bytes ?? 0) <= 12_582_912;
+					}
+					if (!reuseExisting) {
+						await this.#sql.exec(
+							"DELETE FROM _sqliteai_vector WHERE tblname = 'products' AND colname = 'embedding'; DROP TABLE IF EXISTS vector0_products_embedding; PRAGMA shrink_memory;",
+						);
+					}
 					await this.#sql.query(
-						"SELECT vector_quantize('products', 'embedding') AS quantized",
+						"SELECT vector_init('products', 'embedding', ?) AS initialized",
+						[
+							`dimension=${this.#dimension},type=INT8,distance=COSINE,qtype=TURBOQUANT,qbits=2,max_memory=1MB`,
+						],
 					);
+					if (!reuseExisting) {
+						await this.#sql.query(
+							"SELECT vector_quantize('products', 'embedding') AS quantized",
+						);
+					}
+					this.#vectorType = targetType;
+					this.#quantized = true;
+					return;
+				} catch {
+					// If an in-memory fallback DB hits hard_heap_limit during quantization,
+					// clean up and fall through to streaming vector_full_scan.
 				}
-				await this.#sql.query(
-					"SELECT vector_quantize_preload('products', 'embedding') AS preloaded",
-				);
-				this.#vectorType = targetType;
-				this.#quantized = true;
-				return;
 			}
 		}
 		await this.#sql.exec(
-			"DELETE FROM _sqliteai_vector WHERE tblname = 'products' AND colname = 'embedding'; DROP TABLE IF EXISTS vector0_products_embedding;",
+			"DELETE FROM _sqliteai_vector WHERE tblname = 'products' AND colname = 'embedding'; DROP TABLE IF EXISTS vector0_products_embedding; PRAGMA shrink_memory;",
 		);
 		await this.#sql.query(
 			"SELECT vector_init('products', 'embedding', ?) AS initialized",
-			[`dimension=${this.#dimension},type=${targetType},distance=COSINE`],
+			[
+				`dimension=${this.#dimension},type=${targetType},distance=COSINE,max_memory=1MB`,
+			],
 		);
 		this.#vectorType = targetType;
 		this.#quantized = false;
