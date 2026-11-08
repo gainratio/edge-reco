@@ -226,8 +226,7 @@ const BROWSE_CATEGORIES_SQL = `
 const MIN_TURBOQUANT_ROWS = 256;
 
 const FULL_SCAN_PREFIX = "vector_full_scan('products', 'embedding'";
-const QUANTIZE_SCAN_PREFIX =
-	"vector_quantize_scan_stream('products', 'embedding'";
+const QUANTIZE_SCAN_PREFIX = "vector_quantize_scan('products', 'embedding'";
 
 const HYBRID_SQL = `
 	WITH lexical AS (
@@ -695,9 +694,7 @@ export class CatalogueDb implements CatalogueStore {
 					},
 				});
 			} finally {
-				await this.#sql.exec(
-					"PRAGMA cache_size = -4096; PRAGMA shrink_memory;",
-				);
+				await this.#sql.exec("PRAGMA cache_size = -12288;");
 			}
 			const [sample] = await this.#sql.query(
 				"SELECT length(embedding) AS len FROM products LIMIT 1",
@@ -806,7 +803,6 @@ export class CatalogueDb implements CatalogueStore {
 				[revisionKey],
 			);
 		}
-		await this.#sql.exec("PRAGMA shrink_memory;");
 	}
 
 	/** Number of products in the database. */
@@ -1089,7 +1085,7 @@ export class CatalogueDb implements CatalogueStore {
 			return;
 		}
 		await this.#sql.exec(
-			"PRAGMA cache_size = -4096; CREATE TABLE IF NOT EXISTS _sqliteai_vector (tblname TEXT, colname TEXT, key TEXT, value ANY, PRIMARY KEY(tblname, colname, key));",
+			"PRAGMA cache_size = -12288; CREATE TABLE IF NOT EXISTS _sqliteai_vector (tblname TEXT, colname TEXT, key TEXT, value ANY, PRIMARY KEY(tblname, colname, key));",
 		);
 		if (targetType === "INT8") {
 			const [meta] = await this.#sql.query(
@@ -1104,11 +1100,12 @@ export class CatalogueDb implements CatalogueStore {
 					let reuseExisting = false;
 					if (hasQuantizedTable) {
 						const [qMeta] = await this.#sql.query(
-							"SELECT COALESCE(SUM(counter), 0) AS qn, COALESCE(MAX(length(data)), 0) AS max_bytes FROM vector0_products_embedding",
+							"SELECT COALESCE(SUM(counter), 0) AS qn, COALESCE(MAX(length(data)), 0) AS max_bytes, COALESCE(SUM(length(data)), 0) AS total_bytes FROM vector0_products_embedding",
 						);
 						reuseExisting =
 							Number(qMeta?.qn ?? 0) === rowCount &&
-							Number(qMeta?.max_bytes ?? 0) <= 2_097_152;
+							Number(qMeta?.max_bytes ?? 0) <= 2_097_152 &&
+							Number(qMeta?.total_bytes ?? 0) <= 12_582_912;
 					}
 					if (!reuseExisting) {
 						await this.#sql.exec(
@@ -1118,7 +1115,7 @@ export class CatalogueDb implements CatalogueStore {
 					await this.#sql.query(
 						"SELECT vector_init('products', 'embedding', ?) AS initialized",
 						[
-							`dimension=${this.#dimension},type=INT8,distance=COSINE,qtype=TURBOQUANT,qbits=4,max_memory=1MB`,
+							`dimension=${this.#dimension},type=INT8,distance=COSINE,qtype=TURBOQUANT,qbits=2,max_memory=1MB`,
 						],
 					);
 					if (!reuseExisting) {
@@ -1126,7 +1123,6 @@ export class CatalogueDb implements CatalogueStore {
 							"SELECT vector_quantize('products', 'embedding') AS quantized",
 						);
 					}
-					await this.#sql.exec("PRAGMA shrink_memory;");
 					this.#vectorType = targetType;
 					this.#quantized = true;
 					return;

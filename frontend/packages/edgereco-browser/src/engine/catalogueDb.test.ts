@@ -793,9 +793,9 @@ describe("openCatalogueStore", () => {
 		);
 		expect(vHits[0]?.id).toBe("p-0");
 		expect(vHits[0]?.score).toBeGreaterThan(0.95);
-		expect(
-			executedSql.some((s) => s.includes("vector_quantize_scan_stream")),
-		).toBe(true);
+		expect(executedSql.some((s) => s.includes("vector_quantize_scan("))).toBe(
+			true,
+		);
 
 		const hHits = await targetDb.hybrid(
 			"Turbo Jacket",
