@@ -3,10 +3,13 @@
 		"navLabel": "EdgeReco",
 		"thesis": "by gainratio is open source — and runs on your device. Search, ranking, and recommendations execute right in this browser tab, with no per-query backend.",
 		"links": {
+			"projectPage": "Open-source project page",
 			"repo": "EdgeReco on GitHub",
 			"substrate": "EdgeProc substrate",
 			"whatIs": "What is EdgeProc?",
+			"onDeviceSearch": "On-device search",
 			"faq": "FAQ",
+			"openSourceHub": "GainRatio Open-Source Hub",
 			"amlFilter": "AML-Filter — sanctions screening in the tab",
 			"almamesh": "AlmaMesh — a Python astrology engine in the tab",
 			"allRepos": "All repositories on GitHub"

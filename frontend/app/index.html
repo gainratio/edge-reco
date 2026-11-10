@@ -41,6 +41,7 @@
             "url": "https://edge-reco.com",
             "applicationCategory": "DeveloperApplication",
             "operatingSystem": "Web",
+            "isAccessibleForFree": true,
             "description": "EdgeReco runs search, ranking, and recommendations in the shopper's browser. Your store sends one small signed file once; after that everything runs on-device with zero backend calls.",
             "offers": {
               "@type": "Offer",
@@ -50,15 +51,32 @@
             "license": "https://opensource.org/licenses/MIT",
             "codeRepository": "https://github.com/gainratio/edge-reco",
             "programmingLanguage": ["Python", "TypeScript"],
-            "keywords": "on-device search, browser recommendations, local-first, BM25 keyword search, FAISS vector search, reciprocal rank fusion, session-aware reranking, signed content-addressed bundles, ecommerce recommendations",
+            "keywords": "SQLite WASM, OPFS, BM25 FTS5, on-device vector search, hybrid search, TurboQuant, local-first ecommerce search, WebAssembly search engine, browser recommendation engine, reciprocal rank fusion, session-aware reranking, signed content-addressed bundles",
             "sameAs": [
               "https://github.com/gainratio/edge-reco",
+              "https://open-source.gainratio.com/edge-reco/",
               "https://github.com/gainratio/edge-proc",
               "https://github.com/hseshadr"
             ],
             "isBasedOn": { "@id": "https://edge-reco.com/edgeproc#edgeproc" },
-            "author": { "@id": "https://github.com/hseshadr#hseshadr" },
-            "publisher": { "@id": "https://github.com/hseshadr#hseshadr" }
+            "author": { "@id": "https://open-source.gainratio.com/#gainratio" },
+            "publisher": { "@id": "https://open-source.gainratio.com/#gainratio" },
+            "creator": { "@id": "https://github.com/hseshadr#hseshadr" }
+          },
+          {
+            "@type": "Organization",
+            "@id": "https://open-source.gainratio.com/#gainratio",
+            "name": "GainRatio",
+            "url": "https://open-source.gainratio.com/",
+            "sameAs": [
+              "https://github.com/gainratio",
+              "https://open-source.gainratio.com/",
+              "https://gainratio.com/",
+              "https://browser.gainratio.com/",
+              "https://edge-reco.com/",
+              "https://aml-filter.com/",
+              "https://almamesh.com/"
+            ]
           },
           {
             "@type": "SoftwareSourceCode",
@@ -69,7 +87,7 @@
             "codeRepository": "https://github.com/gainratio/edge-proc",
             "description": "EdgeProc is the open-source local-first substrate EdgeReco is built on: signed, content-addressed index bundles verified fail-closed, local BM25 keyword search and FAISS vector search combined with reciprocal rank fusion, and a deterministic task router.",
             "sameAs": ["https://github.com/gainratio/edge-proc"],
-            "author": { "@id": "https://github.com/hseshadr#hseshadr" }
+            "author": { "@id": "https://open-source.gainratio.com/#gainratio" }
           },
           {
             "@type": "Person",
@@ -112,7 +130,9 @@
       <p>
         <a href="https://github.com/gainratio/edge-reco">View source on GitHub</a>
         ·
-        <a href="https://github.com/gainratio/edge-reco/blob/main/docs/ARCHITECTURE.md">Architecture</a>
+        <a href="https://open-source.gainratio.com/">GainRatio Open Source</a>
+        ·
+        <a href="/on-device-search">On-device search</a>
         ·
         <a href="/edgeproc">EdgeProc substrate</a>
         ·

@@ -42,8 +42,12 @@ const MAINTAINER = "https://github.com/hseshadr";
 const repoUrl = (repo) => `${ORG}/${repo}`;
 
 // The three live sites are separate domains with no inbound links between them.
-// Every page must reach the other two, or each stays an island.
-const SIBLING_SITES = ["https://aml-filter.com/", "https://almamesh.com/"];
+// Every page must reach the other two and the open-source hub, or each stays an island.
+const SIBLING_SITES = [
+	"https://open-source.gainratio.com/",
+	"https://aml-filter.com/",
+	"https://almamesh.com/",
+];
 
 // A Set, deliberately: these assertions must match a whole href, never a
 // substring of one. `"…/hseshadr".includes()`-style checks pass for
@@ -383,11 +387,39 @@ test("robots.txt and llms.txt keep AI crawlers and canonical sources accessible"
 	const llms = await artifact("llms.txt");
 	for (const url of [
 		"https://edge-reco.com/",
+		"https://edge-reco.com/on-device-search",
 		"https://edge-reco.com/edgeproc",
+		"https://edge-reco.com/github",
 		"https://edge-reco.com/faq",
+		"https://open-source.gainratio.com/",
+		"https://browser.gainratio.com/",
 		"https://github.com/gainratio/edge-reco",
 		"https://github.com/gainratio/edge-proc",
 	]) {
 		assert.ok(llms.includes(url), `llms.txt missing ${url}`);
 	}
+});
+
+test("root SoftwareApplication JSON-LD exposes free-access offer and GainRatio publisher", async () => {
+	const document = await htmlDocument("index.html");
+	const raw = document.querySelector(
+		'script[type="application/ld+json"]',
+	)?.textContent;
+	assert.ok(raw, "missing JSON-LD in index.html");
+	const graph = JSON.parse(raw)["@graph"];
+	const app = graph.find((node) => node["@type"] === "SoftwareApplication");
+	assert.ok(app, "missing SoftwareApplication node in index.html JSON-LD");
+	assert.equal(app.isAccessibleForFree, true);
+	assert.deepEqual(app.offers, {
+		"@type": "Offer",
+		price: "0",
+		priceCurrency: "USD",
+	});
+	assert.equal(app.codeRepository, "https://github.com/gainratio/edge-reco");
+	assert.equal(
+		app.publisher["@id"],
+		"https://open-source.gainratio.com/#gainratio",
+	);
+	assert.match(app.keywords, /SQLite WASM/u);
+	assert.match(app.keywords, /TurboQuant/u);
 });

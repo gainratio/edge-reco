@@ -52,6 +52,8 @@ const ALLOWED_URL_HOSTS = new Map([
 	["aml-filter.com", "sibling-site link"],
 	["almamesh.com", "sibling-site link"],
 	["open-source.gainratio.com", "open-source hub link"],
+	["gainratio.com", "maintainer organization site in JSON-LD"],
+	["browser.gainratio.com", "browser runtime docs link in JSON-LD"],
 	[
 		"schema.org",
 		"JSON-LD @context identifier in the static pages, not a request",
