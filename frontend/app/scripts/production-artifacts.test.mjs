@@ -423,3 +423,35 @@ test("root SoftwareApplication JSON-LD exposes free-access offer and GainRatio p
 	assert.match(app.keywords, /SQLite WASM/u);
 	assert.match(app.keywords, /TurboQuant/u);
 });
+
+test("every HTML route and file sets Cache-Control no-transform to block edge script injection", async () => {
+	const headers = await artifact("_headers");
+	const blocks = new Map();
+	let currentPath = null;
+	for (const rawLine of headers.split("\n")) {
+		const trimmed = rawLine.trim();
+		if (!trimmed || trimmed.startsWith("#")) continue;
+		if (!rawLine.startsWith(" ") && !rawLine.startsWith("\t")) {
+			currentPath = trimmed;
+			blocks.set(currentPath, []);
+		} else if (currentPath) {
+			blocks.get(currentPath).push(trimmed);
+		}
+	}
+	const requiredHtmlPaths = new Set(["/404.html"]);
+	for (const { path, file } of ROUTES) {
+		requiredHtmlPaths.add(path);
+		requiredHtmlPaths.add(`/${file}`);
+	}
+	for (const routePath of requiredHtmlPaths) {
+		const directives = blocks.get(routePath) ?? [];
+		assert.ok(
+			directives.some((line) =>
+				/^Cache-Control:\s*public,\s*max-age=0,\s*must-revalidate,\s*no-transform$/iu.test(
+					line,
+				),
+			),
+			`_headers missing Cache-Control no-transform for ${routePath}`,
+		);
+	}
+});
