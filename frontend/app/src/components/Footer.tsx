@@ -30,7 +30,7 @@ export function Footer() {
 					className="nimbus-footer__link"
 					href="https://open-source.gainratio.com/edge-reco/"
 				>
-					Open-source project page
+					{t("footer.links.projectPage")}
 				</a>
 				<a
 					className="nimbus-footer__link"
@@ -43,6 +43,9 @@ export function Footer() {
 					href="https://github.com/gainratio/edge-proc"
 				>
 					{t("footer.links.substrate")}
+				</a>
+				<a className="nimbus-footer__link" href="/on-device-search">
+					{t("footer.links.onDeviceSearch")}
 				</a>
 				<a className="nimbus-footer__link" href="/edgeproc">
 					{t("footer.links.whatIs")}
@@ -68,6 +71,12 @@ export function Footer() {
 				{t("footer.moreLead")}
 			</p>
 			<nav className="nimbus-footer__links" aria-label={t("footer.moreLabel")}>
+				<a
+					className="nimbus-footer__link"
+					href="https://open-source.gainratio.com/"
+				>
+					{t("footer.links.openSourceHub")}
+				</a>
 				<a className="nimbus-footer__link" href="https://aml-filter.com/">
 					{t("footer.links.amlFilter")}
 				</a>

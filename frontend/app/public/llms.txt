@@ -1,81 +1,47 @@
 # EdgeReco
 
-> EdgeReco is an open-source, browser-first product recommendation engine. After a
-> one-time sync of a small signed catalog bundle, product search, ranking, and
-> recommendations run entirely on the shopper's device — with no per-query backend
-> ranking call. The live storefront showcases EdgeReco on a 100,000-product catalog.
+> EdgeReco is an open-source, browser-first ecommerce search and recommendation engine
+> built by GainRatio. After a one-time sync of a signed, content-addressed catalog
+> bundle, product search, hybrid ranking, and session-aware recommendations execute
+> entirely inside the shopper's browser via SQLite WASM and OPFS — with zero per-query
+> backend calls and zero shopper-behavior egress. The live storefront showcases
+> EdgeReco on a 100,000-product catalog across 12 departments.
 
-## Canonical links
+## Canonical URLs (edge-reco.com)
 
-- Live demo: https://edge-reco.com/
-- Source (GitHub): https://github.com/gainratio/edge-reco
-- Maintainer: https://github.com/hseshadr
-- Substrate (EdgeProc): https://github.com/gainratio/edge-proc
-- EdgeProc name disambiguation: https://edge-reco.com/edgeproc
-- All repositories: https://edge-reco.com/github
-- FAQ: https://edge-reco.com/faq
+- [Live Storefront](https://edge-reco.com/): Interactive 100,000-product browser search and recommendation showcase.
+- [On-Device Search & Recommendations](https://edge-reco.com/on-device-search): Architecture overview of browser-executed FTS5 + vector retrieval with zero backend latency.
+- [EdgeProc Substrate](https://edge-reco.com/edgeproc): Entity disambiguation and architecture of the underlying `gainratio/edge-proc` local-first search substrate.
+- [GitHub Directory](https://edge-reco.com/github): Canonical index of EdgeReco, EdgeProc, `edgeproc-core`, and sibling GainRatio repositories.
+- [FAQ](https://edge-reco.com/faq): Technical answers on bundle verification, Nimbus demo catalog, offline operation, and privacy guarantees.
 
-## Project facts
+## Key Architectural Invariants
 
-- Name: EdgeReco
-- Also written as: Edge-Reco, edge-reco
-- Category: open-source browser-first product recommendation engine
-- Runtime: web browser / local-first execution
-- Languages: TypeScript (browser engine), Python (catalog and bundle tooling)
-- Core techniques: signed, content-addressed catalog bundles verified fail-closed
-  (Ed25519 signature over an sha256 content-addressed manifest); query embedding with
-  all-MiniLM-L6-v2 on ONNX Runtime Web; in the browser, one SQLite database in a Web
-  Worker holds the catalog: BM25 keyword search is SQLite FTS5's bm25(), exact vector
-  search is sqlite-vector, and Reciprocal Rank Fusion (RRF, k=60) of the two is a
-  single SQL query. The database is kept in OPFS for the first tab and in memory for
-  other tabs or where OPFS is refused. The Python tier uses FAISS and rank_bm25;
-  session-aware reranking driven by
-  in-session interaction signals (clicks, views, cart, favorites)
-- Primary use case: local product search and recommendations without a per-query
-  backend ranking call
-- Demo store: EdgeReco live storefront (100,000 products across 12 departments)
-- Repository: gainratio/edge-reco
-- Status: experimental / beta
+1. **Fail-closed cryptographic bundle verification**: Every catalog release is content-addressed with SHA-256 chunks and signed with an Ed25519 manifest key (`/public.key`). Any signature mismatch, chunk digest failure, or rollback attempt aborts activation before SQLite opens the catalog.
+2. **Single-worker SQLite WASM + OPFS persistence**: In the browser, one Web Worker owns the SQLite WASM database backed by Origin Private File System (OPFS) for durable offline reloads, falling back transparently to in-memory SQLite when OPFS is unavailable or held by a second tab.
+3. **Single-SQL hybrid retrieval & vector quantization**: Lexical search runs on SQLite FTS5 `bm25()`, semantic vector search runs on `sqlite-vector` with on-device `all-MiniLM-L6-v2` query embeddings via ONNX Runtime Web (supporting compact vector compression including TurboQuant / int8 quantization), and Reciprocal Rank Fusion (`RRF`, `k=60`) merges both signals in a single local SQL query.
+4. **Session-aware reranking with zero PII/event egress**: Clicks, product views, favorites, and cart additions stay strictly inside the shopper's local SQLite database. `Content-Security-Policy: connect-src 'self'` enforces at the browser boundary that zero search queries or interaction events leave the device.
 
-## Privacy
+## Project Facts
 
-- No user data leaves the device. The shopper's activity (clicks, views, favorites,
-  cart adds: timestamp, event type, product id) is stored only in the on-device SQLite
-  database in their own browser. Nothing is sent to or stored on any server or cloud.
-  There is no analytics, event uplink, or collector.
-- The data belongs to the shopper. They can wipe it with "Reset taste" or by clearing
-  the site's data. Export/import is not built yet.
-- If the browser refuses durable storage or another tab holds the database, SQLite runs
-  in memory and the activity resets on reload; the store says so on screen.
+- Name: EdgeReco (`Edge-Reco`, `edge-reco`, `gainratio/edge-reco`)
+- License: MIT (`https://opensource.org/licenses/MIT`)
+- Source Repository: https://github.com/gainratio/edge-reco
+- Open-Source Dossier: https://open-source.gainratio.com/edge-reco/
+- GainRatio Open Source Hub: https://open-source.gainratio.com/
+- Browser Runtime Docs (`@edgeproc/browser`): https://browser.gainratio.com/
+- Maintainer: Harish Seshadri (https://github.com/hseshadr)
+- Languages: TypeScript (browser engine & UI), Python (catalog & bundle builder)
 
-## Related project: EdgeProc
+## Related GainRatio Open-Source Stack
 
-EdgeProc (also written edge-proc, gainratio/edge-proc) is the reusable substrate that
-EdgeReco is built on. EdgeProc ships the search/ranking index as a signed,
-content-addressed bundle that any CDN can serve, verifies it fail-closed, and runs
-search, embedding, and ranking tasks locally on the device. EdgeProc itself builds on
-edgeproc-core (on PyPI as edgeproc-core). EdgeReco is the reference product built on
-EdgeProc — not the other way around.
+All repositories live under https://github.com/gainratio and are indexed at https://open-source.gainratio.com/:
 
-- EdgeProc repository: https://github.com/gainratio/edge-proc
-- edgeproc-core (EdgeProc's foundation): https://github.com/gainratio/edgeproc-core
-- EdgeProc is implemented in Python and runs locally / edge-capable.
-
-## Other repositories by the same maintainer
-
-All public, all on https://github.com/gainratio. Listed with anchor copy at
-https://edge-reco.com/github.
-
-- https://github.com/gainratio/aml-filter — screen a name against 31,566 sanctioned
-  entities (OFAC SDN, EU, UN, UK OFSI) entirely inside the browser tab; signed watchlist
-  bundles with fail-closed Ed25519 verification. Live at https://aml-filter.com/
-- https://github.com/gainratio/privacy-core — redact PII in the browser before a prompt
-  leaves the machine, then rehydrate the reply locally; 11 entity types, type-checked
-  Egress Guard on the send path. TypeScript.
-- https://github.com/gainratio/assay — sign a decision record with Ed25519 over RFC 8785
-  canonical JSON and verify it offline years later; shipped as avow on PyPI and
-  @gainratio/avow on npm.
-- https://github.com/gainratio/almamesh — Vedic astrology running the whole Python engine
-  in the browser via Pyodide (Skyfield, DE421 JPL kernel). Live at https://almamesh.com/
-- https://github.com/gainratio/ci — the shared GitHub Actions the edgeproc repos use: 7
-  reusable workflows + 5 composite actions, every `uses:` SHA-pinned.
+- [EdgeProc (`gainratio/edge-proc`)](https://github.com/gainratio/edge-proc): Python local-first substrate for Ed25519-signed FastCDC bundles, deterministic task routing, and local FAISS + BM25 RRF retrieval.
+- [`edgeproc-core` (`gainratio/edgeproc-core`)](https://github.com/gainratio/edgeproc-core): Multi-tenant vector-partition routing protocol and RFC 9457 error taxonomy on PyPI (`edgeproc-core`).
+- [`@edgeproc/browser`](https://browser.gainratio.com/): Browser runtime for Ed25519-verified bundle sync into OPFS-backed SQLite WASM.
+- [AML-Filter (`gainratio/aml-filter`)](https://github.com/gainratio/aml-filter): Zero-egress browser sanctions screening across 31,566 OFAC SDN, EU, UN, and UK OFSI entities — live at https://aml-filter.com/
+- [Privacy Core (`gainratio/privacy-core`)](https://github.com/gainratio/privacy-core): Deterministic in-browser PII redaction, Luhn/IBAN/SSN checksum validation, and type-checked LLM Egress Guard (`https://privacy.gainratio.com/`).
+- [Assay / Avow (`gainratio/assay`)](https://github.com/gainratio/assay): Ed25519 signing and offline verification over RFC 8785 canonical JSON (`avow` on PyPI, `@gainratio/avow` on npm, docs at `https://avow.gainratio.com/`).
+- [AlmaMesh (`gainratio/almamesh`)](https://github.com/gainratio/almamesh): Full Python Vedic astronomy & Kundli engine running in-browser via Pyodide + JPL DE421 ephemeris — live at https://almamesh.com/
+- [GainRatio CI (`gainratio/ci`)](https://github.com/gainratio/ci): SHA-pinned reusable GitHub Actions workflows and composite actions for OIDC publishing, secret scanning, and Pages deployment.

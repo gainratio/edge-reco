@@ -58,8 +58,11 @@ describe("Footer", () => {
 	// open web pointed at edge-reco.com and its pages sat crawled-but-unindexed.
 	// A crawler follows an <a href>; it does not follow a sitemap into a domain
 	// nobody links to. These are the outbound edges that fix that.
-	it("links out to the sibling live sites", () => {
+	it("links out to the GainRatio Open-Source Hub and sibling live sites", () => {
 		render(<Footer />);
+		expect(
+			screen.getByRole("link", { name: /GainRatio Open-Source Hub/i }),
+		).toHaveAttribute("href", "https://open-source.gainratio.com/");
 		expect(screen.getByRole("link", { name: /AML-Filter/i })).toHaveAttribute(
 			"href",
 			"https://aml-filter.com/",
