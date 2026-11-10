@@ -69,7 +69,7 @@ export const LANDING_METRICS: readonly RepresentativeMetric[] = [
 		num: `~${seconds(median(measurement.coldStartMs))}`,
 		unit: "s",
 		vars: {
-			products: CATALOG_PRODUCTS,
+			products: CATALOG_PRODUCTS.toLocaleString("en-US"),
 			warm: `${seconds(median(measurement.warmStartMs))} s`,
 		},
 	},
@@ -81,7 +81,7 @@ export const LANDING_METRICS: readonly RepresentativeMetric[] = [
 	{ id: "cost", num: "$0", tone: "pos" },
 	{
 		id: "catalog",
-		num: String(CATALOG_PRODUCTS),
+		num: CATALOG_PRODUCTS.toLocaleString("en-US"),
 		vars: { categories: CATALOG_CATEGORIES, bundle: BUNDLE_SIZE },
 	},
 ];

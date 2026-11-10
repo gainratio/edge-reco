@@ -80,6 +80,18 @@ describe("Landing", () => {
 		).toBeInTheDocument();
 	});
 
+	it("renders 2-bit TurboQuant specimen copy and comma-formatted catalog counts", () => {
+		render(<Landing onLaunch={() => {}} />);
+		expect(
+			screen.getByText("384-d 2-bit TurboQuant scan (WASM)"),
+		).toBeInTheDocument();
+		expect(document.body.textContent).not.toContain("INT8 cosine scan");
+		expect(
+			screen.getAllByText(/100,000 products/).length,
+		).toBeGreaterThanOrEqual(2);
+		expect(document.body.textContent).not.toContain("100000 products");
+	});
+
 	it("calls onLaunch when the Launch CTA is clicked", async () => {
 		const onLaunch = vi.fn();
 		render(<Landing onLaunch={onLaunch} />);
