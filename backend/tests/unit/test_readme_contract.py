@@ -25,6 +25,7 @@ _SECTIONS = (
     "## What it does not do",
     "## When to use something else",
     "## Run it yourself",
+    "## Under the hood (for developers)",
     "## Develop",
     "## More detail",
     "## License",

@@ -104,7 +104,9 @@ export function Landing({ onLaunch }: LandingProps) {
 								</a>
 							</div>
 							<p className="landing__demo-note">
-								{t("demoNote", { products: CATALOG_PRODUCTS })}
+								{t("demoNote", {
+									products: CATALOG_PRODUCTS.toLocaleString("en-US"),
+								})}
 							</p>
 							<p className="landing__footnote">
 								{t("footnote", {
@@ -152,7 +154,7 @@ export function Landing({ onLaunch }: LandingProps) {
 									</div>
 									<div className="landing__specimen-signal">
 										<div className="landing__specimen-signal-row">
-											<span>384-d INT8 cosine scan (WASM)</span>
+											<span>384-d 2-bit TurboQuant scan (WASM)</span>
 											<span>w = 0.52</span>
 										</div>
 										<div className="landing__specimen-bar landing__specimen-bar--hot">

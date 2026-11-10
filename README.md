@@ -15,8 +15,9 @@ back" and it only finds products whose titles happen to contain the word "back".
 
 EdgeReco does the searching and ranking inside the shopper's browser tab. Your store
 publishes one signed catalog bundle, about 32.6 MB for 100,000 products. The browser
-verifies every chunk, streams the SQLite catalog into OPFS, searches by meaning as well
-as by words, and re-ranks recommendations as the shopper clicks. No server answers the
+verifies every chunk, streams the SQLite catalog into OPFS (Origin Private File System,
+the browser's private on-disk storage), searches by meaning as well as
+by words, and re-ranks recommendations as the shopper clicks. No server answers the
 searches, so the application and inference cost does not grow with traffic, and the
 store keeps working offline.
 
@@ -161,6 +162,12 @@ and its runtime once and checks each against a pinned fingerprint.
 
 The optional Python library, command line tool and API server need Python 3.13 and
 [uv](https://docs.astral.sh/uv/). See [docs/USAGE.md](docs/USAGE.md).
+
+## Under the hood (for developers)
+
+- **Page-aligned SQLite + content-addressed chunking (`backend/` + `edge-proc`).** The offline builder compiles products, an FTS5 BM25 keyword index, and 2-bit TurboQuant 384-d embeddings (`sqlite-vector`) into `catalogue.sqlite`, splits it into zstd-compressed SHA-256 chunks, and signs the manifest with Ed25519.
+- **OPFS streaming & delta updates (`@gainratio/browser`).** Inside a dedicated Web Worker, the browser checks the Ed25519 signature and every chunk digest before writing SQLite pages into OPFS; when prices or products change, only modified chunks are fetched and existing chunks are reused from cache.
+- **Hybrid retrieval, Reciprocal Rank Fusion & MMR (`frontend/`).** Each query runs lexical BM25 (`FTS5`) alongside semantic MiniLM-L6-v2 (`onnxruntime-web` WASM) vector similarity, merges candidates with Reciprocal Rank Fusion (`RRF`), diversifies results with Maximal Marginal Relevance (`MMR`), and combines shopper session signals through `@gainratio/assay`.
 
 ## Develop
 
