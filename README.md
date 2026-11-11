@@ -21,6 +21,10 @@ by words, and re-ranks recommendations as the shopper clicks. No server answers 
 searches, so the application and inference cost does not grow with traffic, and the
 store keeps working offline.
 
+![Live walkthrough of the EdgeReco demo store: searching by meaning, clicking three items to re-rank recommendations in the browser, and opening the why? score math](docs/assets/live-demo.gif)
+
+**[Watch the 1080p walkthrough](https://open-source.gainratio.com/edge-reco/)** · **[Launch the live store](https://edge-reco.com)**
+
 **Technical docs:** [Architecture](docs/ARCHITECTURE.md) · [Getting started for developers](docs/GETTING_STARTED.md) · [Python library and CLI](docs/USAGE.md) · [Security and privacy](docs/SECURITY-PRIVACY.md) · [Deploy](docs/DEPLOY.md)
 
 ## The Black Friday problem
