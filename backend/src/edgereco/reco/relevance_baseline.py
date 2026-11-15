@@ -27,8 +27,9 @@ about nothing. Callers ask for one segment at a time — this module has no "ove
 
 from __future__ import annotations
 
+import importlib.metadata
 from pathlib import Path
-from typing import Final, Literal
+from typing import Final, Literal, NotRequired, TypedDict
 
 from assay.models import RankedQuery, RelevanceJudgment
 from assay.ranking import RankingReport, ranking_report
@@ -48,6 +49,11 @@ _BACKEND_ROOT: Final[Path] = Path(__file__).resolve().parents[3]
 RELEVANCE_EXPORT: Final[Path] = (
     _BACKEND_ROOT.parent
     / "frontend/packages/edgereco-browser/src/engine/__fixtures__/relevance_export.json"
+)
+
+#: Committed Assay IR summary consumed by the pre-boot Landing page (`landing-figures.ts`).
+RELEVANCE_MEASUREMENT_JSON: Final[Path] = (
+    _BACKEND_ROOT.parent / "frontend/app/src/metrics/relevance-measurement.json"
 )
 
 
@@ -153,3 +159,116 @@ def empty_positive_pages(export: RelevanceExport) -> int:
     """
     answerable = [q for q in export.queries if q.segment != "negative"]
     return sum(1 for query in answerable if not query.ranked_ids)
+
+
+def _round4(value: float) -> float:
+    return round(float(value), 4)
+
+
+class DepthMetricsPayload(TypedDict):
+    """Per-cutoff Assay IR metrics plus the theoretical oracle ceiling at cutoff ``k``."""
+
+    k: int
+    queryCount: int
+    precision: float
+    recall: float
+    oracleRecallCeiling: float
+    f1: float
+    oracleF1Ceiling: float
+    ndcg: float
+    mrr: float
+    map: float
+    ndcgCiLow: NotRequired[float]
+    ndcgCiHigh: NotRequired[float]
+
+
+class SegmentPairPayload(TypedDict):
+    """Reported ``@10`` and ``@24`` Assay metrics for one query segment."""
+
+    k10: DepthMetricsPayload
+    k24: DepthMetricsPayload
+
+
+class NegativeMetricsPayload(TypedDict):
+    """False-positive and empty-page counts on unanswerable vs answerable queries."""
+
+    queryCount: int
+    fullDepthPages: int
+    falsePositivesShown: int
+    emptyPositivePages: int
+
+
+class RelevanceMeasurementPayload(TypedDict):
+    """Committed JSON schema consumed by ``frontend/app/src/metrics/landing-figures.ts``."""
+
+    schema: str
+    scorer: str
+    catalogId: str
+    labelMethod: str
+    natural: SegmentPairPayload
+    taxonomyWord: SegmentPairPayload
+    negatives: NegativeMetricsPayload
+
+
+def _oracle_ceilings(export: RelevanceExport, segment: Segment, k: int) -> tuple[float, float]:
+    queries = export.in_segment(segment)
+    recalls: list[float] = []
+    f1s: list[float] = []
+    for query in queries:
+        n_rel = len(query.relevant_ids)
+        r_max = min(k, n_rel) / n_rel
+        p_max = min(k, n_rel) / k
+        recalls.append(r_max)
+        f1s.append((2.0 * p_max * r_max) / (p_max + r_max))
+    return _round4(sum(recalls) / len(recalls)), _round4(sum(f1s) / len(f1s))
+
+
+def _segment_depth_payload(
+    export: RelevanceExport, segment: Segment, k: int
+) -> DepthMetricsPayload:
+    report = segment_report(export, segment, k=k)
+    oracle_recall, oracle_f1 = _oracle_ceilings(export, segment, k=k)
+    interval = report.ndcg_interval
+    payload: DepthMetricsPayload = {
+        "k": k,
+        "queryCount": report.n_queries,
+        "precision": _round4(report.mean_precision_at_k),
+        "recall": _round4(report.mean_recall_at_k),
+        "oracleRecallCeiling": oracle_recall,
+        "f1": _round4(report.mean_f1_at_k),
+        "oracleF1Ceiling": oracle_f1,
+        "ndcg": _round4(report.mean_ndcg_at_k),
+        "mrr": _round4(report.mrr),
+        "map": _round4(report.mean_average_precision),
+    }
+    if interval.kind == "interval":
+        payload["ndcgCiLow"] = _round4(float(interval.low))
+        payload["ndcgCiHigh"] = _round4(float(interval.high))
+    return payload
+
+
+def build_relevance_measurement(
+    export: RelevanceExport | None = None,
+) -> RelevanceMeasurementPayload:
+    """Build the Assay-scored IR summary consumed by the pre-boot Landing page."""
+    loaded = export or load_export()
+    return {
+        "schema": "edgereco.relevance-measurement/v1",
+        "scorer": f"assay-engine {importlib.metadata.version('assay-engine')} (trec_eval)",
+        "catalogId": loaded.catalog_id,
+        "labelMethod": loaded.label_method,
+        "natural": {
+            "k10": _segment_depth_payload(loaded, "natural", 10),
+            "k24": _segment_depth_payload(loaded, "natural", 24),
+        },
+        "taxonomyWord": {
+            "k10": _segment_depth_payload(loaded, "taxonomy-word", 10),
+            "k24": _segment_depth_payload(loaded, "taxonomy-word", 24),
+        },
+        "negatives": {
+            "queryCount": len(loaded.in_segment("negative")),
+            "fullDepthPages": full_depth_negatives(loaded),
+            "falsePositivesShown": negative_results(loaded),
+            "emptyPositivePages": empty_positive_pages(loaded),
+        },
+    }

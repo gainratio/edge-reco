@@ -475,6 +475,7 @@ describe("EngineRuntime.clearBundleCache — explicit user recovery only", () =>
 		expect(syncOptionsSeen[0]).toEqual({
 			wantedPaths: [
 				"catalog_meta.json",
+				"ivf_centroids.f32",
 				"ranking_config.json",
 				"ranking_receipt.json",
 				"cooccurrence.json",

@@ -14,9 +14,9 @@ plain keyword search, which misses what shoppers mean: type "something for my ac
 back" and it only finds products whose titles happen to contain the word "back".
 
 EdgeReco does the searching and ranking inside the shopper's browser tab. Your store
-publishes signed SQLite + 2-bit TurboQuant catalog bundles — one ~32.6 MB bundle for the
-100,000-product live demo, or 64 sharded IVF-TurboQuant bundles (~1.9 MB zstd per shard
-behind a 96 KiB centroid router) for catalogs up to 1,000,000 products. The browser
+publishes signed SQLite + 2-bit TurboQuant catalog bundles — 64 sharded IVF-TurboQuant
+bundles (~79.0 MB signed bundle across 3,331 chunks behind a 96 KiB centroid router) in
+the 1,000,000-product live storefront, or a single bundle for smaller catalogs. The browser
 verifies every chunk, streams SQLite into OPFS (Origin Private File System, the browser's
 private on-disk storage), searches by meaning as well as by words, and re-ranks
 recommendations as the shopper clicks. No server answers the searches, so the application
@@ -60,13 +60,13 @@ pricing hurts most.
 ## Try it
 
 1. Open [edge-reco.com](https://edge-reco.com) and click **Launch the live demo**. This
-   opens the EdgeReco demo store with 100,000 products across 12 departments. The
-   first launch streams the 100,000-product catalog into OPFS and loads the small
-   language model on the first semantic search, so give it a moment. Later visits
-   start from the copy in your browser.
+   opens the EdgeReco demo store with 1,000,000 products across 12 departments. The
+   first launch syncs the centroid router and home shard into OPFS, fetches probed shards
+   on demand, and loads the small language model on the first semantic search, so give it
+   a moment. Later visits start from the copy in your browser.
 2. Type `something for my aching back` in the search box and press Enter.
 
-![The EdgeReco demo store after searching "something for my aching back": a neck and back massager is the first result, then a stadium seat with back support. The strip under the search box reads 0 backend calls and 100,000 catalog.](docs/assets/search-aching-back.png)
+![The EdgeReco demo store after searching "something for my aching back": a neck and back massager is the first result, then a stadium seat with back support. The strip under the search box reads 0 backend calls and local catalog metrics.](docs/assets/search-aching-back.png)
 
 A neck and back massager comes first, then a stadium seat with back support. Only three
 products come back, because nothing else in the store is a good match. The strip under
@@ -78,10 +78,10 @@ numbers (search time, start-up time, memory) are measured live on your machine a
    toward the massager's category (Health & Household). Those signals are saved only in
    your browser. **Reset taste** clears them.
 4. Click **⚡ Apply delta** in the top metrics bar to simulate a live price update.
-   Because the catalog ships as a page-aligned SQLite database split into content-addressed
-   chunks, your browser downloads only the 2 changed chunks (about 32 KB) and reuses the
-   other 2,059 chunks from its local cache — updating prices in place without reloading the
-   page or the language model.
+   Because each catalog shard ships as a page-aligned SQLite database split into
+   content-addressed chunks, your browser downloads only the 2 changed chunks (about
+   43 KB) and reuses the other 3,329 chunks from its local cache — updating prices in
+   place without reloading the page or the language model.
 
 ## How it works
 
@@ -121,15 +121,16 @@ a separate, unrelated project (it hides personal data in AI prompts).
 
 ## What it does not do
 
-- **Ten-million-item catalogs.** Single-bundle mode ships 100,000 products in the live
-  demo, and sharded IVF-TurboQuant mode partitions up to 1,000,000 products into ~1.9 MB
-  SQLite shards routed by a 96 KiB centroid table — not tens of millions of items.
+- **Ten-million-item catalogs.** Sharded IVF-TurboQuant mode partitions 1,000,000
+  products across 64 SQLite shards routed by a 96 KiB centroid table in the live demo —
+  not tens of millions of items.
 - **Private catalogs.** Every shopper can download the catalog shards, so anything in the
   catalog is public.
-- **Private Browsing / disabled local storage.** The live demo streams its 100,000-product
-  catalog into a file-backed OPFS SQLite database (~32.6 MB on the wire, ~24 MB model on
-  first semantic search) so memory stays bounded on phones and desktops; Private Browsing
-  blocks OPFS and displays a warning to reopen in a normal tab.
+- **Private Browsing / disabled local storage.** The live demo streams its home catalog
+  shard into a file-backed OPFS SQLite database (~24 MB model on first semantic search)
+  and probes extra shards in bounded worker memory so usage stays predictable on phones
+  and desktops; Private Browsing blocks OPFS and displays a warning to reopen in a normal
+  tab.
 - **A hosted service.** You build the catalog and host the static files yourself.
 - **Merchandising tools.** There is no dashboard, A/B testing or manual boosting. Ranking
   is tuned by editing weights in the signed catalog.
@@ -172,7 +173,7 @@ The optional Python library, command line tool and API server need Python 3.13 a
 
 - **Pre-quantized 2-bit TurboQuant & 1M IVF sharding (`backend/` + `edge-proc`).** The offline builder compiles products, an FTS5 BM25 keyword index, and pre-populated 2-bit TurboQuant 384-d shadow rows (`vector0_products_embedding` at 108 B/row, stripping raw float32 vectors via `zeroblob(0)`) into SQLite — either a single `catalogue.sqlite` up to 100,000 products or 64 spherical k-means IVF shards (~1.9 MB zstd per shard + 96 KiB `centroids.f32`) up to 1,000,000 products — and signs the manifest with Ed25519.
 - **OPFS streaming & binary delta updates (`@gainratio/browser` + `edge-proc`).** Inside a dedicated Web Worker, the browser checks the Ed25519 signature and every digest before writing SQLite pages into OPFS; when prices or products change, clients either fetch modified content-addressed chunks or apply prebuilt `zstd --patch-from` binary delta patches (~9.4 KB for a 1%-updated shard).
-- **Hybrid retrieval, Reciprocal Rank Fusion & MMR (`frontend/`).** Each query runs lexical BM25 (`FTS5`) alongside semantic MiniLM-L6-v2 (`onnxruntime-web` WASM) vector similarity (routing across top `nprobe` IVF centroids via `rankIvfCentroids` on sharded catalogs), merges candidates with Reciprocal Rank Fusion (`RRF`), diversifies results with Maximal Marginal Relevance (`MMR`), and combines shopper session signals through `@gainratio/assay`.
+- **Hybrid retrieval, Reciprocal Rank Fusion, MMR & Assay quality checks (`frontend/` + `backend/`).** Each query runs lexical BM25 (`FTS5`) alongside semantic MiniLM-L6-v2 (`onnxruntime-web` WASM) vector similarity (routing across top `nprobe` IVF centroids via `rankIvfCentroids` on sharded catalogs), merges candidates with Reciprocal Rank Fusion (`RRF`), diversifies results with Maximal Marginal Relevance (`MMR`), combines shopper session signals through `@gainratio/assay`, and verifies held-out precision, recall, F1, nDCG, and MRR floors in CI with `assay-engine` (`trec_eval`).
 
 ## Develop
 

@@ -461,6 +461,13 @@ function affinityScore(
 	return weights.category * cat + weights.tag * tag + weights.brand * brand;
 }
 
+/** Verified IVF shard router and per-shard SQLite stream factory. */
+export interface ShardedSqliteInput {
+	readonly shardCount: number;
+	readonly centroids: Float32Array;
+	readonly shardChunks: (shardIndex: number) => AsyncIterable<Uint8Array>;
+}
+
 /** The async catalogue surface the search engine uses. */
 export interface CatalogueStore {
 	replace(
@@ -484,6 +491,14 @@ export interface CatalogueStore {
 		options?: CatalogueSwapOptions,
 	): Promise<void>;
 	/**
+	 * Configure a multi-shard `IVF-TurboQuant` store and stream anchor `shard_00`
+	 * into OPFS while keeping shards `01..K-1` demand-loaded.
+	 */
+	importShardedSqlite?(
+		sharded: ShardedSqliteInput,
+		options?: CatalogueSwapOptions,
+	): Promise<void>;
+	/**
 	 * Fast path for warm reloads over a durable OPFS database: if the database
 	 * already holds `revisionKey` with `expectedCount` products, re-registers
 	 * `sqlite-vector` in place and returns `true` without re-importing.
@@ -491,6 +506,14 @@ export interface CatalogueStore {
 	activateRevision?(
 		revisionKey: string,
 		expectedCount: number,
+	): Promise<boolean>;
+	/**
+	 * Warm-reload fast path for sharded IVF catalogs over durable OPFS `shard_00`.
+	 */
+	activateShardedRevision?(
+		revisionKey: string,
+		expectedCount: number,
+		sharded: ShardedSqliteInput,
 	): Promise<boolean>;
 	hybrid(
 		query: string,
@@ -540,6 +563,7 @@ export interface CatalogueDbOpenDeps {
 	readonly importStream?: (
 		chunks: AsyncIterable<Uint8Array>,
 	) => Promise<SqlStorage>;
+	readonly forceStreamImport?: boolean;
 }
 
 /** Catalogue search over one open SQLite database. */
@@ -573,7 +597,8 @@ export class CatalogueDb implements CatalogueStore {
 		this.#vectorType = vectorType;
 		this.#openSql = deps.openSql ?? openCatalogueSql;
 		this.#importStream = deps.importStream ?? importCatalogueSqlFromChunks;
-		this.#customImportStream = deps.importStream !== undefined;
+		this.#customImportStream =
+			deps.forceStreamImport ?? deps.importStream !== undefined;
 	}
 
 	/** Create the schema and register the vector column; closes `sql` on failure. */
@@ -848,6 +873,22 @@ export class CatalogueDb implements CatalogueStore {
 		return this.#readThroughGate(async () => {
 			const [row] = await this.#sql.query("SELECT count(*) AS n FROM products");
 			return Number(row?.n ?? 0);
+		});
+	}
+
+	/** Optional global catalog/category totals stored on anchor shard `0`. */
+	public async globalCounts(): Promise<ReadonlyMap<string, number> | null> {
+		return this.#readThroughGate(async () => {
+			const [exists] = await this.#sql.query(
+				"SELECT count(*) AS ok FROM sqlite_schema WHERE type = 'table' AND name = '_edgereco_global_counts'",
+			);
+			if (Number(exists?.ok) !== 1) {
+				return null;
+			}
+			const rows = await this.#sql.query(
+				"SELECT category, total FROM _edgereco_global_counts",
+			);
+			return new Map(rows.map((r) => [String(r.category), Number(r.total)]));
 		});
 	}
 

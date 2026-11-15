@@ -108,11 +108,12 @@
       <p>
         EdgeReco is an open-source product search and recommendation engine that
         runs in the shopper's browser. A store publishes a signed catalog bundle
-        — scaling up to 1,000,000 products via sharded 2-bit IVF-TurboQuant
-        SQLite bundles (~1.9 MB per shard, 9.4 KB zstd delta patches, with a
-        100,000-product single-bundle live demo); the browser verifies it,
-        stores it locally in OPFS, and serves search, ranking, and personalized
-        recommendations without a per-query backend.
+        — 1,000,000 products across 64 sharded 2-bit IVF-TurboQuant SQLite
+        bundles (79.0 MB signed bundle across 3,331 chunks behind a 96 KiB
+        centroid router, 42.9 KB two-chunk delta updates) in the live demo; the
+        browser verifies it, stores the home shard in OPFS, probes shards on
+        demand, and serves search, ranking, and personalized recommendations
+        without a per-query backend.
       </p>
       <h2>How it works</h2>
       <p>

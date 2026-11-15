@@ -4,7 +4,10 @@ import {
 	CATALOG_PRODUCTS,
 	LANDING_MEASURED_ON,
 	LANDING_METRICS,
+	LANDING_QUALITY_METRICS,
 	MODEL_DOWNLOAD,
+	QUALITY_NATURAL_QUERIES,
+	QUALITY_SCORER,
 	type RepresentativeMetric,
 } from "../metrics/landing-figures";
 
@@ -24,7 +27,13 @@ const WHY_KEYS = [
 /** The five boot pipeline steps shown under "How it works", in display order. */
 const STEP_KEYS = ["sync", "verify", "persist", "load", "search"] as const;
 
-function MetricTile({ metric }: { metric: RepresentativeMetric }) {
+function MetricTile({
+	metric,
+	namespacePrefix = "metrics",
+}: {
+	metric: RepresentativeMetric;
+	namespacePrefix?: "metrics" | "qualityMetrics";
+}) {
 	const { t } = useTranslation("landing");
 	const toneClass = metric.tone ? ` metric-tile__num--${metric.tone}` : "";
 	return (
@@ -36,10 +45,10 @@ function MetricTile({ metric }: { metric: RepresentativeMetric }) {
 				) : null}
 			</div>
 			<div className="metric-tile__label">
-				{t(`metrics.${metric.id}.label`)}
+				{t(`${namespacePrefix}.${metric.id}.label`, { ...metric.vars })}
 			</div>
 			<div className="metric-tile__sub">
-				{t(`metrics.${metric.id}.sub`, { ...metric.vars })}
+				{t(`${namespacePrefix}.${metric.id}.sub`, { ...metric.vars })}
 			</div>
 		</div>
 	);
@@ -124,7 +133,7 @@ export function Landing({ onLaunch }: LandingProps) {
 									<span />
 								</div>
 								<span className="landing__specimen-file">
-									catalogue.sqlite · OPFS
+									64 IVF shards · OPFS
 								</span>
 								<span className="landing__specimen-seal">
 									Ed25519 VERIFIED ✓
@@ -165,7 +174,7 @@ export function Landing({ onLaunch }: LandingProps) {
 
 								<div className="landing__specimen-section-head">
 									<span>Reciprocal Rank Fusion + MMR (λ = 0.7)</span>
-									<span>Top 3 / 100k</span>
+									<span>Top 3 / 1M</span>
 								</div>
 
 								<div className="landing__specimen-cards">
@@ -246,6 +255,34 @@ export function Landing({ onLaunch }: LandingProps) {
 					<div className="landing__tiles">
 						{LANDING_METRICS.map((metric) => (
 							<MetricTile key={metric.id} metric={metric} />
+						))}
+					</div>
+				</section>
+
+				<section
+					className="landing__band"
+					aria-label={t("qualityBand.ariaLabel")}
+				>
+					<div className="landing__band-head">
+						<div className="section-head__title landing__band-title">
+							{t("qualityBand.titleLead")}{" "}
+							<em>{t("qualityBand.titleAccent")}</em>{" "}
+							{t("qualityBand.titleTrail")}
+						</div>
+						<div className="landing__band-live">
+							{t("qualityBand.live", {
+								queries: QUALITY_NATURAL_QUERIES,
+								scorer: QUALITY_SCORER,
+							})}
+						</div>
+					</div>
+					<div className="landing__tiles">
+						{LANDING_QUALITY_METRICS.map((metric) => (
+							<MetricTile
+								key={metric.id}
+								metric={metric}
+								namespacePrefix="qualityMetrics"
+							/>
 						))}
 					</div>
 				</section>

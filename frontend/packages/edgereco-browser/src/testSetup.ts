@@ -16,6 +16,11 @@ vi.mock("./engine/catalogueSql", async (importOriginal) => {
 		openCatalogueSql: vi.fn(() =>
 			actual.openCatalogueSql({ workerFactory: nodeSqlWorkerFactory }),
 		),
+		openCatalogueShardSql: vi.fn((shardIndex: number) =>
+			actual.openCatalogueShardSql(shardIndex, {
+				workerFactory: nodeSqlWorkerFactory,
+			}),
+		),
 		importCatalogueSqlFromChunks: vi.fn((chunks: AsyncIterable<Uint8Array>) =>
 			actual.importCatalogueSqlFromChunks(chunks, {
 				workerFactory: nodeSqlWorkerFactory,

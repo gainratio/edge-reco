@@ -26,14 +26,17 @@ argued for in the PR that does it — never a quiet edit.
 
 from __future__ import annotations
 
+import json
 from pathlib import Path
 from typing import Final, NamedTuple
 
 import pytest
 
 from edgereco.reco.relevance_baseline import (
+    RELEVANCE_MEASUREMENT_JSON,
     RelevanceExport,
     Segment,
+    build_relevance_measurement,
     empty_positive_pages,
     full_depth_negatives,
     load_export,
@@ -120,14 +123,18 @@ BASELINE: Final[tuple[Floor, ...]] = (
     Floor("natural", "mean_ndcg_at_k", 10, 0.9399),
     Floor("natural", "mean_recall_at_k", 10, 0.2170),
     Floor("natural", "mean_precision_at_k", 10, 0.9419),
+    Floor("natural", "mean_f1_at_k", 10, 0.3451),
     Floor("natural", "mean_ndcg_at_k", 24, 0.9065),
     Floor("natural", "mean_recall_at_k", 24, 0.4880),
+    Floor("natural", "mean_f1_at_k", 24, 0.6097),
     # taxonomy-word (n=12): the leaky control group, gated so the leak cannot widen.
     Floor("taxonomy-word", "mean_ndcg_at_k", 10, 1.0000),
     Floor("taxonomy-word", "mean_recall_at_k", 10, 0.0238),
     Floor("taxonomy-word", "mean_precision_at_k", 10, 1.0000),
+    Floor("taxonomy-word", "mean_f1_at_k", 10, 0.0465),
     Floor("taxonomy-word", "mean_ndcg_at_k", 24, 1.0000),
     Floor("taxonomy-word", "mean_recall_at_k", 24, 0.0571),
+    Floor("taxonomy-word", "mean_f1_at_k", 24, 0.1081),
 )
 
 #: Not one of the 8 unanswerable queries may come back holding a full page. Was 8
@@ -356,3 +363,9 @@ def test_export_path_is_read_from_disk(tmp_path: Path, export: RelevanceExport) 
     copy = tmp_path / "relevance_export.json"
     copy.write_text(export.model_dump_json(), encoding="utf-8")
     assert load_export(copy).queries == export.queries
+
+
+def test_landing_relevance_measurement_matches_assay_export(export: RelevanceExport) -> None:
+    """The Landing page's committed IR summary must equal Assay's live trec_eval output."""
+    committed = json.loads(RELEVANCE_MEASUREMENT_JSON.read_text(encoding="utf-8"))
+    assert committed == build_relevance_measurement(export)

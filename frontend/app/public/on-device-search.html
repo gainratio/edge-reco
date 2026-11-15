@@ -27,13 +27,13 @@
 <body>
 <p><a href="/">EdgeReco</a></p>
 <h1>On-device search and recommendations</h1>
-<p>EdgeReco moves product search, ranking, and recommendations out of a paid backend and into each shopper's browser. A store publishes a signed catalog bundle — scaling up to 1,000,000 products across 64 sharded 2-bit IVF-TurboQuant SQLite bundles (~1.9 MB zstd per shard behind a 96 KiB centroid router, with a 100,000-product single-bundle live demo); the browser verifies it, stores SQLite in OPFS, and answers queries locally with FTS5 and pre-quantized 2-bit TurboQuant vector search.</p>
+<p>EdgeReco moves product search, ranking, and recommendations out of a paid backend and into each shopper's browser. A store publishes a signed catalog bundle — 1,000,000 products across 64 sharded 2-bit IVF-TurboQuant SQLite bundles (79.0 MB signed bundle across 3,331 chunks behind a 96 KiB centroid router) in the live storefront; the browser verifies it, stores the home shard in OPFS, probes extra shards on demand, and answers queries locally with FTS5 and pre-quantized 2-bit TurboQuant vector search.</p>
 <h2>What runs locally</h2>
 <ul>
 <li>Keyword search with SQLite FTS5</li>
-<li>2-bit TurboQuant vector similarity and 1M-product IVF shard routing with sqlite-vector</li>
-<li>Session-aware ranking and recommendations</li>
-<li>Offline operation and ~9.4 KB zstd binary delta updates after the first sync</li>
+<li>2-bit TurboQuant vector similarity and 1,000,000-product IVF shard routing with sqlite-vector</li>
+<li>Session-aware ranking, per-item Assay score receipts, and held-out Assay IR evaluation (94.2% Precision@10, 48.8% Recall@24, 0.61 F1@24, 0.94 nDCG@10)</li>
+<li>Offline operation, 42.9 KB two-chunk delta hot-swaps, and ~9.4 KB zstd binary delta updates after the first sync</li>
 </ul>
 <h2>Why it matters</h2>
 <p>No per-query server cost, no catalog API latency, and no upload of shopper behavior. The engine is open source and the bundle is content-addressed and signature-verified.</p>

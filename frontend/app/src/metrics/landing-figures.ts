@@ -18,6 +18,7 @@
 // fails if a hardcoded timing or heap claim reappears there.
 
 import measurement from "./live-measurement.json";
+import relevance from "./relevance-measurement.json";
 
 const median = (xs: readonly number[]): number => {
 	const s = [...xs].sort((a, b) => a - b);
@@ -28,22 +29,28 @@ const median = (xs: readonly number[]): number => {
 };
 
 const seconds = (ms: number): string => (ms / 1000).toFixed(1);
+const pct = (ratio: number): string => `${(ratio * 100).toFixed(1)}`;
+const dec2 = (value: number): string => value.toFixed(2);
 
 /** The day the quoted measurement was taken (YYYY-MM-DD), shown on the band. */
 export const LANDING_MEASURED_ON = measurement.measuredAt.slice(0, 10);
+
+/** Assay IR scorer provenance string shown on the search-quality band. */
+export const QUALITY_SCORER = relevance.scorer;
+export const QUALITY_NATURAL_QUERIES = relevance.natural.k10.queryCount;
 
 /** One-time embedding model download on a first visit, as measured. */
 export const MODEL_DOWNLOAD = `${Math.round(measurement.embeddingModelMb)} MB`;
 
 /** Products in the committed demo catalog. Guarded against the signed bundle in tests. */
-export const CATALOG_PRODUCTS = 100000;
+export const CATALOG_PRODUCTS = 1000000;
 /** Categories the committed catalog is balanced across (see CLAUDE.md invariant). */
 export const CATALOG_CATEGORIES = 12;
 /**
  * On-disk size of the committed signed bundle (backend/examples/catalog).
  * Guarded against the bundle's real byte count in landing-figures.test.ts.
  */
-export const BUNDLE_SIZE = "32.6 MB";
+export const BUNDLE_SIZE = "79.0 MB";
 
 export interface RepresentativeMetric {
 	/** Stable key into the `landing` namespace: `metrics.<id>.{label,sub}`. */
@@ -83,5 +90,65 @@ export const LANDING_METRICS: readonly RepresentativeMetric[] = [
 		id: "catalog",
 		num: CATALOG_PRODUCTS.toLocaleString("en-US"),
 		vars: { categories: CATALOG_CATEGORIES, bundle: BUNDLE_SIZE },
+	},
+];
+
+/** Six IR quality tiles scored by `assay.ranking` (`trec_eval`) over the held-out golden set. */
+export const LANDING_QUALITY_METRICS: readonly RepresentativeMetric[] = [
+	{
+		id: "precision",
+		num: pct(relevance.natural.k10.precision),
+		unit: "%",
+		tone: "pos",
+		vars: {
+			k: relevance.natural.k10.k,
+			p24: `${pct(relevance.natural.k24.precision)}%`,
+			k24: relevance.natural.k24.k,
+		},
+	},
+	{
+		id: "recall",
+		num: pct(relevance.natural.k24.recall),
+		unit: "%",
+		vars: {
+			k24: relevance.natural.k24.k,
+			shareOfCeiling: `${pct(relevance.natural.k24.recall / relevance.natural.k24.oracleRecallCeiling)}%`,
+			ceiling: `${pct(relevance.natural.k24.oracleRecallCeiling)}%`,
+		},
+	},
+	{
+		id: "f1",
+		num: dec2(relevance.natural.k24.f1),
+		tone: "hot",
+		vars: {
+			k24: relevance.natural.k24.k,
+			shareOfCeiling: `${pct(relevance.natural.k24.f1 / relevance.natural.k24.oracleF1Ceiling)}%`,
+			ceiling: dec2(relevance.natural.k24.oracleF1Ceiling),
+		},
+	},
+	{
+		id: "ndcg",
+		num: dec2(relevance.natural.k10.ndcg),
+		tone: "pos",
+		vars: {
+			k: relevance.natural.k10.k,
+			ciLow: dec2(relevance.natural.k10.ndcgCiLow),
+			ciHigh: dec2(relevance.natural.k10.ndcgCiHigh),
+		},
+	},
+	{
+		id: "mrr",
+		num: dec2(relevance.natural.k10.mrr),
+		vars: {
+			map: dec2(relevance.natural.k10.map),
+		},
+	},
+	{
+		id: "negatives",
+		num: `${relevance.negatives.fullDepthPages}/${relevance.negatives.queryCount}`,
+		tone: "pos",
+		vars: {
+			empty: relevance.negatives.emptyPositivePages,
+		},
 	},
 ];

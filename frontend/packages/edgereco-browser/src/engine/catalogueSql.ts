@@ -39,6 +39,16 @@ export const CATALOGUE_DATABASE = "edgereco-catalogue";
 /** The vector index main's build stored in OPFS before this database existed. */
 export const LEGACY_VECTOR_INDEX = "edgereco-catalog";
 
+/** Stable database name for `shardIndex` (`0` reuses `edgereco-catalogue`). */
+export function catalogueShardDatabaseName(shardIndex: number): string {
+	if (!Number.isInteger(shardIndex) || shardIndex < 0) {
+		throw new RangeError(`shardIndex must be a non-negative integer`);
+	}
+	return shardIndex === 0
+		? CATALOGUE_DATABASE
+		: `${CATALOGUE_DATABASE}-s${String(shardIndex).padStart(2, "0")}`;
+}
+
 /** The slice of an open SQL database the catalogue uses. */
 export interface CatalogueSql {
 	/** Where the database actually lives: OPFS, or memory and why. */
@@ -62,6 +72,24 @@ export interface OpenCatalogueSqlDeps {
 	readonly workerFactory?: SqlWorkerFactory;
 }
 
+export async function openCatalogueShardSql(
+	shardIndex: number,
+	deps: OpenCatalogueSqlDeps = {},
+): Promise<CatalogueSql> {
+	const name = catalogueShardDatabaseName(shardIndex);
+	if (shardIndex === 0) {
+		return openNamedSql(name, "catalogue", deps);
+	}
+	return openSqlDatabase(
+		{
+			name,
+			persistence: "memory",
+			memoryProfile: "auto",
+		},
+		deps,
+	);
+}
+
 /**
  * Open the catalogue database in OPFS. When OPFS is unusable or another tab
  * owns the pool it opens in memory instead: loadVectorIndex rebuilds the whole
@@ -70,7 +98,7 @@ export interface OpenCatalogueSqlDeps {
 export function openCatalogueSql(
 	deps: OpenCatalogueSqlDeps = {},
 ): Promise<CatalogueSql> {
-	return openNamedSql(CATALOGUE_DATABASE, "catalogue", deps);
+	return openCatalogueShardSql(0, deps);
 }
 
 /**

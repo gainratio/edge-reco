@@ -205,4 +205,23 @@ describe("importCatalogueSqlFromChunks & clearCatalogueSqlStorage", () => {
 			expect.any(Error),
 		);
 	});
+
+	it("names and opens memory-backed extra-shard scratch databases independently from shard 0", async () => {
+		expect(seam.catalogueShardDatabaseName(0)).toBe("edgereco-catalogue");
+		expect(seam.catalogueShardDatabaseName(1)).toBe("edgereco-catalogue-s01");
+		expect(() => seam.catalogueShardDatabaseName(-1)).toThrow(RangeError);
+		expect(() => seam.catalogueShardDatabaseName(1.5)).toThrow(RangeError);
+
+		const scratch = await seam.openCatalogueShardSql(2, {
+			workerFactory: nodeSqlWorkerFactory,
+		});
+		try {
+			await scratch.exec(
+				"CREATE TABLE s2(id TEXT); INSERT INTO s2 VALUES ('ok');",
+			);
+			expect(await scratch.query("SELECT id FROM s2")).toEqual([{ id: "ok" }]);
+		} finally {
+			await scratch.close();
+		}
+	});
 });

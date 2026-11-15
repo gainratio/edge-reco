@@ -47,7 +47,7 @@ same-origin.
 ## How it relates to the backend bundles
 
 The app consumes the same signed bundle format the Python tier produces:
-`backend/examples/catalog` holds the committed 100,000-product demo bundle
+`backend/examples/catalog` holds the committed 1,000,000-product 64-shard demo bundle
 (`latest` pointer → manifest → content-addressed chunks). Rebuild or re-sign it
 with the `edgereco` CLI (see [`docs/QUICKSTART.md`](../../docs/QUICKSTART.md) §5)
 and the app picks up the new version on the next load — verified fail-closed
