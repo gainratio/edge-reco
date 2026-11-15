@@ -152,3 +152,46 @@ export const LANDING_QUALITY_METRICS: readonly RepresentativeMetric[] = [
 		},
 	},
 ];
+
+export interface StorefrontQualitySummary {
+	readonly k10: number;
+	readonly k24: number;
+	readonly queryCount: number;
+	readonly scorer: string;
+	readonly precision10: string;
+	readonly precision24: string;
+	readonly recall24: string;
+	readonly recallCeiling24: string;
+	readonly recallShareOfCeiling: string;
+	readonly f1At24: string;
+	readonly f1Ceiling24: string;
+	readonly f1ShareOfCeiling: string;
+	readonly ndcg10: string;
+	readonly ndcgCiLow: string;
+	readonly ndcgCiHigh: string;
+	readonly mrr10: string;
+	readonly map10: string;
+	readonly negativeFalsePositives: string;
+}
+
+/** Single-source Assay (`trec_eval`) IR summary shared with the booted Storefront. */
+export const STOREFRONT_QUALITY_SUMMARY: StorefrontQualitySummary = {
+	k10: relevance.natural.k10.k,
+	k24: relevance.natural.k24.k,
+	queryCount: relevance.natural.k10.queryCount,
+	scorer: relevance.scorer,
+	precision10: `${pct(relevance.natural.k10.precision)}%`,
+	precision24: `${pct(relevance.natural.k24.precision)}%`,
+	recall24: `${pct(relevance.natural.k24.recall)}%`,
+	recallCeiling24: `${pct(relevance.natural.k24.oracleRecallCeiling)}%`,
+	recallShareOfCeiling: `${pct(relevance.natural.k24.recall / relevance.natural.k24.oracleRecallCeiling)}%`,
+	f1At24: dec2(relevance.natural.k24.f1),
+	f1Ceiling24: dec2(relevance.natural.k24.oracleF1Ceiling),
+	f1ShareOfCeiling: `${pct(relevance.natural.k24.f1 / relevance.natural.k24.oracleF1Ceiling)}%`,
+	ndcg10: dec2(relevance.natural.k10.ndcg),
+	ndcgCiLow: dec2(relevance.natural.k10.ndcgCiLow),
+	ndcgCiHigh: dec2(relevance.natural.k10.ndcgCiHigh),
+	mrr10: dec2(relevance.natural.k10.mrr),
+	map10: dec2(relevance.natural.k10.map),
+	negativeFalsePositives: `${relevance.negatives.fullDepthPages}/${relevance.negatives.queryCount}`,
+};

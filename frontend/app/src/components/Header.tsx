@@ -7,6 +7,7 @@ interface HeaderProps {
 	activeCategory: string | null;
 	onSelectCategory: (category: string | null) => void;
 	cartCount: number;
+	onOverview?: () => void;
 }
 
 export function Header({
@@ -16,17 +17,31 @@ export function Header({
 	activeCategory,
 	onSelectCategory,
 	cartCount,
+	onOverview,
 }: HeaderProps) {
 	const { t } = useTranslation("storefront");
+	const wordmarkBody = (
+		<>
+			<span className="wordmark__name">
+				EdgeReco<span className="wordmark__dot">.</span>
+			</span>
+			<span className="wordmark__tag">{t("brand.tagline")}</span>
+		</>
+	);
 	return (
 		<header className="nimbus-header">
 			<div className="nimbus-header__bar">
-				<div className="wordmark">
-					<span className="wordmark__name">
-						EdgeReco<span className="wordmark__dot">.</span>
-					</span>
-					<span className="wordmark__tag">{t("brand.tagline")}</span>
-				</div>
+				{onOverview !== undefined ? (
+					<button
+						type="button"
+						className="wordmark wordmark--button"
+						onClick={onOverview}
+					>
+						{wordmarkBody}
+					</button>
+				) : (
+					<div className="wordmark">{wordmarkBody}</div>
+				)}
 
 				<div className="search">
 					<svg
@@ -66,16 +81,27 @@ export function Header({
 					{t("sessionPill")}
 				</div>
 
-				<a
-					className="header-gh"
-					href="https://github.com/gainratio/edge-reco"
-					target="_blank"
-					rel="noreferrer"
-					title={t("openSourceTitle")}
-				>
-					{t("openSource")}
-					<span aria-hidden="true"> ↗</span>
-				</a>
+				<div className="header-links">
+					{onOverview !== undefined && (
+						<button
+							type="button"
+							className="header-gh header-overview"
+							onClick={onOverview}
+						>
+							{t("overview")}
+						</button>
+					)}
+					<a
+						className="header-gh"
+						href="https://github.com/gainratio/edge-reco"
+						target="_blank"
+						rel="noreferrer"
+						title={t("openSourceTitle")}
+					>
+						{t("openSource")}
+						<span aria-hidden="true"> ↗</span>
+					</a>
+				</div>
 
 				{cartCount > 0 && (
 					<span

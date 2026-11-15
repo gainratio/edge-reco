@@ -11,7 +11,16 @@ const { bootstrap, clearCatalogCache } = vi.hoisted(() => ({
 }));
 vi.mock("./api/client", () => ({ bootstrapApp: bootstrap, clearCatalogCache }));
 vi.mock("./components/Storefront", () => ({
-	Storefront: () => <div>storefront</div>,
+	Storefront: ({ onOverview }: { onOverview?: () => void }) => (
+		<div>
+			<span>storefront</span>
+			{onOverview && (
+				<button type="button" onClick={onOverview}>
+					Overview
+				</button>
+			)}
+		</div>
+	),
 }));
 
 import { App } from "./App";
@@ -221,5 +230,26 @@ describe("App launch gate", () => {
 		expect(await screen.findByText("storefront")).toBeInTheDocument();
 		expect(clearCatalogCache).toHaveBeenCalledOnce();
 		expect(bootstrap).toHaveBeenCalledTimes(2);
+	});
+
+	it("returns to Landing via Overview and resumes the warm Storefront without rebooting", async () => {
+		bootstrap.mockReturnValueOnce(Promise.resolve());
+		render(<App />);
+		await userEvent.click(
+			screen.getByRole("button", { name: /Launch the live demo/i }),
+		);
+		expect(await screen.findByText("storefront")).toBeInTheDocument();
+		expect(bootstrap).toHaveBeenCalledTimes(1);
+
+		await userEvent.click(screen.getByRole("button", { name: "Overview" }));
+		expect(
+			screen.getByRole("button", { name: /Launch the live demo/i }),
+		).toBeInTheDocument();
+
+		await userEvent.click(
+			screen.getByRole("button", { name: /Launch the live demo/i }),
+		);
+		expect(await screen.findByText("storefront")).toBeInTheDocument();
+		expect(bootstrap).toHaveBeenCalledTimes(1);
 	});
 });

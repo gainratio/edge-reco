@@ -1,4 +1,5 @@
 import { useTranslation } from "react-i18next";
+import { STOREFRONT_QUALITY_SUMMARY } from "../metrics/landing-figures";
 import { useMetrics } from "../metrics/store";
 
 /**
@@ -88,7 +89,113 @@ export function MetricsStrip({
 							: t("metrics.applyDelta")}
 				</button>
 			)}
+			<AssayQualityDisclosure />
 		</div>
+	);
+}
+
+interface QualityStatProps {
+	readonly value: string;
+	readonly label: string;
+	readonly sub: string;
+	readonly steady?: boolean;
+}
+
+function QualityStat({ value, label, sub, steady = false }: QualityStatProps) {
+	return (
+		<div className="metrics-quality__card">
+			<dt className="metrics-quality__label">{label}</dt>
+			<dd
+				className={
+					steady
+						? "metrics-quality__val metrics-quality__val--steady"
+						: "metrics-quality__val"
+				}
+			>
+				{value}
+			</dd>
+			<dd className="metrics-quality__sub">{sub}</dd>
+		</div>
+	);
+}
+
+function AssayQualityDisclosure() {
+	const { t } = useTranslation("storefront");
+	const q = STOREFRONT_QUALITY_SUMMARY;
+	return (
+		<details className="metrics-quality">
+			<summary className="metrics-quality__summary">
+				<span className="metrics-strip__value metrics-strip__value--steady">
+					{t("metrics.qualityPillValue", {
+						p10: q.precision10,
+						k: q.k10,
+						r24: q.recall24,
+						k24: q.k24,
+						f1: q.f1At24,
+					})}
+				</span>
+				<span className="metrics-strip__label">
+					{t("metrics.qualityPillLabel")}
+				</span>
+			</summary>
+			<div className="metrics-quality__panel">
+				<p className="metrics-quality__caption">
+					{t("metrics.qualityHeading", {
+						queries: q.queryCount,
+						scorer: q.scorer,
+					})}
+				</p>
+				<dl className="metrics-quality__grid">
+					<QualityStat
+						value={q.precision10}
+						label={t("metrics.qualityPrecisionLabel", { k: q.k10 })}
+						sub={t("metrics.qualityPrecisionSub", {
+							p24: q.precision24,
+							k24: q.k24,
+						})}
+						steady
+					/>
+					<QualityStat
+						value={q.recall24}
+						label={t("metrics.qualityRecallLabel", { k24: q.k24 })}
+						sub={t("metrics.qualityRecallSub", {
+							share: q.recallShareOfCeiling,
+							ceiling: q.recallCeiling24,
+							k24: q.k24,
+						})}
+					/>
+					<QualityStat
+						value={q.f1At24}
+						label={t("metrics.qualityF1Label", { k24: q.k24 })}
+						sub={t("metrics.qualityF1Sub", {
+							share: q.f1ShareOfCeiling,
+							ceiling: q.f1Ceiling24,
+							k24: q.k24,
+						})}
+					/>
+					<QualityStat
+						value={q.ndcg10}
+						label={t("metrics.qualityNdcgLabel", { k: q.k10 })}
+						sub={t("metrics.qualityNdcgSub", {
+							ciLow: q.ndcgCiLow,
+							ciHigh: q.ndcgCiHigh,
+						})}
+						steady
+					/>
+					<QualityStat
+						value={q.mrr10}
+						label={t("metrics.qualityMrrLabel")}
+						sub={t("metrics.qualityMrrSub", { map: q.map10 })}
+					/>
+					<QualityStat
+						value={q.negativeFalsePositives}
+						label={t("metrics.qualityNegativesLabel")}
+						sub={t("metrics.qualityNegativesSub")}
+						steady
+					/>
+				</dl>
+			</div>
+		</details>
 	);
 }
 

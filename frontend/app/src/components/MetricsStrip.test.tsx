@@ -138,4 +138,16 @@ describe("MetricsStrip", () => {
 			screen.getByRole("button", { name: "Applying delta…" }),
 		).toBeDisabled();
 	});
+
+	it("renders the Assay IR Precision, Recall, and F1 summary pill and expandable scorecard", () => {
+		render(<MetricsStrip />);
+		expect(
+			screen.getByText(/94\.2% P@10 · 48\.8% R@24 · 0\.61 F1/),
+		).toBeInTheDocument();
+		expect(screen.getByText("assay ir")).toBeInTheDocument();
+		expect(screen.getByText("Precision@10")).toBeInTheDocument();
+		expect(screen.getByText("Recall@24")).toBeInTheDocument();
+		expect(screen.getByText("F1@24 harmonic mean")).toBeInTheDocument();
+		expect(screen.getByText(/90\.3% of 54\.1% oracle max/)).toBeInTheDocument();
+	});
 });
