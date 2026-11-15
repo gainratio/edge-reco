@@ -26,8 +26,10 @@ from typing import Final
 
 import numpy as np
 from edgeproc.bundles.sqlite import canonicalize_sqlite
+from numpy.typing import NDArray
 
 from edgereco.catalog.models import Product
+from edgereco.catalog.turboquant import populate_turboquant_shadow
 
 CATALOGUE_SQLITE_NAME: Final[str] = "catalogue.sqlite"
 _FLOAT32_BYTES: Final[int] = 4
@@ -109,12 +111,29 @@ def _quantize_embeddings_int8(embeddings: bytes, count: int, dim: int) -> bytes:
     return np.clip(np.round(scaled), -127, 127).astype(np.int8).tobytes()
 
 
+def _resolve_vector_storage(
+    embeddings: bytes,
+    count: int,
+    embedding_dim: int,
+    *,
+    quantize_int8: bool,
+    prequantize_turbo2: bool,
+) -> tuple[bytes, int, NDArray[np.float32] | None]:
+    if prequantize_turbo2:
+        matrix = np.frombuffer(embeddings, dtype=np.float32).reshape(count, embedding_dim)
+        return b"", 0, matrix
+    if quantize_int8:
+        return _quantize_embeddings_int8(embeddings, count, embedding_dim), embedding_dim, None
+    return embeddings, embedding_dim * _FLOAT32_BYTES, None
+
+
 def build_catalogue_sqlite(
     staging_dir: Path,
     *,
     embedding_dim: int,
     embedding_count: int,
     quantize_int8: bool = False,
+    prequantize_turbo2: bool = False,
 ) -> bytes:
     """Build and return canonical ``catalogue.sqlite`` bytes from ``staging_dir``."""
     products_by_id = _load_staged_products(staging_dir / "products.jsonl")
@@ -125,12 +144,13 @@ def build_catalogue_sqlite(
         raise ValueError(
             f"embeddings.f32 has {len(embeddings)} bytes; expected {len(ids) * f32_row_bytes}"
         )
-    if quantize_int8:
-        vector_bytes = _quantize_embeddings_int8(embeddings, len(ids), embedding_dim)
-        row_bytes = embedding_dim
-    else:
-        vector_bytes = embeddings
-        row_bytes = f32_row_bytes
+    vector_bytes, row_bytes, turbo_matrix = _resolve_vector_storage(
+        embeddings,
+        len(ids),
+        embedding_dim,
+        quantize_int8=quantize_int8,
+        prequantize_turbo2=prequantize_turbo2,
+    )
     rows = [
         _product_row(
             row_idx,
@@ -138,11 +158,11 @@ def build_catalogue_sqlite(
             products_by_id.get(product_id),
             vector_bytes,
             row_bytes,
-            compact=quantize_int8 and row_idx >= 720,
+            compact=(quantize_int8 or prequantize_turbo2) and row_idx >= 720,
         )
         for row_idx, product_id in enumerate(ids)
     ]
-    return _write_canonical_sqlite(rows)
+    return _write_canonical_sqlite(rows, turbo_matrix=turbo_matrix)
 
 
 def _load_staged_products(products_path: Path) -> dict[str, Product]:
@@ -211,6 +231,8 @@ def _product_row(
 
 def _write_canonical_sqlite(
     rows: list[tuple[int, str, str, str, str, str, str, str, float, float, float, str, bytes]],
+    *,
+    turbo_matrix: NDArray[np.float32] | None = None,
 ) -> bytes:
     with tempfile.TemporaryDirectory(prefix="edgereco-sqlite-") as tmp:
         db_path = Path(tmp) / CATALOGUE_SQLITE_NAME
@@ -223,4 +245,6 @@ def _write_canonical_sqlite(
                 conn.executemany(_INSERT_PRODUCT_SQL, rows)
                 conn.execute("INSERT INTO products_fts(products_fts) VALUES ('rebuild')")
                 conn.execute("INSERT INTO products_fts(products_fts) VALUES ('optimize')")
+                if turbo_matrix is not None:
+                    populate_turboquant_shadow(conn, turbo_matrix, strip_raw_embeddings=False)
         return canonicalize_sqlite(db_path)

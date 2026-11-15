@@ -30,6 +30,7 @@ export type {
 // EMBEDDING_MODEL stays engine-internal: the model id is wired inside
 // createEmbedder; consumers only ever need the dimension.
 export { EMBEDDING_DIM, type Embedder } from "./engine/embedder";
+export { decodeTurboQuantRow, rankIvfCentroids } from "./engine/ivfRouter";
 // --- the bundle-carried ranking config: strategy map + weights ---
 // DEFAULT_RANKING_CONFIG stays engine-internal: the runtime reads the config
 // from the signed bundle; only the TYPES are part of the public surface.
