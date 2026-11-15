@@ -132,10 +132,12 @@
       <h2>How does EdgeReco work?</h2>
       <p>
         EdgeReco syncs a signed, content-addressed catalog bundle to the browser and
-        verifies it fail-closed (Ed25519 over an sha256 manifest). It then runs BM25
-        keyword search and FAISS vector search, combines them with Reciprocal Rank Fusion,
-        and applies session-aware reranking from in-session interaction signals — all
-        on-device.
+        verifies it fail-closed (Ed25519 over a SHA-256 manifest) — scaling up to
+        1,000,000 products across 64 sharded 2-bit IVF-TurboQuant SQLite bundles (~1.9 MB
+        per shard behind a 96 KiB centroid router, with a 100,000-product single-bundle
+        live demo). It then runs SQLite FTS5 BM25 keyword search and 2-bit TurboQuant
+        vector search, combines them with Reciprocal Rank Fusion, and applies
+        session-aware reranking from in-session interaction signals — all on-device.
       </p>
 
       <h2>Does EdgeReco require a backend for every query?</h2>

@@ -14,12 +14,13 @@ plain keyword search, which misses what shoppers mean: type "something for my ac
 back" and it only finds products whose titles happen to contain the word "back".
 
 EdgeReco does the searching and ranking inside the shopper's browser tab. Your store
-publishes one signed catalog bundle, about 32.6 MB for 100,000 products. The browser
-verifies every chunk, streams the SQLite catalog into OPFS (Origin Private File System,
-the browser's private on-disk storage), searches by meaning as well as
-by words, and re-ranks recommendations as the shopper clicks. No server answers the
-searches, so the application and inference cost does not grow with traffic, and the
-store keeps working offline.
+publishes signed SQLite + 2-bit TurboQuant catalog bundles — one ~32.6 MB bundle for the
+100,000-product live demo, or 64 sharded IVF-TurboQuant bundles (~1.9 MB zstd per shard
+behind a 96 KiB centroid router) for catalogs up to 1,000,000 products. The browser
+verifies every chunk, streams SQLite into OPFS (Origin Private File System, the browser's
+private on-disk storage), searches by meaning as well as by words, and re-ranks
+recommendations as the shopper clicks. No server answers the searches, so the application
+and inference cost does not grow with traffic, and cached shards keep working offline.
 
 ![Live walkthrough of the EdgeReco demo store: searching by meaning, clicking three items to re-rank recommendations in the browser, and opening the why? score math](docs/assets/live-demo.gif)
 
@@ -52,9 +53,9 @@ replaces that with a bundle download per new device plus CDN egress; after the b
 cached, another request adds no server work. Plug in your own vendor price — the point is
 the shape, not a quoted rate.
 
-This is not a replacement for a multi-million-item merchandising platform. It is an edge
-tier for the 100,000-SKU range and for the high-volume rows where per-request pricing
-hurts most.
+This is not a replacement for a ten-million-item merchandising platform. It is an edge
+tier for catalogs up to 1,000,000 SKUs and for the high-volume rows where per-request
+pricing hurts most.
 
 ## Try it
 
@@ -120,13 +121,13 @@ a separate, unrelated project (it hides personal data in AI prompts).
 
 ## What it does not do
 
-- **Multi-million-item catalogs.** It is built for tens to hundreds of thousands of products
-  (the demo ships 100,000), not tens of millions. Search is an exact scan in SQLite with no
-  approximate index, and the whole catalog database is downloaded.
-- **Private catalogs.** Every shopper gets the full catalog file, so anything in it is
-  public.
-- **Private Browsing / disabled local storage.** The 100,000-product catalog streams
-  directly into a file-backed OPFS SQLite database (~32.6 MB on the wire, ~24 MB model on
+- **Ten-million-item catalogs.** Single-bundle mode ships 100,000 products in the live
+  demo, and sharded IVF-TurboQuant mode partitions up to 1,000,000 products into ~1.9 MB
+  SQLite shards routed by a 96 KiB centroid table — not tens of millions of items.
+- **Private catalogs.** Every shopper can download the catalog shards, so anything in the
+  catalog is public.
+- **Private Browsing / disabled local storage.** The live demo streams its 100,000-product
+  catalog into a file-backed OPFS SQLite database (~32.6 MB on the wire, ~24 MB model on
   first semantic search) so memory stays bounded on phones and desktops; Private Browsing
   blocks OPFS and displays a warning to reopen in a normal tab.
 - **A hosted service.** You build the catalog and host the static files yourself.
@@ -140,10 +141,10 @@ a separate, unrelated project (it hides personal data in AI prompts).
 
 | If you need | Use |
 | --- | --- |
-| Millions of products, merchandising tools, and a vendor who runs it | A hosted search and recommendation service |
+| Tens of millions of products, merchandising tools, and a vendor who runs it | A hosted search and recommendation service |
 | Shoppers who search by exact product names only | Your store platform's built-in search |
 | A catalog that must stay private | Your own search server behind an API |
-| Up to ~100,000 products, flat cost, offline use, nothing to run per search | EdgeReco |
+| Up to ~1,000,000 products, flat cost, offline use, nothing to run per search | EdgeReco |
 | A Fortune 500 peak-traffic offload tier in front of an existing catalog | EdgeReco for the high-volume rows; keep the system of record hosted |
 
 ## Run it yourself
@@ -169,9 +170,9 @@ The optional Python library, command line tool and API server need Python 3.13 a
 
 ## Under the hood (for developers)
 
-- **Page-aligned SQLite + content-addressed chunking (`backend/` + `edge-proc`).** The offline builder compiles products, an FTS5 BM25 keyword index, and 2-bit TurboQuant 384-d embeddings (`sqlite-vector`) into `catalogue.sqlite`, splits it into zstd-compressed SHA-256 chunks, and signs the manifest with Ed25519.
-- **OPFS streaming & delta updates (`@gainratio/browser`).** Inside a dedicated Web Worker, the browser checks the Ed25519 signature and every chunk digest before writing SQLite pages into OPFS; when prices or products change, only modified chunks are fetched and existing chunks are reused from cache.
-- **Hybrid retrieval, Reciprocal Rank Fusion & MMR (`frontend/`).** Each query runs lexical BM25 (`FTS5`) alongside semantic MiniLM-L6-v2 (`onnxruntime-web` WASM) vector similarity, merges candidates with Reciprocal Rank Fusion (`RRF`), diversifies results with Maximal Marginal Relevance (`MMR`), and combines shopper session signals through `@gainratio/assay`.
+- **Pre-quantized 2-bit TurboQuant & 1M IVF sharding (`backend/` + `edge-proc`).** The offline builder compiles products, an FTS5 BM25 keyword index, and pre-populated 2-bit TurboQuant 384-d shadow rows (`vector0_products_embedding` at 108 B/row, stripping raw float32 vectors via `zeroblob(0)`) into SQLite — either a single `catalogue.sqlite` up to 100,000 products or 64 spherical k-means IVF shards (~1.9 MB zstd per shard + 96 KiB `centroids.f32`) up to 1,000,000 products — and signs the manifest with Ed25519.
+- **OPFS streaming & binary delta updates (`@gainratio/browser` + `edge-proc`).** Inside a dedicated Web Worker, the browser checks the Ed25519 signature and every digest before writing SQLite pages into OPFS; when prices or products change, clients either fetch modified content-addressed chunks or apply prebuilt `zstd --patch-from` binary delta patches (~9.4 KB for a 1%-updated shard).
+- **Hybrid retrieval, Reciprocal Rank Fusion & MMR (`frontend/`).** Each query runs lexical BM25 (`FTS5`) alongside semantic MiniLM-L6-v2 (`onnxruntime-web` WASM) vector similarity (routing across top `nprobe` IVF centroids via `rankIvfCentroids` on sharded catalogs), merges candidates with Reciprocal Rank Fusion (`RRF`), diversifies results with Maximal Marginal Relevance (`MMR`), and combines shopper session signals through `@gainratio/assay`.
 
 ## Develop
 

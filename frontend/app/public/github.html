@@ -146,17 +146,18 @@
         <ul class="repos">
           <li>
             <a href="https://github.com/gainratio/edge-reco"><strong>gainratio/edge-reco</strong></a>
-            — Product search and recommendations that run on the shopper's device: a
-            100,000-product catalog ships as a 32.6 MB signed, content-addressed SQLite bundle,
-            then MiniLM semantic search, rank fusion and session-aware reranking all run in the
-            tab. Zero backend calls after sync. 1,150+ tests.
+            — Product search and recommendations that run on the shopper's device: scales
+            up to 1,000,000 products via 64 sharded 2-bit IVF-TurboQuant SQLite bundles (~1.9 MB
+            per shard, 96 KiB centroid router, 9.4 KB zstd delta patches), with a 100,000-product,
+            32.6 MB single-bundle live demo storefront. MiniLM semantic search, rank fusion and
+            session-aware reranking all run in the tab with zero backend calls after sync.
           </li>
           <li>
             <a href="https://github.com/gainratio/edge-proc"><strong>gainratio/edge-proc</strong></a>
             — Ship a search index to a device as signed, content-addressed bundles:
-            fail-closed Ed25519 verification, FastCDC chunking so the next release
-            downloads only the chunks that changed, then FAISS + BM25 rank fusion locally.
-            Python. 309 tests, 98% coverage. EdgeReco is built on it.
+            fail-closed Ed25519 verification, FastCDC chunking plus prebuilt zstd --patch-from
+            binary delta patches so the next release downloads only changed bytes, then FAISS +
+            BM25 rank fusion locally. Python. 784 tests, 98% coverage. EdgeReco is built on it.
           </li>
           <li>
             <a href="https://github.com/gainratio/edgeproc-core"><strong>gainratio/edgeproc-core</strong></a>

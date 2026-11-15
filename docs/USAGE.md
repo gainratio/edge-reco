@@ -73,11 +73,12 @@ the query's words. It is why "Bose QuietComfort Earbuds" comes back for "earbuds
 
 **Vector search** catches meaning. Each product title is turned into an **embedding**, a
 list of numbers that places similar meanings close together. The query gets the same
-treatment. The Python runtime searches with **FAISS**. The browser imports the verified
-embedding matrix into **SQLite + sqlite-vector**, running in a dedicated Worker with its
-database kept in OPFS (the browser's private per-site file storage). Both use exact
-search (FAISS `IndexFlatIP` / a sqlite-vector full scan). That is fast up to ~100,000 products;
-there is no approximate index yet.
+treatment. The Python runtime searches with **FAISS**. The browser queries **SQLite +
+sqlite-vector** running in a dedicated Worker with its database kept in OPFS (the
+browser's private per-site file storage): single-bundle mode scans up to ~100,000 products
+directly, while sharded 2-bit **IVF-TurboQuant** mode (`partition_ivf_shards` +
+`prequantize_turbo2=True` + `rankIvfCentroids`) routes across 64 ~1.9 MB SQLite shards to
+scale up to **1,000,000 products**.
 
 The two lists are merged with **Reciprocal Rank Fusion** (RRF), which combines lists by
 position rather than by score, so neither method's scale can drown out the other:
