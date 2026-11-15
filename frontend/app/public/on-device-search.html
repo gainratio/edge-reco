@@ -27,13 +27,13 @@
 <body>
 <p><a href="/">EdgeReco</a></p>
 <h1>On-device search and recommendations</h1>
-<p>EdgeReco moves product search, ranking, and recommendations out of a paid backend and into each shopper's browser. A store publishes one signed catalog bundle; the browser verifies it, stores it locally, and answers queries from SQLite with FTS5 and vector search.</p>
+<p>EdgeReco moves product search, ranking, and recommendations out of a paid backend and into each shopper's browser. A store publishes a signed catalog bundle — scaling up to 1,000,000 products across 64 sharded 2-bit IVF-TurboQuant SQLite bundles (~1.9 MB zstd per shard behind a 96 KiB centroid router, with a 100,000-product single-bundle live demo); the browser verifies it, stores SQLite in OPFS, and answers queries locally with FTS5 and pre-quantized 2-bit TurboQuant vector search.</p>
 <h2>What runs locally</h2>
 <ul>
 <li>Keyword search with SQLite FTS5</li>
-<li>Vector similarity with sqlite-vector</li>
+<li>2-bit TurboQuant vector similarity and 1M-product IVF shard routing with sqlite-vector</li>
 <li>Session-aware ranking and recommendations</li>
-<li>Offline operation after the first sync</li>
+<li>Offline operation and ~9.4 KB zstd binary delta updates after the first sync</li>
 </ul>
 <h2>Why it matters</h2>
 <p>No per-query server cost, no catalog API latency, and no upload of shopper behavior. The engine is open source and the bundle is content-addressed and signature-verified.</p>

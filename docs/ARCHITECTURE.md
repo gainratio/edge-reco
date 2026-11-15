@@ -82,7 +82,7 @@ sequenceDiagram
 
 A query goes through three stages, on whichever tier is running it:
 
-1. **Retrieve** — BM25 (keyword) plus the tier's exact vector adapter — FAISS in Python, SQLite + sqlite-vector in the browser — return top-k candidates over the same id space. Vector retrieval is exact flat search (FAISS `IndexFlatIP` / sqlite-vector full scan over `INT8` or `FLOAT32` embeddings); that is fast at demo scale (100,000 products), and there is no ANN index yet.
+1. **Retrieve** — BM25 (keyword) plus the tier's vector adapter — FAISS in Python, SQLite + `sqlite-vector` in the browser — return top-k candidates over the same id space. Single-bundle mode scans up to 100,000 products directly (`INT8`, `FLOAT32`, or pre-quantized 2-bit `TurboQuant` in `vector0_products_embedding` with `zeroblob(0)` raw-vector stripping); for catalogs up to **1,000,000 products**, spherical k-means `IVF-TurboQuant` (`catalog/turboquant.py` + `ivfRouter.ts`) partitions the catalog into 64 ~1.9 MB zstd SQLite shards behind a 96 KiB `centroids.f32` router so each query probes only `nprobe` shards on demand.
 2. **Fuse** — Reciprocal Rank Fusion (`rrf_score(d) = Σ 1/(k + rank_i)`) merges the two lists without depending on raw scores.
 3. **Rerank** — the session-aware scorer applies the published formula.
 
@@ -462,17 +462,16 @@ could serve recommendations from a server while the device downloads its copy in
 background, then switch over. That handoff is not built. Today the browser boot blocks
 until ready, and the two shapes are separate deployment choices.
 
-**Not planned yet:** folding the model into the signed catalog, the automatic handoff,
-and an approximate index for large catalogs are ideas, not scheduled work.
+**Not planned yet:** folding the model into the signed catalog and the automatic server handoff are ideas, not scheduled work.
 
 ## When to use something else
 
 | Option | Where it is the better choice | What you give up |
 | --- | --- | --- |
-| A hosted search/recommendation service (pay per query) | Huge catalogs, merchandising dashboards, A/B testing, and a vendor who runs it | Cost that grows with traffic, and every keystroke crosses the network |
+| A hosted search/recommendation service (pay per query) | Tens of millions of products, merchandising dashboards, A/B testing, and a vendor who runs it | Cost that grows with traffic, and every keystroke crosses the network |
 | Your platform's built-in keyword search | Shoppers search by exact product names | Meaning: "aching back" only finds titles that contain "back" |
-| Your own search server (for example a vector database behind an API) | Millions of products, or data that must never ship to the browser | A server to run, scale and pay for on the busiest day |
-| EdgeReco | Up to ~100,000 products, cost that doesn't grow with traffic, and offline use | A one-time download on first visit, and the whole catalog is public |
+| Your own search server (for example a vector database behind an API) | Tens of millions of products, or data that must never ship to the browser | A server to run, scale and pay for on the busiest day |
+| EdgeReco | Up to ~1,000,000 products (single bundle up to 100k, sharded IVF-TurboQuant up to 1M), cost that doesn't grow with traffic, and offline use | A one-time download of the router/shards on first visit, and catalog shards are public |
 
 ## CI and release pipeline
 
