@@ -59,11 +59,11 @@
 		},
 		"recall": {
 			"label": "Recall@{{k24}}",
-			"sub": "{{r10}} at k={{k10}} · multi-hundred-item nodes"
+			"sub": "{{shareOfCeiling}} of {{ceiling}} max @ {{k24}} slots"
 		},
 		"f1": {
 			"label": "F1@{{k24}} harmonic mean",
-			"sub": "{{f10}} F1@{{k10}} · precision ⊕ recall"
+			"sub": "{{shareOfCeiling}} of {{ceiling}} max @ {{k24}} slots"
 		},
 		"ndcg": {
 			"label": "nDCG@{{k}}",

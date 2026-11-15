@@ -112,8 +112,8 @@ export const LANDING_QUALITY_METRICS: readonly RepresentativeMetric[] = [
 		unit: "%",
 		vars: {
 			k24: relevance.natural.k24.k,
-			r10: `${pct(relevance.natural.k10.recall)}%`,
-			k10: relevance.natural.k10.k,
+			shareOfCeiling: `${pct(relevance.natural.k24.recall / relevance.natural.k24.oracleRecallCeiling)}%`,
+			ceiling: `${pct(relevance.natural.k24.oracleRecallCeiling)}%`,
 		},
 	},
 	{
@@ -122,8 +122,8 @@ export const LANDING_QUALITY_METRICS: readonly RepresentativeMetric[] = [
 		tone: "hot",
 		vars: {
 			k24: relevance.natural.k24.k,
-			f10: dec2(relevance.natural.k10.f1),
-			k10: relevance.natural.k10.k,
+			shareOfCeiling: `${pct(relevance.natural.k24.f1 / relevance.natural.k24.oracleF1Ceiling)}%`,
+			ceiling: dec2(relevance.natural.k24.oracleF1Ceiling),
 		},
 	},
 	{
