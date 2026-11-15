@@ -93,9 +93,11 @@ async function searchP50(page) {
 	return median(samples);
 }
 
+const HEADED = process.env.MEASURE_HEADED === "1";
+
 const open = (dir) =>
 	chromium.launchPersistentContext(dir, {
-		headless: false,
+		headless: !HEADED,
 		viewport: { width: 1280, height: 900 },
 	});
 
@@ -157,7 +159,7 @@ const record = {
 	measuredAt: new Date().toISOString(),
 	target: TARGET,
 	deployedCommit: build.commit,
-	browser: `Chromium ${warm[0].version}, headed, fresh profile per cold run`,
+	browser: `Chromium ${warm[0].version}, ${HEADED ? "headed" : "headless"}, fresh profile per cold run`,
 	machine: `${platform()} ${arch()}, unthrottled network`,
 	command: "cd frontend/app && pnpm run measure:live",
 	coldStartMs: cold.map((r) => round1(r.ms)),
