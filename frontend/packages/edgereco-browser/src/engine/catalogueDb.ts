@@ -34,6 +34,7 @@ import {
 	type SqlStorage,
 } from "./catalogueSql";
 import type { BrowseResponse, Product, SearchResult } from "./domain";
+import { decodeTurboQuantRow } from "./ivfRouter";
 import type { ScoringWeights } from "./rankingConfig";
 import type { SessionProfile } from "./session";
 
@@ -313,6 +314,18 @@ const NEAREST_QUANTIZED_SQL = NEAREST_SQL.replaceAll(
 	FULL_SCAN_PREFIX,
 	QUANTIZE_SCAN_PREFIX,
 );
+
+const NEAREST_BY_VECTOR_QUANTIZED_SQL = `
+	SELECT p.id AS id, p.title AS title, p.description AS description,
+		p.category AS category, p.tags_json AS tags_json, p.brand AS brand,
+		p.price AS price, p.popularity_score AS popularity_score,
+		p.freshness_score AS freshness_score, p.image_url AS image_url,
+		1.0 - scan.distance AS score
+	FROM vector_quantize_scan('products', 'embedding', ?2, max(?3 + 1, 64)) AS scan
+	JOIN products AS p ON p.rowid = scan.rowid
+	WHERE p.id <> ?1
+	ORDER BY scan.distance, p.rowid LIMIT ?3
+`;
 
 const VECTOR_SQL = `
 	SELECT p.id AS id, p.title AS title, p.description AS description,
@@ -671,7 +684,9 @@ export class CatalogueDb implements CatalogueStore {
 				return false;
 			}
 			const int8Bytes = this.#dimension;
-			const targetType = Number(row.len) === int8Bytes ? "INT8" : "FLOAT32";
+			const sampleLen = Number(row.len ?? -1);
+			const targetType =
+				sampleLen === int8Bytes || sampleLen === 0 ? "INT8" : "FLOAT32";
 			this.#vectorType = null;
 			await this.#ensureVectorInit(targetType);
 			return true;
@@ -710,14 +725,16 @@ export class CatalogueDb implements CatalogueStore {
 					checks: [
 						"SELECT count(*) = 1 FROM sqlite_schema WHERE type = 'table' AND name = 'products'",
 						"SELECT count(*) = 1 FROM sqlite_schema WHERE type = 'table' AND name = 'products_fts'",
-						`SELECT count(*) = 0 FROM (SELECT length(embedding) AS len FROM products LIMIT 64) WHERE len NOT IN (${f32Bytes}, ${int8Bytes})`,
+						`SELECT count(*) = 0 FROM (SELECT length(embedding) AS len FROM products LIMIT 64) WHERE len NOT IN (${f32Bytes}, ${int8Bytes}, 0)`,
 					],
 				},
 			});
 			const [sample] = await this.#sql.query(
 				"SELECT length(embedding) AS len FROM products LIMIT 1",
 			);
-			const targetType = Number(sample?.len) === int8Bytes ? "INT8" : "FLOAT32";
+			const sampleLen = Number(sample?.len ?? -1);
+			const targetType =
+				sampleLen === int8Bytes || sampleLen === 0 ? "INT8" : "FLOAT32";
 			this.#vectorType = null;
 			await this.#ensureVectorInit(targetType);
 			if (
@@ -800,11 +817,11 @@ export class CatalogueDb implements CatalogueStore {
 			);
 		}
 		const [badLenRow] = await this.#sql.query(
-			`SELECT count(*) AS bad FROM (SELECT length(embedding) AS len FROM products LIMIT 64) WHERE len NOT IN (${f32Bytes}, ${int8Bytes})`,
+			`SELECT count(*) AS bad FROM (SELECT length(embedding) AS len FROM products LIMIT 64) WHERE len NOT IN (${f32Bytes}, ${int8Bytes}, 0)`,
 		);
 		if (Number(badLenRow?.bad ?? 0) !== 0) {
 			throw new Error(
-				`imported SQLite catalogue has embedding byte length outside (${f32Bytes}, ${int8Bytes})`,
+				`imported SQLite catalogue has embedding byte length outside (${f32Bytes}, ${int8Bytes}, 0)`,
 			);
 		}
 		await this.#sql.exec(
@@ -813,7 +830,9 @@ export class CatalogueDb implements CatalogueStore {
 		const [sample] = await this.#sql.query(
 			"SELECT length(embedding) AS len FROM products LIMIT 1",
 		);
-		const targetType = Number(sample?.len) === int8Bytes ? "INT8" : "FLOAT32";
+		const sampleLen = Number(sample?.len ?? -1);
+		const targetType =
+			sampleLen === int8Bytes || sampleLen === 0 ? "INT8" : "FLOAT32";
 		this.#vectorType = null;
 		await this.#ensureVectorInit(targetType);
 		if (revisionKey !== undefined && revisionKey.length > 0) {
@@ -1099,18 +1118,48 @@ export class CatalogueDb implements CatalogueStore {
 			if (this.#vectorType === null) {
 				await this.#ensureVectorInit("FLOAT32");
 			}
-			const known = await this.#sql.query(
-				"SELECT 1 AS known FROM products WHERE id = ?",
+			const [knownRow] = await this.#sql.query(
+				"SELECT rowid, length(embedding) AS len FROM products WHERE id = ?",
 				[id],
 			);
-			if (known.length === 0) {
+			if (knownRow === undefined) {
 				throw new Error(`unknown product id: ${id}`);
+			}
+			const embLen = Number(knownRow.len);
+			if (embLen === 0 && this.#quantized) {
+				const seedVec = await this.#decodeQuantizedSeedVector(
+					Number(knownRow.rowid),
+				);
+				return this.#scored(NEAREST_BY_VECTOR_QUANTIZED_SQL, [
+					id,
+					this.#encodeQueryVector(seedVec),
+					Math.max(0, k),
+				]);
 			}
 			return this.#scored(
 				this.#quantized ? NEAREST_QUANTIZED_SQL : NEAREST_SQL,
 				[id, Math.max(0, k)],
 			);
 		});
+	}
+
+	async #decodeQuantizedSeedVector(targetRowid: number): Promise<Float32Array> {
+		const [block] = await this.#sql.query(
+			"SELECT rowid1, data FROM vector0_products_embedding WHERE ?1 BETWEEN rowid1 AND rowid2 LIMIT 1",
+			[targetRowid],
+		);
+		const rawData = block?.data;
+		const bytes = ArrayBuffer.isView(rawData)
+			? new Uint8Array(rawData.buffer, rawData.byteOffset, rawData.byteLength)
+			: new Uint8Array(0);
+		return (
+			decodeTurboQuantRow(
+				bytes,
+				Number(block?.rowid1),
+				targetRowid,
+				this.#dimension,
+			) ?? new Float32Array(this.#dimension)
+		);
 	}
 
 	public dispose(): Promise<void> {
@@ -1143,17 +1192,23 @@ export class CatalogueDb implements CatalogueStore {
 			);
 			const rowCount = Number(meta?.n ?? 0);
 			const hasQuantizedTable = Number(meta?.has_q ?? 0) === 1;
-			if (rowCount >= MIN_TURBOQUANT_ROWS) {
+			if (rowCount >= MIN_TURBOQUANT_ROWS || hasQuantizedTable) {
 				try {
 					let reuseExisting = false;
 					if (hasQuantizedTable) {
 						const [qMeta] = await this.#sql.query(
 							"SELECT COALESCE(SUM(counter), 0) AS qn, COALESCE(MAX(length(data)), 0) AS max_bytes, COALESCE(SUM(length(data)), 0) AS total_bytes FROM vector0_products_embedding",
 						);
+						const bytesPerQuantizedRow =
+							12 + Math.ceil((this.#dimension * 2) / 8);
+						const maxExpectedBytes = Math.max(
+							rowCount * bytesPerQuantizedRow * 2,
+							2_097_152,
+						);
 						reuseExisting =
 							Number(qMeta?.qn ?? 0) === rowCount &&
-							Number(qMeta?.max_bytes ?? 0) <= 2_097_152 &&
-							Number(qMeta?.total_bytes ?? 0) <= 12_582_912;
+							Number(qMeta?.max_bytes ?? 0) <= maxExpectedBytes &&
+							Number(qMeta?.total_bytes ?? 0) <= maxExpectedBytes;
 					}
 					if (!reuseExisting) {
 						await this.#sql.exec(
