@@ -117,6 +117,7 @@ dependencies = [
   "msgpack>=1.2.1",         # GHSA-6v7p-g79w-8964 (transitive)
   "torch>=2.12.1",          # CVE-2025-3000 fix (GHSA-rrmf-rvhw-rf47, PYSEC-2025-194); transitive via sentence-transformers
   "setuptools>=83.0.0",     # PYSEC-2026-3447 (transitive build/runtime dep)
+  "opentelemetry-api>=1.45.2",  # CVE-2026-126360 (transitive)
 ]
 
 [dependency-groups]
