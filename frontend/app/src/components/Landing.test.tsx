@@ -87,9 +87,9 @@ describe("Landing", () => {
 		).toBeInTheDocument();
 		expect(document.body.textContent).not.toContain("INT8 cosine scan");
 		expect(
-			screen.getAllByText(/100,000 products/).length,
+			screen.getAllByText(/1,000,000 products/).length,
 		).toBeGreaterThanOrEqual(2);
-		expect(document.body.textContent).not.toContain("100000 products");
+		expect(document.body.textContent).not.toContain("1000000 products");
 	});
 
 	it("calls onLaunch when the Launch CTA is clicked", async () => {

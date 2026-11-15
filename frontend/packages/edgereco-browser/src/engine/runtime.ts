@@ -38,6 +38,7 @@ import {
 	type CatalogueStore,
 	type CatalogueStoreFactory,
 	openCatalogueStore,
+	type ShardedSqliteInput,
 } from "./catalogueDb";
 import { clearCatalogueSqlStorage } from "./catalogueSql";
 import { type CooccurrenceMatrix, parseCooccurrence } from "./cooccurrence";
@@ -50,6 +51,7 @@ import {
 	verifyRankingProof,
 } from "./rankingProof";
 import { createSearchEngine, type SearchEngine } from "./searchEngine";
+import { openShardedCatalogueStore } from "./shardedCatalogueDb";
 import type { VectorIndexFiles } from "./vectorIndex";
 
 /** The bundle files the in-browser index is assembled from. */
@@ -59,6 +61,8 @@ const EMBEDDINGS_PATH = "vector/embeddings.f32";
 const PRODUCTS_PATH = "products.jsonl";
 /** Optional canonical pre-built SQLite database (`products` + `products_fts` + `embedding`). */
 const SQLITE_PATH = "catalogue.sqlite";
+/** Optional multi-shard IVF centroid table (`K * dim` float32). */
+const IVF_CENTROIDS_PATH = "ivf_centroids.f32";
 /** The signed ranking weights; absent on bundles that predate the feature. */
 const RANKING_CONFIG_PATH = "ranking_config.json";
 /** Avow envelope containing EdgeReco's static Assay ranking proof. */
@@ -73,6 +77,7 @@ const COOCCURRENCE_PATH = "cooccurrence.json";
  */
 const SYNC_METADATA_PATHS: ReadonlyArray<string> = [
 	META_PATH,
+	IVF_CENTROIDS_PATH,
 	RANKING_CONFIG_PATH,
 	RANKING_RECEIPT_PATH,
 	COOCCURRENCE_PATH,
@@ -475,10 +480,42 @@ export async function* streamBundleSqliteChunks(
 	}
 }
 
+function shardBundlePath(shardIndex: number): string {
+	return `shards/shard_${String(shardIndex).padStart(2, "0")}.sqlite`;
+}
+
+async function buildShardedSqliteInput(
+	engine: EnginePort,
+	shardCount: number,
+	dim: number,
+	streamOpts?: StreamBundleSqliteChunksOptions,
+): Promise<ShardedSqliteInput> {
+	const centroidsBytes = await engine.readFile(IVF_CENTROIDS_PATH);
+	const expectedBytes = shardCount * dim * 4;
+	if (centroidsBytes.byteLength !== expectedBytes) {
+		throw new IntegrityError(
+			`${IVF_CENTROIDS_PATH} expected ${expectedBytes} bytes, got ${centroidsBytes.byteLength}`,
+		);
+	}
+	const copy = new ArrayBuffer(expectedBytes);
+	new Uint8Array(copy).set(centroidsBytes);
+	return {
+		shardCount,
+		centroids: new Float32Array(copy),
+		shardChunks: (s) =>
+			streamOpts !== undefined
+				? streamBundleSqliteChunks({ ...streamOpts, path: shardBundlePath(s) })
+				: (async function* () {
+						yield await engine.readFile(shardBundlePath(s));
+					})(),
+	};
+}
+
 function tryParseMetaCounts(metaBytes: Uint8Array): {
 	readonly dim: number;
 	readonly count: number;
 	readonly rev: string;
+	readonly ivfShards?: number;
 } | null {
 	try {
 		const raw = JSON.parse(new TextDecoder().decode(metaBytes)) as Record<
@@ -487,6 +524,7 @@ function tryParseMetaCounts(metaBytes: Uint8Array): {
 		>;
 		const dim = raw.embedding_dim;
 		const count = raw.embedding_count;
+		const rawShards = raw.ivf_shards;
 		if (
 			typeof dim === "number" &&
 			Number.isInteger(dim) &&
@@ -496,7 +534,18 @@ function tryParseMetaCounts(metaBytes: Uint8Array): {
 			count >= 1
 		) {
 			const rev = `${String(raw.catalog_id ?? "catalog")}:${String(raw.version ?? "v1")}:${count}`;
-			return { dim, count, rev };
+			const ivfShards =
+				typeof rawShards === "number" &&
+				Number.isInteger(rawShards) &&
+				rawShards >= 1
+					? rawShards
+					: undefined;
+			return {
+				dim,
+				count,
+				rev,
+				...(ivfShards !== undefined ? { ivfShards } : {}),
+			};
 		}
 	} catch {
 		// Fall through to normal validation in loadVectorIndex.
@@ -504,22 +553,106 @@ function tryParseMetaCounts(metaBytes: Uint8Array): {
 	return null;
 }
 
+async function readShardedBundleFiles(
+	engine: EnginePort,
+	meta: Uint8Array,
+	parsedMeta: {
+		readonly dim: number;
+		readonly count: number;
+		readonly rev: string;
+		readonly ivfShards: number;
+	},
+	options?: {
+		readonly revisionKey?: string;
+		readonly makeCatalogue?: CatalogueStoreFactory;
+		readonly preopenDefault?: boolean;
+		readonly streamedSqlite?: StreamBundleSqliteChunksOptions;
+	},
+): Promise<ReadBundleResult> {
+	const revisionKey = options?.revisionKey ?? parsedMeta.rev;
+	const shardedSqlite = await buildShardedSqliteInput(
+		engine,
+		parsedMeta.ivfShards,
+		parsedMeta.dim,
+		options?.streamedSqlite,
+	);
+	const factory =
+		options?.makeCatalogue ??
+		(options?.preopenDefault === true ? openShardedCatalogueStore : undefined);
+	let preopenedStore: CatalogueStore | null = null;
+	if (factory !== undefined) {
+		try {
+			preopenedStore = await factory({ dimension: parsedMeta.dim });
+			if (
+				revisionKey !== undefined &&
+				preopenedStore.activateShardedRevision !== undefined &&
+				(await preopenedStore.activateShardedRevision(
+					revisionKey,
+					parsedMeta.count,
+					shardedSqlite,
+				))
+			) {
+				return {
+					files: {
+						meta,
+						state: new Uint8Array(0),
+						embeddings: new Uint8Array(0),
+						products: new Uint8Array(0),
+						shardedSqlite,
+						revisionKey,
+						sqliteAlreadyActive: true,
+					},
+					preopenedStore,
+				};
+			}
+		} catch {
+			if (preopenedStore !== null) {
+				await preopenedStore.dispose();
+				preopenedStore = null;
+			}
+		}
+	}
+	return {
+		files: {
+			meta,
+			state: new Uint8Array(0),
+			embeddings: new Uint8Array(0),
+			products: new Uint8Array(0),
+			shardedSqlite,
+			...(revisionKey !== undefined ? { revisionKey } : {}),
+		},
+		preopenedStore,
+	};
+}
+
 async function readBundleFiles(
 	engine: EnginePort,
 	options?: {
 		readonly revisionKey?: string;
 		readonly makeCatalogue?: CatalogueStoreFactory;
+		readonly preopenDefault?: boolean;
 		readonly streamedSqlite?: StreamBundleSqliteChunksOptions;
 	},
 ): Promise<ReadBundleResult> {
 	if (options?.streamedSqlite !== undefined) {
 		const meta = await engine.readFile(META_PATH);
 		const parsedMeta = tryParseMetaCounts(meta);
+		if (parsedMeta?.ivfShards !== undefined) {
+			return readShardedBundleFiles(
+				engine,
+				meta,
+				{ ...parsedMeta, ivfShards: parsedMeta.ivfShards },
+				options,
+			);
+		}
 		const revisionKey = options.revisionKey ?? parsedMeta?.rev;
+		const factory =
+			options.makeCatalogue ??
+			(options.preopenDefault === true ? openCatalogueStore : undefined);
 		let preopenedStore: CatalogueStore | null = null;
-		if (parsedMeta !== null && options.makeCatalogue !== undefined) {
+		if (parsedMeta !== null && factory !== undefined) {
 			try {
-				preopenedStore = await options.makeCatalogue({
+				preopenedStore = await factory({
 					dimension: parsedMeta.dim,
 				});
 				if (
@@ -572,11 +705,22 @@ async function readBundleFiles(
 		products === undefined
 	) {
 		const parsedMeta = tryParseMetaCounts(meta);
+		if (parsedMeta?.ivfShards !== undefined) {
+			return readShardedBundleFiles(
+				engine,
+				meta,
+				{ ...parsedMeta, ivfShards: parsedMeta.ivfShards },
+				options,
+			);
+		}
 		const revisionKey = options?.revisionKey ?? parsedMeta?.rev;
+		const factory =
+			options?.makeCatalogue ??
+			(options?.preopenDefault === true ? openCatalogueStore : undefined);
 		let preopenedStore: CatalogueStore | null = null;
-		if (parsedMeta !== null && options?.makeCatalogue !== undefined) {
+		if (parsedMeta !== null && factory !== undefined) {
 			try {
-				preopenedStore = await options.makeCatalogue({
+				preopenedStore = await factory({
 					dimension: parsedMeta.dim,
 				});
 				if (
@@ -960,7 +1104,10 @@ export class EngineRuntime {
 			const [bundleRead, rankingConfig, cooccurrence] = await Promise.all([
 				readBundleFiles(engineClient, {
 					revisionKey: result.manifestHash,
-					makeCatalogue: this.#deps.makeCatalogue ?? openCatalogueStore,
+					preopenDefault: true,
+					...(this.#deps.makeCatalogue !== undefined
+						? { makeCatalogue: this.#deps.makeCatalogue }
+						: {}),
 					...(useStreamedSqlite
 						? {
 								streamedSqlite: {

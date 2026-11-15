@@ -48,6 +48,7 @@ from filelock import FileLock, Timeout
 from pydantic import BaseModel
 
 from edgereco.catalog.product_image import ImageMode, localize_catalog
+from edgereco.catalog.sharded_bundle import IVF_CENTROIDS_NAME, SHARDS_SUBDIR
 from edgereco.catalog.sqlite_bundle import (
     CATALOGUE_SQLITE_NAME,
     build_catalogue_sqlite,
@@ -233,6 +234,15 @@ class CatalogMeta(BaseModel):
     embedding_count: int
     product_count: int
     schema_version: int = 1
+    ivf_shards: int | None = None
+
+
+def _select_chunker(*, sqlite_only: bool, ivf_shards: int | None) -> GearCDC:
+    if ivf_shards is not None:
+        return GearCDC(min_size=131072, avg_size=262144, max_size=1048576)
+    if sqlite_only:
+        return GearCDC(min_size=32768, avg_size=65536, max_size=262144)
+    return GearCDC()
 
 
 def publish_bundle(
@@ -250,6 +260,7 @@ def publish_bundle(
     sequence: int | None = None,
     image_mode: ImageMode = ImageMode.LOCAL,
     sqlite_only: bool = False,
+    ivf_shards: int | None = None,
 ) -> None:
     """Write ``catalog_meta.json`` then build the signed origin from the staging dir.
 
@@ -277,6 +288,7 @@ def publish_bundle(
         embedding_count=embedding_count,
         product_count=product_count,
         schema_version=CURRENT_META_SCHEMA,
+        ivf_shards=ivf_shards,
     )
     files = _stage_files(
         staging_dir,
@@ -286,7 +298,7 @@ def publish_bundle(
         require_feature_files,
         sqlite_only=sqlite_only,
     )
-    chunker = GearCDC(min_size=32768, avg_size=65536, max_size=262144) if sqlite_only else GearCDC()
+    chunker = _select_chunker(sqlite_only=sqlite_only, ivf_shards=ivf_shards)
     origin_dir.mkdir(parents=True, exist_ok=True)
     with _publish_lock(origin_dir):
         sequence = _require_increasing(
@@ -318,8 +330,15 @@ def _stage_files(
     sqlite_only: bool = False,
 ) -> dict[str, bytes]:
     """Write the derived staging files, then read the complete signed file set."""
-    _write_json_no_follow(staging_dir / _META_NAME, meta.model_dump_json())
-    _localize_product_images(staging_dir, image_mode)
+    _write_json_no_follow(staging_dir / _META_NAME, meta.model_dump_json(exclude_none=True))
+    if (
+        not sqlite_only
+        or (staging_dir / "products.jsonl").exists()
+        or (staging_dir / "products.jsonl").is_symlink()
+    ):
+        _localize_product_images(staging_dir, image_mode)
+    else:
+        _refuse_symlink(staging_dir / "images", staging_dir)
     _ensure_ranking_config(staging_dir, require_present=require_feature_files)
     _ensure_cooccurrence(staging_dir, require_present=require_feature_files)
     _write_ranking_receipt(staging_dir, private_key_path)
@@ -522,6 +541,17 @@ def _refuse_symlink(path: Path, staging_dir: Path) -> None:
         )
 
 
+def _read_optional_shards(staging_dir: Path, files: dict[str, bytes]) -> None:
+    centroids_path = staging_dir / IVF_CENTROIDS_NAME
+    _refuse_symlink(centroids_path, staging_dir)
+    if centroids_path.is_file():
+        files[IVF_CENTROIDS_NAME] = centroids_path.read_bytes()
+    shards_dir = staging_dir / SHARDS_SUBDIR
+    _refuse_symlink(shards_dir, staging_dir)
+    if shards_dir.is_dir():
+        _read_tree(staging_dir, SHARDS_SUBDIR, files)
+
+
 def _read_bundle_files(staging_dir: Path, *, sqlite_only: bool = False) -> dict[str, bytes]:
     """Read every bundle file into ``{relpath: bytes}`` (``vector/`` + ``images/`` recursed).
 
@@ -545,6 +575,7 @@ def _read_bundle_files(staging_dir: Path, *, sqlite_only: bool = False) -> dict[
     _refuse_symlink(sqlite_path, staging_dir)
     if sqlite_path.is_file():
         files[CATALOGUE_SQLITE_NAME] = sqlite_path.read_bytes()
+    _read_optional_shards(staging_dir, files)
     if not sqlite_only:
         _read_tree(staging_dir, "vector", files)
     _read_tree(staging_dir, "images", files, skip_extensions=_PHOTO_EXTENSIONS)

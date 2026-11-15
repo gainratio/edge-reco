@@ -3,7 +3,23 @@
 import { describe, expect, it } from "vitest";
 import { CatalogueDb } from "./catalogueDb";
 import { openCatalogueSql } from "./catalogueSql";
-import { decodeTurboQuantRow, rankIvfCentroids } from "./ivfRouter";
+import {
+	decodeTurboQuantRow,
+	rankIvfCentroids,
+	shardForProductId,
+} from "./ivfRouter";
+
+describe("shardForProductId", () => {
+	it("routes S{00..63}-* to its shard and NB-* / unknown IDs to shard 0", () => {
+		expect(shardForProductId("NB-0001-01", 64)).toBe(0);
+		expect(shardForProductId("S00-B001", 64)).toBe(0);
+		expect(shardForProductId("S01-B001", 64)).toBe(1);
+		expect(shardForProductId("S63-B999", 64)).toBe(63);
+		expect(shardForProductId("S64-B999", 64)).toBe(0);
+		expect(shardForProductId("B001", 64)).toBe(0);
+		expect(shardForProductId("S05-B001", 1)).toBe(0);
+	});
+});
 
 describe("rankIvfCentroids", () => {
 	it("ranks coarse IVF centroids by cosine similarity with deterministic tie-breaking", () => {

@@ -209,3 +209,21 @@ export function rankIvfCentroids(
 	scored.sort((a, b) => b.score - a.score || a.shard - b.shard);
 	return scored.slice(0, take).map((entry) => entry.shard);
 }
+
+const SHARD_ID_RE = /^S(\d{2})-/u;
+
+/**
+ * Resolve the owning IVF shard index (`0 .. numShards - 1`) in `O(1)` from a
+ * product ID (`NB-*` -> shard `0`, `S{s:02d}-*` -> shard `s`).
+ */
+export function shardForProductId(productId: string, numShards = 64): number {
+	if (numShards <= 1 || productId.startsWith("NB-")) {
+		return 0;
+	}
+	const match = SHARD_ID_RE.exec(productId);
+	if (match === null) {
+		return 0;
+	}
+	const idx = Number(match[1]);
+	return idx >= 0 && idx < numShards ? idx : 0;
+}

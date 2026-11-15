@@ -16,6 +16,7 @@ import json
 import sqlite3
 import tempfile
 from contextlib import closing
+from dataclasses import dataclass
 from functools import cache
 from pathlib import Path
 from typing import Final
@@ -33,6 +34,14 @@ from edgereco.catalog.product_image import (
 _BACKEND: Final = Path(__file__).resolve().parents[3]
 _CATALOG: Final = _BACKEND / "examples" / "catalog"
 _PUBLIC_IMAGES: Final = _BACKEND.parent / "frontend" / "app" / "public" / "images"
+
+
+@dataclass(frozen=True)
+class _CatalogSummary:
+    total_products: int
+    exemplars: tuple[Product, ...]
+    distinct_image_urls: frozenset[str]
+    non_local_count: int
 
 
 @cache
@@ -67,23 +76,42 @@ def _source_subcategories() -> dict[str, list[str]]:
     return out
 
 
-@cache
-def _products() -> list[Product]:
-    manifest = _manifest()
-    if "products.jsonl" in manifest:
-        raw = _materialize("products.jsonl").decode("utf-8")
-        return [Product.model_validate_json(line) for line in raw.split("\n") if line.strip()]
-    subs_by_id = _source_subcategories()
-    sqlite_bytes = _materialize("catalogue.sqlite")
+def _sqlite_paths_in_manifest(manifest: dict[str, dict[str, object]]) -> list[str]:
+    shards = sorted(p for p in manifest if p.startswith("shards/") and p.endswith(".sqlite"))
+    if shards:
+        return shards
+    return ["catalogue.sqlite"] if "catalogue.sqlite" in manifest else []
+
+
+def _scan_sqlite_blob(
+    sqlite_bytes: bytes,
+    subs_by_id: dict[str, list[str]],
+    *,
+    collect_exemplars: bool,
+) -> tuple[int, int, set[str], list[Product]]:
     with tempfile.NamedTemporaryFile(suffix=".sqlite") as tmp:
         tmp.write(sqlite_bytes)
         tmp.flush()
         with closing(sqlite3.connect(tmp.name)) as conn:
+            total = int(conn.execute("SELECT count(*) FROM products").fetchone()[0])
+            bad = int(
+                conn.execute(
+                    "SELECT count(*) FROM products WHERE image_url NOT LIKE '/images/%'"
+                ).fetchone()[0]
+            )
+            urls = {
+                str(r[0])
+                for r in conn.execute("SELECT DISTINCT image_url FROM products").fetchall()
+            }
+            if not collect_exemplars:
+                return total, bad, urls, []
             rows = conn.execute(
                 "SELECT id, title, description, category, tags_json, brand, price, "
-                "popularity_score, freshness_score, image_url FROM products ORDER BY rowid ASC"
+                "popularity_score, freshness_score, image_url FROM products "
+                "ORDER BY rowid ASC LIMIT ?",
+                (MAX_SIGNED_CARDS,),
             ).fetchall()
-    return [
+    exemplars = [
         Product(
             id=r[0],
             title=r[1],
@@ -99,6 +127,44 @@ def _products() -> list[Product]:
         )
         for r in rows
     ]
+    return total, bad, urls, exemplars
+
+
+@cache
+def _summary() -> _CatalogSummary:
+    manifest = _manifest()
+    if "products.jsonl" in manifest:
+        raw = _materialize("products.jsonl").decode("utf-8")
+        products = [Product.model_validate_json(line) for line in raw.split("\n") if line.strip()]
+        bad = sum(1 for p in products if not p.image_url.startswith("/images/"))
+        return _CatalogSummary(
+            total_products=len(products),
+            exemplars=tuple(products[:MAX_SIGNED_CARDS]),
+            distinct_image_urls=frozenset(p.image_url for p in products),
+            non_local_count=bad,
+        )
+    subs_by_id = _source_subcategories()
+    total_all = 0
+    bad_all = 0
+    urls_all: set[str] = set()
+    exemplars: list[Product] = []
+    for idx, relpath in enumerate(_sqlite_paths_in_manifest(manifest)):
+        total, bad, urls, first_rows = _scan_sqlite_blob(
+            _materialize(relpath),
+            subs_by_id,
+            collect_exemplars=(idx == 0),
+        )
+        total_all += total
+        bad_all += bad
+        urls_all.update(urls)
+        if idx == 0:
+            exemplars = first_rows
+    return _CatalogSummary(
+        total_products=total_all,
+        exemplars=tuple(exemplars),
+        distinct_image_urls=frozenset(urls_all),
+        non_local_count=bad_all,
+    )
 
 
 def _signed_image_paths() -> list[str]:
@@ -111,28 +177,27 @@ def test_the_manifest_resolves_under_a_glob_too() -> None:
 
 
 def test_every_product_points_at_its_own_local_card() -> None:
-    products = _products()
-    assert len(products) in (5040, 100000)
-    by_id = {p.id: p for p in products}
-    wrong_pass0 = [
-        p.id for p in products[:MAX_SIGNED_CARDS] if p.image_url != local_image_url(p.id)
-    ]
+    summary = _summary()
+    assert summary.total_products in (5040, 100000, 1000000)
+    assert summary.non_local_count == 0
+    by_id = {p.id: p for p in summary.exemplars}
+    wrong_pass0 = [p.id for p in summary.exemplars if p.image_url != local_image_url(p.id)]
     assert wrong_pass0 == []
-    mismatched_card = [
-        p.id
-        for p in products
-        if not p.image_url.startswith("/images/") or Path(p.image_url).stem not in by_id
-    ]
+    mismatched_card = [url for url in summary.distinct_image_urls if Path(url).stem not in by_id]
     assert mismatched_card == []
 
 
 def test_every_product_card_is_signed_into_the_bundle() -> None:
-    missing = [p.id for p in _products() if p.image_url.lstrip("/") not in _manifest()]
+    missing = [url for url in _summary().distinct_image_urls if url.lstrip("/") not in _manifest()]
     assert missing == []
 
 
 def test_every_product_card_is_served_by_the_static_origin() -> None:
-    missing = [p.id for p in _products() if not (_PUBLIC_IMAGES / Path(p.image_url).name).is_file()]
+    missing = [
+        url
+        for url in _summary().distinct_image_urls
+        if not (_PUBLIC_IMAGES / Path(url).name).is_file()
+    ]
     assert missing == []
 
 
@@ -147,13 +212,13 @@ def test_static_origin_serves_exactly_the_signed_bytes() -> None:
 
 
 def test_static_origin_has_no_orphan_images() -> None:
-    referenced = {Path(p.image_url).name for p in _products()}
+    referenced = {Path(url).name for url in _summary().distinct_image_urls}
     orphans = sorted(f.name for f in _PUBLIC_IMAGES.iterdir() if f.name not in referenced)
     assert orphans == []
 
 
 def test_committed_cards_are_what_the_renderer_makes_today() -> None:
-    by_id = {p.id: p for p in _products()}
+    by_id = {p.id: p for p in _summary().exemplars}
     stale = [
         relpath
         for relpath in _signed_image_paths()

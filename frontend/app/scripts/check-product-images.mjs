@@ -66,10 +66,11 @@ function readProducts(catalogDir, manifest) {
 	const jsonlEntry = manifest.get("products.jsonl");
 	if (jsonlEntry !== undefined) {
 		const text = materialize(catalogDir, jsonlEntry).toString("utf8");
-		return text
+		const rows = text
 			.split("\n")
 			.filter((line) => line.trim())
 			.map((line) => JSON.parse(line));
+		return { productCount: rows.length, rows };
 	}
 	const sqliteEntry = manifest.get("catalogue.sqlite");
 	if (sqliteEntry !== undefined) {
@@ -80,9 +81,10 @@ function readProducts(catalogDir, manifest) {
 			writeFileSync(dbPath, blob);
 			const db = new DatabaseSync(dbPath, { readOnly: true });
 			try {
-				return db
+				const rows = db
 					.prepare("SELECT id, image_url FROM products ORDER BY rowid ASC")
 					.all();
+				return { productCount: rows.length, rows };
 			} finally {
 				db.close();
 			}
@@ -90,7 +92,41 @@ function readProducts(catalogDir, manifest) {
 			rmSync(tmpRoot, { recursive: true, force: true });
 		}
 	}
-	return [];
+	const shardEntries = [...manifest.entries()]
+		.filter(([path]) => /^shards\/shard_\d+\.sqlite$/u.test(path))
+		.sort(([a], [b]) => a.localeCompare(b));
+	if (shardEntries.length > 0) {
+		const tmpRoot = mkdtempSync(join(tmpdir(), "edgereco-pimg-shards-"));
+		let productCount = 0;
+		const byUrl = new Map();
+		try {
+			for (const [shardPath, shardEntry] of shardEntries) {
+				const blob = materialize(catalogDir, shardEntry);
+				const dbPath = join(tmpRoot, shardPath.replaceAll("/", "_"));
+				writeFileSync(dbPath, blob);
+				const db = new DatabaseSync(dbPath, { readOnly: true });
+				try {
+					const grouped = db
+						.prepare(
+							"SELECT min(id) AS id, image_url, count(*) AS cnt FROM products GROUP BY image_url",
+						)
+						.all();
+					for (const g of grouped) {
+						productCount += Number(g.cnt);
+						if (!byUrl.has(g.image_url)) {
+							byUrl.set(g.image_url, { id: g.id, image_url: g.image_url });
+						}
+					}
+				} finally {
+					db.close();
+				}
+			}
+			return { productCount, rows: [...byUrl.values()] };
+		} finally {
+			rmSync(tmpRoot, { recursive: true, force: true });
+		}
+	}
+	return { productCount: 0, rows: [] };
 }
 
 function problemFor(product, manifest, imagesDir) {
@@ -113,14 +149,14 @@ function problemFor(product, manifest, imagesDir) {
 /** Every reason a shipped product would show a broken picture; empty means none. */
 export function findProductImageProblems({ catalogDir, imagesDir }) {
 	const manifest = readManifest(catalogDir);
-	const products = readProducts(catalogDir, manifest);
-	if (products.length === 0) {
+	const { productCount, rows } = readProducts(catalogDir, manifest);
+	if (productCount === 0) {
 		return { productCount: 0, problems: ["the bundle lists no products"] };
 	}
-	const problems = products
+	const problems = rows
 		.map((p) => problemFor(p, manifest, imagesDir))
 		.filter((p) => p !== null);
-	return { productCount: products.length, problems };
+	return { productCount, problems };
 }
 
 function main() {

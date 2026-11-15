@@ -589,8 +589,8 @@ export function Storefront() {
 
 			{storageLimited && (
 				<p className="storage-warning" role="status">
-					Local catalogue storage is unavailable. Private Browsing blocks the
-					100k catalogue; reopen EdgeReco in a normal Safari tab.
+					Local catalogue storage is unavailable. Private Browsing blocks the 1M
+					catalogue; reopen EdgeReco in a normal Safari tab.
 				</p>
 			)}
 

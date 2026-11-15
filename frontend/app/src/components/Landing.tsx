@@ -124,7 +124,7 @@ export function Landing({ onLaunch }: LandingProps) {
 									<span />
 								</div>
 								<span className="landing__specimen-file">
-									catalogue.sqlite · OPFS
+									64 IVF shards · OPFS
 								</span>
 								<span className="landing__specimen-seal">
 									Ed25519 VERIFIED ✓
@@ -165,7 +165,7 @@ export function Landing({ onLaunch }: LandingProps) {
 
 								<div className="landing__specimen-section-head">
 									<span>Reciprocal Rank Fusion + MMR (λ = 0.7)</span>
-									<span>Top 3 / 100k</span>
+									<span>Top 3 / 1M</span>
 								</div>
 
 								<div className="landing__specimen-cards">

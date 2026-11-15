@@ -36,14 +36,14 @@ export const LANDING_MEASURED_ON = measurement.measuredAt.slice(0, 10);
 export const MODEL_DOWNLOAD = `${Math.round(measurement.embeddingModelMb)} MB`;
 
 /** Products in the committed demo catalog. Guarded against the signed bundle in tests. */
-export const CATALOG_PRODUCTS = 100000;
+export const CATALOG_PRODUCTS = 1000000;
 /** Categories the committed catalog is balanced across (see CLAUDE.md invariant). */
 export const CATALOG_CATEGORIES = 12;
 /**
  * On-disk size of the committed signed bundle (backend/examples/catalog).
  * Guarded against the bundle's real byte count in landing-figures.test.ts.
  */
-export const BUNDLE_SIZE = "32.6 MB";
+export const BUNDLE_SIZE = "79.0 MB";
 
 export interface RepresentativeMetric {
 	/** Stable key into the `landing` namespace: `metrics.<id>.{label,sub}`. */

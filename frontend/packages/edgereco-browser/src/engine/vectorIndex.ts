@@ -14,10 +14,12 @@ import {
 	type CatalogueSwapOptions,
 	type HybridRow,
 	openCatalogueStore,
+	type ShardedSqliteInput,
 } from "./catalogueDb";
 import type { BrowseResponse, Product, SearchResult } from "./domain";
 import type { ScoringWeights } from "./rankingConfig";
 import type { SessionProfile } from "./session";
+import { openShardedCatalogueStore } from "./shardedCatalogueDb";
 
 const DECODER = new TextDecoder();
 
@@ -35,6 +37,8 @@ export interface VectorIndexFiles {
 	readonly sqlite?: Uint8Array;
 	/** Demand-driven async stream of verified `catalogue.sqlite` chunks. */
 	readonly sqliteChunks?: () => AsyncIterable<Uint8Array>;
+	/** Multi-shard `IVF-TurboQuant` SQLite streams + coarse centroids. */
+	readonly shardedSqlite?: ShardedSqliteInput;
 	/** Optional bundle revision key (`manifestHash` or `catalog_id:version:count`). */
 	readonly revisionKey?: string;
 	/** True when the pre-opened CatalogueStore already activated `revisionKey` on OPFS. */
@@ -431,7 +435,8 @@ function parseBundleRevision(
 		files.revisionKey ??
 		`${String(meta.catalog_id ?? "catalog")}:${String(meta.version ?? "v1")}:${meta.embedding_count}`;
 	if (
-		(files.sqliteChunks !== undefined ||
+		(files.shardedSqlite !== undefined ||
+			files.sqliteChunks !== undefined ||
 			files.sqlite !== undefined ||
 			files.sqliteAlreadyActive === true) &&
 		files.state.byteLength === 0 &&
@@ -498,6 +503,13 @@ async function applyBundleToStore(
 		...options,
 		revisionKey: options?.revisionKey ?? parsed.revisionKey,
 	};
+	if (
+		files.shardedSqlite !== undefined &&
+		store.importShardedSqlite !== undefined
+	) {
+		await store.importShardedSqlite(files.shardedSqlite, swapOpts);
+		return;
+	}
 	if (files.sqliteChunks !== undefined) {
 		if (store.importSqliteFromChunks !== undefined) {
 			await store.importSqliteFromChunks(files.sqliteChunks(), swapOpts);
@@ -547,13 +559,29 @@ async function applyBundleToStore(
  */
 export async function loadVectorIndex(
 	files: VectorIndexFiles,
-	factory: CatalogueStoreFactory = openCatalogueStore,
+	factory?: CatalogueStoreFactory,
 ): Promise<VectorIndex> {
 	const { dim, ntotal, ids, matrix, products, revisionKey } =
 		parseBundleRevision(files);
-	const store = await openCatalogue(factory, dim);
+	const resolvedFactory =
+		factory ??
+		(files.shardedSqlite !== undefined
+			? openShardedCatalogueStore
+			: openCatalogueStore);
+	const store = await openCatalogue(resolvedFactory, dim);
 	try {
 		if (files.sqliteAlreadyActive === true) {
+			return new VectorIndex(store, ids, products, dim, ntotal);
+		}
+		if (
+			files.shardedSqlite !== undefined &&
+			store.activateShardedRevision !== undefined &&
+			(await store.activateShardedRevision(
+				revisionKey,
+				ntotal,
+				files.shardedSqlite,
+			))
+		) {
 			return new VectorIndex(store, ids, products, dim, ntotal);
 		}
 		const hasSqlite =
