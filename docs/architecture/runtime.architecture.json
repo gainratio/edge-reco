@@ -160,7 +160,7 @@
     {
       "dot": "rose",
       "title": "Page-aligned Gear-CDC delta sync",
-      "items": ["Scales to 1,000,000 products via 64 sharded 2-bit IVF-TurboQuant SQLite bundles (~1.9 MB/shard; 100k single-bundle demo in 2,061 chunks)", "Price updates fetch 2 changed chunks (~32 KB) or apply 9.4 KB zstd --patch-from binary deltas"]
+      "items": ["1,000,000 products in 64 sharded 2-bit IVF-TurboQuant SQLite bundles (79.0 MB signed bundle across 3,331 chunks behind a 96 KiB centroid router)", "Price updates fetch 2 changed chunks (42.9 KB, reusing 3,329 cached chunks) or apply ~9.4 KB zstd --patch-from binary deltas"]
     },
     {
       "dot": "cyan",

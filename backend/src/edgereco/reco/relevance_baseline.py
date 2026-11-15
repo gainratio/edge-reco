@@ -27,8 +27,9 @@ about nothing. Callers ask for one segment at a time — this module has no "ove
 
 from __future__ import annotations
 
+import importlib.metadata
 from pathlib import Path
-from typing import Final, Literal
+from typing import Any, Final, Literal
 
 from assay.models import RankedQuery, RelevanceJudgment
 from assay.ranking import RankingReport, ranking_report
@@ -48,6 +49,11 @@ _BACKEND_ROOT: Final[Path] = Path(__file__).resolve().parents[3]
 RELEVANCE_EXPORT: Final[Path] = (
     _BACKEND_ROOT.parent
     / "frontend/packages/edgereco-browser/src/engine/__fixtures__/relevance_export.json"
+)
+
+#: Committed Assay IR summary consumed by the pre-boot Landing page (`landing-figures.ts`).
+RELEVANCE_MEASUREMENT_JSON: Final[Path] = (
+    _BACKEND_ROOT.parent / "frontend/app/src/metrics/relevance-measurement.json"
 )
 
 
@@ -153,3 +159,51 @@ def empty_positive_pages(export: RelevanceExport) -> int:
     """
     answerable = [q for q in export.queries if q.segment != "negative"]
     return sum(1 for query in answerable if not query.ranked_ids)
+
+
+def _round4(value: float) -> float:
+    return round(float(value), 4)
+
+
+def _segment_depth_payload(export: RelevanceExport, segment: Segment, k: int) -> dict[str, Any]:
+    report = segment_report(export, segment, k=k)
+    interval = report.ndcg_interval
+    payload: dict[str, Any] = {
+        "k": k,
+        "queryCount": report.n_queries,
+        "precision": _round4(report.mean_precision_at_k),
+        "recall": _round4(report.mean_recall_at_k),
+        "f1": _round4(report.mean_f1_at_k),
+        "ndcg": _round4(report.mean_ndcg_at_k),
+        "mrr": _round4(report.mrr),
+        "map": _round4(report.mean_average_precision),
+    }
+    if interval.kind == "interval":
+        payload["ndcgCiLow"] = _round4(float(interval.low))
+        payload["ndcgCiHigh"] = _round4(float(interval.high))
+    return payload
+
+
+def build_relevance_measurement(export: RelevanceExport | None = None) -> dict[str, Any]:
+    """Build the Assay-scored IR summary consumed by the pre-boot Landing page."""
+    loaded = export or load_export()
+    return {
+        "schema": "edgereco.relevance-measurement/v1",
+        "scorer": f"assay-engine {importlib.metadata.version('assay-engine')} (trec_eval)",
+        "catalogId": loaded.catalog_id,
+        "labelMethod": loaded.label_method,
+        "natural": {
+            "k10": _segment_depth_payload(loaded, "natural", 10),
+            "k24": _segment_depth_payload(loaded, "natural", 24),
+        },
+        "taxonomyWord": {
+            "k10": _segment_depth_payload(loaded, "taxonomy-word", 10),
+            "k24": _segment_depth_payload(loaded, "taxonomy-word", 24),
+        },
+        "negatives": {
+            "queryCount": len(loaded.in_segment("negative")),
+            "fullDepthPages": full_depth_negatives(loaded),
+            "falsePositivesShown": negative_results(loaded),
+            "emptyPositivePages": empty_positive_pages(loaded),
+        },
+    }

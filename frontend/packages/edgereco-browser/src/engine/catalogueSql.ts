@@ -36,13 +36,10 @@ export type {
 /** The catalogue database's stable name (hashed into its OPFS pool). */
 export const CATALOGUE_DATABASE = "edgereco-catalogue";
 
-/** Maximum number of IVF shards supported in OPFS pool cleanup. */
-export const MAX_CATALOGUE_SHARDS = 64;
-
 /** The vector index main's build stored in OPFS before this database existed. */
 export const LEGACY_VECTOR_INDEX = "edgereco-catalog";
 
-/** Stable OPFS database name for `shardIndex` (`0` reuses `edgereco-catalogue`). */
+/** Stable database name for `shardIndex` (`0` reuses `edgereco-catalogue`). */
 export function catalogueShardDatabaseName(shardIndex: number): string {
 	if (!Number.isInteger(shardIndex) || shardIndex < 0) {
 		throw new RangeError(`shardIndex must be a non-negative integer`);
@@ -75,13 +72,22 @@ export interface OpenCatalogueSqlDeps {
 	readonly workerFactory?: SqlWorkerFactory;
 }
 
-export function openCatalogueShardSql(
+export async function openCatalogueShardSql(
 	shardIndex: number,
 	deps: OpenCatalogueSqlDeps = {},
 ): Promise<CatalogueSql> {
 	const name = catalogueShardDatabaseName(shardIndex);
-	const label = shardIndex === 0 ? "catalogue" : `catalogue-s${shardIndex}`;
-	return openNamedSql(name, label, deps);
+	if (shardIndex === 0) {
+		return openNamedSql(name, "catalogue", deps);
+	}
+	return openSqlDatabase(
+		{
+			name,
+			persistence: "memory",
+			memoryProfile: "auto",
+		},
+		deps,
+	);
 }
 
 /**
@@ -96,20 +102,24 @@ export function openCatalogueSql(
 }
 
 /**
- * Stream a canonical SQLite shard image chunk-by-chunk directly into OPFS.
+ * Stream a canonical SQLite database chunk-by-chunk directly into the
+ * catalogue's OPFS database (`edgereco-catalogue`), without materializing a
+ * full-file `Uint8Array` or an in-memory SQLite database.
+ *
+ * The caller must close any active `CatalogueSql` connection to
+ * `edgereco-catalogue` before calling this function and reopen afterward, so
+ * the exclusive OPFS pool lock and `FileSystemSyncAccessHandle`s are free.
  */
-export async function importCatalogueShardSqlFromChunks(
-	shardIndex: number,
+export async function importCatalogueSqlFromChunks(
 	chunks: AsyncIterable<Uint8Array>,
 	deps: OpenCatalogueSqlDeps = {},
 ): Promise<SqlStorage> {
-	const name = catalogueShardDatabaseName(shardIndex);
 	let streamError: unknown;
 	const stream = chunksToReadableStream(chunks, (error) => {
 		streamError = error;
 	});
 	try {
-		return await importDatabaseFromStream(name, stream, {
+		return await importDatabaseFromStream(CATALOGUE_DATABASE, stream, {
 			memoryProfile: "auto",
 			...deps,
 		});
@@ -119,22 +129,6 @@ export async function importCatalogueShardSqlFromChunks(
 		}
 		throw error;
 	}
-}
-
-/**
- * Stream a canonical SQLite database chunk-by-chunk directly into the
- * catalogue's OPFS database (`edgereco-catalogue`), without materializing a
- * full-file `Uint8Array` or an in-memory SQLite database.
- *
- * The caller must close any active `CatalogueSql` connection to
- * `edgereco-catalogue` before calling this function and reopen afterward, so
- * the exclusive OPFS pool lock and `FileSystemSyncAccessHandle`s are free.
- */
-export function importCatalogueSqlFromChunks(
-	chunks: AsyncIterable<Uint8Array>,
-	deps: OpenCatalogueSqlDeps = {},
-): Promise<SqlStorage> {
-	return importCatalogueShardSqlFromChunks(0, chunks, deps);
 }
 
 function chunksToReadableStream(
@@ -253,16 +247,6 @@ export async function clearCatalogueSqlStorage(
 		const pool = await sqlDatabasePoolName(CATALOGUE_DATABASE);
 		const result = await removeOpfsPool(pool, deps);
 		(deps.log ?? console.info)(`${label}: ${result}`);
-		for (let shard = 1; shard < MAX_CATALOGUE_SHARDS; shard++) {
-			const shardName = catalogueShardDatabaseName(shard);
-			const shardPool = await sqlDatabasePoolName(shardName);
-			const shardRes = await removeOpfsPool(shardPool, deps);
-			if (shardRes === "removed") {
-				(deps.log ?? console.info)(
-					`[edge-reco] catalogue sql pool ${shardName}: removed`,
-				);
-			}
-		}
 		return result;
 	} catch (error) {
 		console.warn(`${label}: failed`, error);

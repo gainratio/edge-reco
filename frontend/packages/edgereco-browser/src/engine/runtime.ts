@@ -250,11 +250,49 @@ function parseManifestFiles(
 	return files as ReadonlyArray<FileEntry>;
 }
 
-function parseManifestFileEntry(
-	manifestBytes: Uint8Array,
+const verifiedManifestCache = new WeakMap<
+	FetchBytes,
+	Map<string, Promise<ReadonlyArray<FileEntry>>>
+>();
+
+function loadVerifiedManifestFiles(
+	fetchFn: FetchBytes,
+	base: string,
+	manifestHash: string,
+): Promise<ReadonlyArray<FileEntry>> {
+	let byKey = verifiedManifestCache.get(fetchFn);
+	if (byKey === undefined) {
+		byKey = new Map();
+		verifiedManifestCache.set(fetchFn, byKey);
+	}
+	const key = `${base}|${manifestHash}`;
+	const cached = byKey.get(key);
+	if (cached !== undefined) return cached;
+	const pending = (async () => {
+		const manifestBytes = await fetchWithRetry(
+			fetchFn,
+			`${base}/manifest/${manifestHash}`,
+			MAX_MANIFEST_BYTES,
+		);
+		const actualManifestHash = await sha256Hex(manifestBytes);
+		if (actualManifestHash !== manifestHash) {
+			throw new IntegrityError(
+				`manifest sha256 mismatch: expected ${manifestHash}, got ${actualManifestHash}`,
+			);
+		}
+		return parseManifestFiles(manifestBytes);
+	})();
+	byKey.set(key, pending);
+	pending.catch(() => {
+		byKey.delete(key);
+	});
+	return pending;
+}
+
+function selectManifestFileEntry(
+	files: ReadonlyArray<FileEntry>,
 	targetPath: string,
 ): FileEntry {
-	const files = parseManifestFiles(manifestBytes);
 	const entry = files.find(
 		(candidate): candidate is FileEntry =>
 			typeof candidate === "object" &&
@@ -436,18 +474,12 @@ export async function* streamBundleSqliteChunks(
 			`invalid manifestHash for streamed SQLite bundle: ${options.manifestHash}`,
 		);
 	}
-	const manifestBytes = await fetchWithRetry(
+	const files = await loadVerifiedManifestFiles(
 		fetchFn,
-		`${base}/manifest/${options.manifestHash}`,
-		MAX_MANIFEST_BYTES,
+		base,
+		options.manifestHash,
 	);
-	const actualManifestHash = await sha256Hex(manifestBytes);
-	if (actualManifestHash !== options.manifestHash) {
-		throw new IntegrityError(
-			`manifest sha256 mismatch: expected ${options.manifestHash}, got ${actualManifestHash}`,
-		);
-	}
-	const entry = parseManifestFileEntry(manifestBytes, targetPath);
+	const entry = selectManifestFileEntry(files, targetPath);
 	const chunks = entry.chunks;
 	const inFlight: Array<Promise<Uint8Array>> = [];
 	let nextIndex = 0;

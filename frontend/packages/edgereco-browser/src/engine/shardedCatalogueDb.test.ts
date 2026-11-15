@@ -73,7 +73,7 @@ async function buildShardImage(
 
 describe("ShardedCatalogueDb", () => {
 	it("imports shard 0 on boot, routes queries across shards, fuses RRF, and caps extra open shards via LRU", async () => {
-		const shardCount = 5;
+		const shardCount = 6;
 		const rowsPerShard = 4;
 		const globalTotal = shardCount * rowsPerShard;
 		const built = await Promise.all(
@@ -90,7 +90,14 @@ describe("ShardedCatalogueDb", () => {
 			centroids,
 			shardChunks: (s) =>
 				(async function* () {
-					yield built[s]?.bytes ?? new Uint8Array(0);
+					const bytes = built[s]?.bytes ?? new Uint8Array(0);
+					if (s === 1) {
+						const mid = Math.floor(bytes.byteLength / 2);
+						yield bytes.subarray(0, mid);
+						yield bytes.subarray(mid);
+						return;
+					}
+					yield bytes;
 				})(),
 		};
 
@@ -137,20 +144,22 @@ describe("ShardedCatalogueDb", () => {
 		const zeroHits = await store.vectorSearch(new Float32Array(DIM), 2);
 		expect(zeroHits.length).toBeLessThanOrEqual(2);
 
-		// Sequential opens + inflight dedup exercise cached hit & LRU eviction (>3 extra shards)
+		// Sequential + concurrent opens exercise multi-chunk assembly, cached hit, LRU reuse, and overflow cap (>4 extra shards)
 		await Promise.all([store.nearest("S01-P0", 2), store.nearest("S01-P1", 2)]);
 		await store.nearest("S02-P0", 2);
 		await store.nearest("S03-P0", 2);
-		const nearS4 = await store.nearest("S04-P0", 2);
-		expect(nearS4.every((n) => n.id.startsWith("S04-"))).toBe(true);
+		await store.nearest("S04-P0", 2);
+		const nearS5 = await store.nearest("S05-P0", 2);
+		expect(nearS5.every((n) => n.id.startsWith("S05-"))).toBe(true);
 		const hydrated = await store.productsByIds?.([
 			"NB-0001-01",
 			"S01-P0",
 			"S02-P0",
 			"S03-P0",
 			"S04-P0",
+			"S05-P0",
 		]);
-		expect(hydrated?.size).toBe(5);
+		expect(hydrated?.size).toBe(6);
 		expect(hydrated?.get("S02-P0")?.title).toBe("Merino Trail Cardigan");
 
 		// Warm revision activation checks shard 0 revision + global count
@@ -202,6 +211,21 @@ describe("ShardedCatalogueDb", () => {
 		q1[1] = 1;
 		const offlineHits = await plain.hybrid("Item", q1, 3);
 		expect(offlineHits.length).toBeGreaterThan(0);
+
+		// Corrupt extra-shard SQLite bytes clean up the acquired slot and rethrow
+		await plain.importShardedSqlite({
+			shardCount: 2,
+			centroids: centroids.subarray(0, 2 * DIM),
+			shardChunks: (s) =>
+				(async function* () {
+					if (s === 0) {
+						yield built[0]?.bytes ?? new Uint8Array(0);
+						return;
+					}
+					yield new Uint8Array([1, 2, 3, 4]);
+				})(),
+		});
+		await expect(plain.hybrid("Item", q1, 3)).rejects.toThrow();
 		await plain.dispose();
 	});
 

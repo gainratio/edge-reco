@@ -45,9 +45,8 @@ Open http://localhost:4173, click **Launch the live demo**, and search for
 1. Vitalune Neck and Back Massager | 4 Heads | 20 Speeds | Quiet Motor
 2. Kestrow Stadium Seat with Back Support | Extra Wide | Armrests | Red
 3. Vitalune Neck and Back Massager | 6 Heads | 20 Speeds | Carry Case
-strip: local search latency · 0 backend calls · 100,000 catalog · ~32.6 MB signed bundle
-  (the 2026-09-26 measured cold-start figure was taken on a 720-product bundle; re-measuring
-  the 100,000-product build is tracked, so do not quote it as the current cold start)
+strip: local search latency · 0 backend calls · 1,000,000 catalog · 79.0 MB signed bundle
+  (live figures are recorded against edge-reco.com via `pnpm -F frontend run measure:live`)
 console errors: 0
 ```
 
@@ -99,7 +98,7 @@ catalog address (`localhost:8921`). If you then run `vite preview`, the app says
 | `backend/src/edgereco/search/` | Python hybrid search: BM25 plus FAISS, merged with RRF. |
 | `backend/src/edgereco/cli.py` | The `edgereco` command line tool. |
 | `backend/tests/` | `unit/`, `bdd/` (steps for the Gherkin files in `backend/features/`), `integration/`, `e2e/`. |
-| `backend/examples/catalog/` | The committed, signed 100,000-product catalog the demo loads. |
+| `backend/examples/catalog/` | The committed, signed 1,000,000-product 64-shard catalog the demo loads. |
 | `backend/scripts/` | Catalog curation and the parity-fixture generators. |
 
 The signed-catalog download and checking in the browser come from

@@ -1,7 +1,8 @@
 // Multi-shard IVF-TurboQuant CatalogueStore over K self-contained SQLite shards.
-// Cold boot imports only anchor `shard_00` (`edgereco-catalogue`); queries route
-// via `rankIvfCentroids` (`nprobe = 2` + shard `0`) and stream extra shards on
-// demand into a bounded LRU of SQLite Workers.
+// Cold boot imports only anchor `shard_00` (`edgereco-catalogue`) into OPFS and
+// pre-warms `DEFAULT_NPROBE` reusable in-memory SQLite Workers; queries route
+// via `rankIvfCentroids` (`nprobe = 2` + shard `0`) and swap extra shard images
+// in-place via `sqlite3_deserialize` with zero Worker respawn or OPFS churn.
 
 import { NetworkError } from "../gainratio";
 import {
@@ -18,8 +19,9 @@ import {
 	type ShardedSqliteInput,
 } from "./catalogueDb";
 import {
-	importCatalogueShardSqlFromChunks,
+	importCatalogueSqlFromChunks,
 	openCatalogueShardSql,
+	openCatalogueSql,
 	retireLegacyVectorPool,
 } from "./catalogueSql";
 import type { BrowseResponse, Product, SearchResult } from "./domain";
@@ -28,7 +30,8 @@ import type { ScoringWeights } from "./rankingConfig";
 import type { SessionProfile } from "./session";
 
 const DEFAULT_NPROBE = 2;
-const MAX_EXTRA_OPEN_SHARDS = 3;
+const MAX_EXTRA_OPEN_SHARDS = 4;
+const SHARD_SWAP_TIMEOUT_MS = 30_000;
 
 export type OpenShardDb = (
 	shardIndex: number,
@@ -36,20 +39,50 @@ export type OpenShardDb = (
 ) => Promise<CatalogueDb>;
 
 const defaultOpenShardDb: OpenShardDb = async (shardIndex, dimension) =>
-	CatalogueDb.open(
-		await openCatalogueShardSql(shardIndex),
-		dimension,
-		DEFAULT_LEXICAL_WEIGHTS,
-		{
-			openSql: () => openCatalogueShardSql(shardIndex),
-			importStream: (chunks) =>
-				importCatalogueShardSqlFromChunks(shardIndex, chunks),
-			forceStreamImport: false,
-		},
-	);
+	shardIndex === 0
+		? CatalogueDb.open(
+				await openCatalogueSql(),
+				dimension,
+				DEFAULT_LEXICAL_WEIGHTS,
+				{
+					openSql: openCatalogueSql,
+					importStream: importCatalogueSqlFromChunks,
+					forceStreamImport: false,
+				},
+			)
+		: CatalogueDb.open(
+				await openCatalogueShardSql(shardIndex),
+				dimension,
+				DEFAULT_LEXICAL_WEIGHTS,
+				{
+					openSql: () => openCatalogueShardSql(shardIndex),
+					forceStreamImport: false,
+				},
+			);
 
 function shardRevKey(revisionKey: string, shardIndex: number): string {
 	return revisionKey.length > 0 ? `${revisionKey}:s${shardIndex}` : "";
+}
+
+async function assembleChunks(
+	chunks: AsyncIterable<Uint8Array>,
+): Promise<Uint8Array> {
+	const parts: Uint8Array[] = [];
+	let total = 0;
+	for await (const chunk of chunks) {
+		parts.push(chunk);
+		total += chunk.byteLength;
+	}
+	if (parts.length === 1) {
+		return parts[0] as Uint8Array;
+	}
+	const combined = new Uint8Array(total);
+	let offset = 0;
+	for (const part of parts) {
+		combined.set(part, offset);
+		offset += part.byteLength;
+	}
+	return combined;
 }
 
 function rankSublist(
@@ -110,7 +143,10 @@ export class ShardedCatalogueDb implements CatalogueStore {
 	readonly #dimension: number;
 	readonly #openShardDb: OpenShardDb;
 	readonly #extra = new Map<number, CatalogueDb>();
+	readonly #idleSlots: CatalogueDb[] = [];
 	readonly #inflight = new Map<number, Promise<CatalogueDb>>();
+	#allocatedSlots = 0;
+	#nextSlotId = 1;
 	#sharded: ShardedSqliteInput | null = null;
 	#revisionKey = "";
 	#globalCounts: ReadonlyMap<string, number> | null = null;
@@ -162,6 +198,7 @@ export class ShardedCatalogueDb implements CatalogueStore {
 		this.#sharded = sharded;
 		this.#revisionKey = revisionKey;
 		this.#globalCounts = counts;
+		await this.#prewarmSlots(sharded.shardCount);
 		return true;
 	}
 
@@ -172,12 +209,15 @@ export class ShardedCatalogueDb implements CatalogueStore {
 		if (sharded.centroids.length !== sharded.shardCount * this.#dimension) {
 			throw new RangeError("IVF centroids byte length mismatch");
 		}
-		await this.#closeExtraShards();
+		this.#recycleExtraShards();
 		const rev = options?.revisionKey ?? "";
-		await this.#shard0.importSqliteFromChunks(sharded.shardChunks(0), {
-			...options,
-			revisionKey: shardRevKey(rev, 0),
-		});
+		await Promise.all([
+			this.#shard0.importSqliteFromChunks(sharded.shardChunks(0), {
+				...options,
+				revisionKey: shardRevKey(rev, 0),
+			}),
+			this.#prewarmSlots(sharded.shardCount),
+		]);
 		this.#sharded = sharded;
 		this.#revisionKey = rev;
 		this.#globalCounts = await this.#shard0.globalCounts();
@@ -261,7 +301,7 @@ export class ShardedCatalogueDb implements CatalogueStore {
 	}
 
 	public async dispose(): Promise<void> {
-		await this.#closeExtraShards();
+		await this.#disposeExtraShards();
 		await this.#shard0.dispose();
 	}
 
@@ -317,33 +357,79 @@ export class ShardedCatalogueDb implements CatalogueStore {
 		return pending;
 	}
 
-	async #openAndImportExtra(
-		shardIndex: number,
-		sharded: ShardedSqliteInput,
-	): Promise<CatalogueDb> {
-		while (this.#extra.size >= MAX_EXTRA_OPEN_SHARDS) {
+	async #prewarmSlots(shardCount: number): Promise<void> {
+		const target = Math.min(Math.max(0, shardCount - 1), DEFAULT_NPROBE);
+		const needed = Math.max(0, target - this.#allocatedSlots);
+		if (needed === 0) return;
+		this.#allocatedSlots += needed;
+		const opened = await Promise.all(
+			Array.from({ length: needed }, () =>
+				this.#openShardDb(this.#nextSlotId++, this.#dimension),
+			),
+		);
+		this.#idleSlots.push(...opened);
+	}
+
+	async #acquireSlot(): Promise<CatalogueDb> {
+		const idle = this.#idleSlots.pop();
+		if (idle !== undefined) return idle;
+		if (this.#allocatedSlots < MAX_EXTRA_OPEN_SHARDS) {
+			this.#allocatedSlots += 1;
+			return this.#openShardDb(this.#nextSlotId++, this.#dimension);
+		}
+		if (this.#extra.size > 0) {
 			const [oldest, evicted] = this.#extra.entries().next().value as [
 				number,
 				CatalogueDb,
 			];
 			this.#extra.delete(oldest);
-			await evicted.dispose();
+			return evicted;
 		}
-		const db = await this.#openShardDb(shardIndex, this.#dimension);
-		const rev = shardRevKey(this.#revisionKey, shardIndex);
-		const count = await db.count();
-		if (count <= 0 || !(await db.activateRevision(rev, count))) {
-			await db.importSqliteFromChunks(sharded.shardChunks(shardIndex), {
-				revisionKey: rev,
+		this.#allocatedSlots += 1;
+		return this.#openShardDb(this.#nextSlotId++, this.#dimension);
+	}
+
+	async #openAndImportExtra(
+		shardIndex: number,
+		sharded: ShardedSqliteInput,
+	): Promise<CatalogueDb> {
+		const bytes = await assembleChunks(sharded.shardChunks(shardIndex));
+		const db = await this.#acquireSlot();
+		try {
+			await db.importSqlite(bytes, {
+				revisionKey: shardRevKey(this.#revisionKey, shardIndex),
+				swapTimeoutMs: SHARD_SWAP_TIMEOUT_MS,
 			});
+		} catch (error) {
+			this.#allocatedSlots = Math.max(0, this.#allocatedSlots - 1);
+			await db.dispose();
+			throw error;
+		}
+		while (this.#extra.size >= MAX_EXTRA_OPEN_SHARDS) {
+			const [oldest, overflow] = this.#extra.entries().next().value as [
+				number,
+				CatalogueDb,
+			];
+			this.#extra.delete(oldest);
+			this.#allocatedSlots = Math.max(0, this.#allocatedSlots - 1);
+			await overflow.dispose();
 		}
 		this.#extra.set(shardIndex, db);
 		return db;
 	}
 
-	async #closeExtraShards(): Promise<void> {
-		const dbs = [...this.#extra.values()];
+	#recycleExtraShards(): void {
+		for (const db of this.#extra.values()) {
+			this.#idleSlots.push(db);
+		}
 		this.#extra.clear();
+	}
+
+	async #disposeExtraShards(): Promise<void> {
+		const dbs = [...this.#extra.values(), ...this.#idleSlots];
+		this.#extra.clear();
+		this.#idleSlots.length = 0;
+		this.#allocatedSlots = 0;
 		await Promise.all(dbs.map((db) => db.dispose()));
 	}
 }

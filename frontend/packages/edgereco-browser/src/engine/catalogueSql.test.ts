@@ -206,33 +206,22 @@ describe("importCatalogueSqlFromChunks & clearCatalogueSqlStorage", () => {
 		);
 	});
 
-	it("names and imports per-shard databases independently from shard 0", async () => {
+	it("names and opens memory-backed extra-shard scratch databases independently from shard 0", async () => {
 		expect(seam.catalogueShardDatabaseName(0)).toBe("edgereco-catalogue");
 		expect(seam.catalogueShardDatabaseName(1)).toBe("edgereco-catalogue-s01");
 		expect(() => seam.catalogueShardDatabaseName(-1)).toThrow(RangeError);
 		expect(() => seam.catalogueShardDatabaseName(1.5)).toThrow(RangeError);
 
-		const seed = await seam.openCatalogueShardSql(2, {
-			workerFactory: nodeSqlWorkerFactory,
-		});
-		await seed.exec("CREATE TABLE s2(id TEXT); INSERT INTO s2 VALUES ('ok');");
-		const bytes = await seed.exportDatabase?.();
-		await seed.close();
-		if (bytes === undefined) throw new Error("expected exportDatabase");
-
-		async function* oneChunk() {
-			yield bytes as Uint8Array;
-		}
-		await seam.importCatalogueShardSqlFromChunks(2, oneChunk(), {
-			workerFactory: nodeSqlWorkerFactory,
-		});
-		const reopened = await seam.openCatalogueShardSql(2, {
+		const scratch = await seam.openCatalogueShardSql(2, {
 			workerFactory: nodeSqlWorkerFactory,
 		});
 		try {
-			expect(await reopened.query("SELECT id FROM s2")).toEqual([{ id: "ok" }]);
+			await scratch.exec(
+				"CREATE TABLE s2(id TEXT); INSERT INTO s2 VALUES ('ok');",
+			);
+			expect(await scratch.query("SELECT id FROM s2")).toEqual([{ id: "ok" }]);
 		} finally {
-			await reopened.close();
+			await scratch.close();
 		}
 	});
 });

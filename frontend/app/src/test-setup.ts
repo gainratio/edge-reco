@@ -36,12 +36,6 @@ vi.mock(
 					workerFactory: nodeSqlWorkerFactory,
 				}),
 			),
-			importCatalogueShardSqlFromChunks: vi.fn(
-				(shardIndex: number, chunks: AsyncIterable<Uint8Array>) =>
-					actual.importCatalogueShardSqlFromChunks(shardIndex, chunks, {
-						workerFactory: nodeSqlWorkerFactory,
-					}),
-			),
 			openUserSql: vi.fn(() =>
 				actual.openUserSql({ workerFactory: nodeSqlWorkerFactory }),
 			),

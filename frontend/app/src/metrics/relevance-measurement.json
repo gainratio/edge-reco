@@ -1,0 +1,60 @@
+{
+	"schema": "edgereco.relevance-measurement/v1",
+	"scorer": "assay-engine 0.5.0.dev6 (trec_eval)",
+	"catalogId": "amazon-demo",
+	"labelMethod": "breadcrumb-node-membership",
+	"natural": {
+		"k10": {
+			"k": 10,
+			"queryCount": 31,
+			"precision": 0.9419,
+			"recall": 0.2171,
+			"f1": 0.3452,
+			"ndcg": 0.94,
+			"mrr": 0.9446,
+			"map": 0.4769,
+			"ndcgCiLow": 0.8505,
+			"ndcgCiHigh": 1.0
+		},
+		"k24": {
+			"k": 24,
+			"queryCount": 31,
+			"precision": 0.8844,
+			"recall": 0.4881,
+			"f1": 0.6098,
+			"ndcg": 0.9066,
+			"mrr": 0.9446,
+			"map": 0.4769,
+			"ndcgCiLow": 0.833,
+			"ndcgCiHigh": 0.9647
+		}
+	},
+	"taxonomyWord": {
+		"k10": {
+			"k": 10,
+			"queryCount": 12,
+			"precision": 1.0,
+			"recall": 0.0238,
+			"f1": 0.0465,
+			"ndcg": 1.0,
+			"mrr": 1.0,
+			"map": 0.0571
+		},
+		"k24": {
+			"k": 24,
+			"queryCount": 12,
+			"precision": 1.0,
+			"recall": 0.0571,
+			"f1": 0.1081,
+			"ndcg": 1.0,
+			"mrr": 1.0,
+			"map": 0.0571
+		}
+	},
+	"negatives": {
+		"queryCount": 8,
+		"fullDepthPages": 0,
+		"falsePositivesShown": 6,
+		"emptyPositivePages": 0
+	}
+}

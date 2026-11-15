@@ -227,7 +227,7 @@ The SPA consumes the private `@edgereco/browser` workspace package and the stand
 
 `frontend/app/`:
 
-A React + Vite SPA over `@edgereco/browser`, which composes `@gainratio/browser`. The app boots through an intro landing page (its performance tiles quote a dated, recorded measurement of the live site — `src/metrics/live-measurement.json`, written by `pnpm run measure:live` in real Chromium — through `src/metrics/landing-figures.ts`, and `landing-figures.test.ts` recomputes every tile from the raw runs); once launched, the store shows a live `MetricsStrip` of real per-session numbers (recommend latency, backend calls, cold start, JS heap, catalog size). The home page is a 100,000-product catalog grid across 12 departments with a search box and a `RailStack` of *For You* / *Trending* / *New arrivals* rails — the For You rail re-ranks live as the user clicks, favorites, adds to cart, or lingers; Trending / New arrivals are stable. Clicking a product opens the PDP (`ProductDetail.tsx`; a `#/p/<id>` hash history entry, no router library, so browser Back stays in-app and a reload restores the view) with its seed-based rails — *Similar items*, *Because you viewed*, *Customers also bought*, *Frequently bought together*. The taste itself is durable on the device: every folded interaction appends to an OPFS taste log (`src/signals/tasteLog.ts`, rolling 500-event window, no PII), boot replays it through the same fold with the bundle's `interaction_weights` to rebuild the profile, and a "Reset taste" control next to the For-You badge wipes log + profile back to baseline — still zero backend calls. The headline demo — `cd backend && uv run poe demo` (or `cd frontend && docker compose up` for a Docker-only run) — brings up the static signed-bundle origin + Caddy edge + the SPA; the browser does the search.
+A React + Vite SPA over `@edgereco/browser`, which composes `@gainratio/browser`. The app boots through an intro landing page (its performance tiles quote a dated, recorded measurement of the live site — `src/metrics/live-measurement.json`, written by `pnpm run measure:live` in real Chromium — and its search-quality tiles quote held-out Assay IR evaluation from `src/metrics/relevance-measurement.json` through `src/metrics/landing-figures.ts`, with `landing-figures.test.ts` recomputing every tile from the raw records); once launched, the store shows a live `MetricsStrip` of real per-session numbers (recommend latency, backend calls, cold start, JS heap, catalog size). The home page is a 1,000,000-product catalog grid across 12 departments (served via 64 IVF-TurboQuant SQLite shards behind `centroids.f32`) with a search box and a `RailStack` of *For You* / *Trending* / *New arrivals* rails — the For You rail re-ranks live as the user clicks, favorites, adds to cart, or lingers; Trending / New arrivals are stable. Clicking a product opens the PDP (`ProductDetail.tsx`; a `#/p/<id>` hash history entry, no router library, so browser Back stays in-app and a reload restores the view) with its seed-based rails — *Similar items*, *Because you viewed*, *Customers also bought*, *Frequently bought together*. The taste itself is durable on the device: every folded interaction appends to an OPFS taste log (`src/signals/tasteLog.ts`, rolling 500-event window, no PII), boot replays it through the same fold with the bundle's `interaction_weights` to rebuild the profile, and a "Reset taste" control next to the For-You badge wipes log + profile back to baseline — still zero backend calls. The headline demo — `cd backend && uv run poe demo` (or `cd frontend && docker compose up` for a Docker-only run) — brings up the static signed-bundle origin + Caddy edge + the SPA; the browser does the search.
 
 The SPA pins the verify public key (`public/public.key`) at build time — it never trusts the origin for the key. That trust root may be a raw 32-byte Ed25519 key or an `edgeproc.keyring/v1` JSON keyring (key rotation + revocation). The sync Worker and the ranking-proof check both parse it with `@gainratio/browser`'s `parseTrustRoot`, so the two readers always agree on its format.
 
@@ -273,7 +273,7 @@ that are not floats remain exact.
 
 ## Release reliability and performance contract
 
-The browser release gate uses the committed 100,000-product catalog, the real q8
+The browser release gate uses the committed 1,000,000-product 64-shard catalog, the real q8
 MiniLM model, ONNX/WASM, signed-bundle sync, and headless Chromium. Budgets are
 chosen from the demo promise (a short first-load screen, then visibly instant local
 search), before measurement:
@@ -301,7 +301,7 @@ requires the exact-SHA and canonical-host checks in `.github/workflows/deploy.ym
 
 ```mermaid
 flowchart TB
-  build["Your cloud<br>build + sign the catalog<br>100,000 products → ~32.6 MB signed bundle"]
+  build["Your cloud<br>build + sign the catalog<br>1,000,000 products → 64 shards (79.0 MB signed bundle)"]
   sync["Download once, then check it<br>Ed25519 + SHA-256<br>any mismatch aborts the load"]
   engine["Search + rank in the tab<br>keywords + meaning → fuse → personalize"]
   recs["Results and recommendations<br>0 backend calls · works offline"]
@@ -318,13 +318,13 @@ flowchart TB
 Everything in green happens on the shopper's own device. Your cloud is touched only to
 publish a new catalog, never to answer a search.
 
-- **origin** serves a *signed, content-addressed bundle*: the prebuilt SQLite database
-  (`catalogue.sqlite` holding the products, FTS5 index, and quantized 384-d `sqlite-vector`
-  embeddings) and the ranking weights. *Content-addressed* means every piece is named by
-  the hash of its own bytes, so it can be cached forever and cannot be changed without
-  detection. It is a `latest` version pointer plus immutable `manifest/<hash>` and
-  `chunk/<hash>` objects. A committed 100,000-product bundle lives in
-  `backend/examples/catalog/` (~32.6 MB on disk).
+- **origin** serves a *signed, content-addressed bundle*: the prebuilt SQLite databases
+  (single `catalogue.sqlite` or 64 IVF shards holding the products, FTS5 index, and
+  quantized 384-d `sqlite-vector` embeddings) and the ranking weights. *Content-addressed*
+  means every piece is named by the hash of its own bytes, so it can be cached forever and
+  cannot be changed without detection. It is a `latest` version pointer plus immutable
+  `manifest/<hash>` and `chunk/<hash>` objects. A committed 1,000,000-product 64-shard
+  bundle lives in `backend/examples/catalog/` (~79.0 MB across 3,331 chunks on disk).
 - **edge** is a Caddy reverse proxy (a small static web server standing in for a CDN)
   with the cache policy: immutable chunks cached forever, a short-lived pointer.
 - **browser tier**: the storefront single-page app syncs the bundle (fetches it, checks its
@@ -357,8 +357,8 @@ edit modifies only the touched SQLite B-tree leaf pages while every surrounding 
 stays identical. A client compares the new manifest with what it already has in OPFS and
 fetches only the pieces that changed, reusing the rest (notably the unaffected SQLite pages
 and vector rows). In the live EdgeReco storefront, clicking **⚡ Apply delta** switches from the
-baseline catalog (`sequence: 30`) to the flash-sale delta overlay (`sequence: 31`, `/bundle-delta/`),
-fetches only **2 changed chunks (~32 KB)** while reusing **2,059 cached chunks** from OPFS (99.90%
+baseline catalog (`sequence: 40`) to the flash-sale delta overlay (`sequence: 41`, `/bundle-delta/`),
+fetches only **2 changed chunks (42.9 KB)** while reusing **3,329 cached chunks** (99.94%
 chunk reuse), and calls `EngineRuntime.syncUpdate()` to hot-swap the
 SQLite database in place — without reloading the page, the 23 MB ONNX model, or the shopper's
 `taste_events`. As [DEPLOY.md](DEPLOY.md) puts it: *"a one-line edit re-publishes one chunk;
@@ -504,7 +504,7 @@ without a coverage gap.
   - `backend/features/`: Gherkin behaviour specs, decoupled from step implementations
   - `backend/tests/`: `unit/` `bdd/` `integration/` `e2e/`
   - `backend/deploy/`: `Dockerfile`, `docker-compose.yml`, Caddy edge config
-  - `backend/examples/catalog/`: committed signed 100,000-product bundle (`latest` + `manifest/` + `chunk/`)
+  - `backend/examples/catalog/`: committed signed 1,000,000-product 64-shard bundle (`latest` + `manifest/` + `chunk/`)
   - `backend/examples/source/catalog.csv`: committed, reproducible build source (12 balanced categories)
   - `backend/examples/keys/public.key`: pinned Ed25519 verify key for the bundle
   - `backend/demo_server/`: optional FastAPI launcher (not in the main checks); ships the synthetic fixture

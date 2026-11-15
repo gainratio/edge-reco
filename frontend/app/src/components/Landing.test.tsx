@@ -21,7 +21,7 @@ describe("Landing", () => {
 		expect(heading.querySelector("em")).toHaveTextContent("shouldn't");
 	});
 
-	it("renders all six representative metric tiles", () => {
+	it("renders all six representative metric tiles and all six Assay search-quality tiles", () => {
 		render(<Landing onLaunch={() => {}} />);
 		const labels = [
 			"per search (median)",
@@ -30,10 +30,17 @@ describe("Landing", () => {
 			"JS heap (Chromium)",
 			"inference / 1k recs",
 			"demo products, in-tab",
+			"Precision@10",
+			"Recall@24",
+			"F1@24 harmonic mean",
+			"nDCG@10",
+			"Mean Reciprocal Rank",
+			"full-page false positives",
 		];
 		for (const label of labels) {
 			expect(screen.getByText(label)).toBeInTheDocument();
 		}
+		expect(screen.getByText(/assay-engine.*trec_eval/)).toBeInTheDocument();
 		// honesty labels are present, not scrubbed
 		expect(screen.getByText("JS heap (Chromium)")).toBeInTheDocument();
 		expect(

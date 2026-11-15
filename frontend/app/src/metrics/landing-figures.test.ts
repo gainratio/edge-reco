@@ -9,8 +9,12 @@ import {
 	CATALOG_PRODUCTS,
 	LANDING_MEASURED_ON,
 	LANDING_METRICS,
+	LANDING_QUALITY_METRICS,
+	QUALITY_NATURAL_QUERIES,
+	QUALITY_SCORER,
 } from "./landing-figures";
 import measurement from "./live-measurement.json";
+import relevance from "./relevance-measurement.json";
 
 const here = dirname(fileURLToPath(import.meta.url)); // …/frontend/app/src/metrics
 const repoRoot = join(here, "../../../..");
@@ -179,5 +183,42 @@ describe("landing performance tiles quote the recorded live measurement", () => 
 		for (const text of strings(landingCopy)) {
 			expect(text).not.toMatch(unitClaim);
 		}
+	});
+});
+
+describe("landing search-quality tiles quote the Assay relevance measurement", () => {
+	const qTile = (id: string) => {
+		const found = LANDING_QUALITY_METRICS.find((m) => m.id === id);
+		if (!found) throw new Error(`no quality tile with id "${id}"`);
+		return found;
+	};
+
+	it("exposes six Assay trec_eval quality tiles and provenance", () => {
+		expect(LANDING_QUALITY_METRICS).toHaveLength(6);
+		expect(QUALITY_SCORER).toBe(relevance.scorer);
+		expect(QUALITY_SCORER).toContain("assay-engine");
+		expect(QUALITY_NATURAL_QUERIES).toBe(relevance.natural.k10.queryCount);
+	});
+
+	it("recomputes Precision, Recall, F1, nDCG, MRR, and negative guards from relevance-measurement.json", () => {
+		expect(qTile("precision").num).toBe(
+			(relevance.natural.k10.precision * 100).toFixed(1),
+		);
+		expect(qTile("recall").num).toBe(
+			(relevance.natural.k24.recall * 100).toFixed(1),
+		);
+		expect(qTile("f1").num).toBe(relevance.natural.k24.f1.toFixed(2));
+		expect(qTile("f1").vars?.f10).toBe(relevance.natural.k10.f1.toFixed(2));
+		expect(qTile("ndcg").num).toBe(relevance.natural.k10.ndcg.toFixed(2));
+		expect(qTile("ndcg").vars?.ciLow).toBe(
+			relevance.natural.k10.ndcgCiLow.toFixed(2),
+		);
+		expect(qTile("ndcg").vars?.ciHigh).toBe(
+			relevance.natural.k10.ndcgCiHigh.toFixed(2),
+		);
+		expect(qTile("mrr").num).toBe(relevance.natural.k10.mrr.toFixed(2));
+		expect(qTile("negatives").num).toBe(
+			`${relevance.negatives.fullDepthPages}/${relevance.negatives.queryCount}`,
+		);
 	});
 });

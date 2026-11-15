@@ -2,16 +2,18 @@
 
 > EdgeReco is an open-source, browser-first ecommerce search and recommendation engine
 > built by GainRatio. After syncing a signed SQLite + 2-bit TurboQuant catalog bundle —
-> scaling up to 1,000,000 products via 64 spherical k-means IVF-TurboQuant shards (~1.9 MB
-> zstd per shard behind a 96 KiB centroid router, with ~9.4 KB zstd --patch-from delta
-> patches) — product search, hybrid ranking, and session-aware recommendations execute
-> entirely inside the shopper's browser via SQLite WASM and OPFS with zero per-query
-> backend calls and zero shopper-behavior egress. The live single-bundle storefront
-> showcases EdgeReco on a 100,000-product catalog across 12 departments.
+> 1,000,000 products across 64 spherical k-means IVF-TurboQuant shards (79.0 MB signed
+> bundle across 3,331 GearCDC chunks behind a 96 KiB centroid router, with 42.9 KB
+> two-chunk delta updates and ~9.4 KB zstd --patch-from binary patches) — product search,
+> hybrid ranking, and session-aware recommendations execute entirely inside the shopper's
+> browser via SQLite WASM and OPFS with zero per-query backend calls and zero
+> shopper-behavior egress. The live storefront showcases EdgeReco on all 1,000,000
+> products across 12 departments, with held-out Precision@10 (94.2%), Recall@24 (48.8%),
+> F1@24 (0.61), nDCG@10 (0.94), and MRR (0.94) scored by Assay (`trec_eval`).
 
 ## Canonical URLs (edge-reco.com)
 
-- [Live Storefront](https://edge-reco.com/): Interactive 100,000-product single-bundle storefront showcase (engine scales up to 1,000,000 products via sharded IVF-TurboQuant).
+- [Live Storefront](https://edge-reco.com/): Interactive 1,000,000-product 64-shard IVF-TurboQuant storefront showcase across 12 departments.
 - [On-Device Search & Recommendations](https://edge-reco.com/on-device-search): Architecture overview of browser-executed FTS5 + vector retrieval with zero backend latency.
 - [EdgeProc Substrate](https://edge-reco.com/edgeproc): Entity disambiguation and architecture of the underlying `gainratio/edge-proc` local-first search substrate.
 - [GitHub Directory](https://edge-reco.com/github): Canonical index of EdgeReco, EdgeProc, `edgeproc-core`, and sibling GainRatio repositories.
