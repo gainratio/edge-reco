@@ -97,4 +97,23 @@ describe("Header", () => {
 		renderHeader({ cartCount: 3 });
 		expect(screen.getByText("3")).toBeInTheDocument();
 	});
+
+	it("renders Overview and clickable wordmark when onOverview is passed", async () => {
+		const onOverview = vi.fn();
+		render(
+			<Header
+				query=""
+				onQueryChange={() => {}}
+				categories={[]}
+				activeCategory={null}
+				onSelectCategory={() => {}}
+				cartCount={0}
+				onOverview={onOverview}
+			/>,
+		);
+		await userEvent.click(screen.getByRole("button", { name: "Overview" }));
+		expect(onOverview).toHaveBeenCalledTimes(1);
+		await userEvent.click(screen.getByRole("button", { name: /EdgeReco/i }));
+		expect(onOverview).toHaveBeenCalledTimes(2);
+	});
 });

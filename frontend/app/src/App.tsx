@@ -44,6 +44,7 @@ function rememberLaunch(): void {
  */
 export function App() {
 	const [launched, setLaunched] = useState(launchedInThisTab);
+	const [viewingOverview, setViewingOverview] = useState(false);
 	const [stage, setStage] = useState<BootStage | null>(null);
 	const [ready, setReady] = useState(false);
 	const [failure, setFailure] = useState<BootFailure | null>(null);
@@ -84,11 +85,13 @@ export function App() {
 	}, []);
 	const onLaunch = useCallback(() => {
 		rememberLaunch();
+		setViewingOverview(false);
 		setLaunched(true);
 	}, []);
+	const onOverview = useCallback(() => setViewingOverview(true), []);
 
 	let screen: ReactNode;
-	if (!launched) {
+	if (!launched || viewingOverview) {
 		screen = <Landing onLaunch={onLaunch} />;
 	} else if (!ready) {
 		screen = (
@@ -107,7 +110,7 @@ export function App() {
 			/>
 		);
 	} else {
-		screen = <Storefront />;
+		screen = <Storefront onOverview={onOverview} />;
 	}
 
 	return (

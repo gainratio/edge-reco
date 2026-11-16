@@ -135,7 +135,11 @@ async function safeResults(
  * Back stays in-app and a reload restores the view — while the taste profile
  * itself survives reloads via the durable in-browser log (signals/tasteLog.ts).
  */
-export function Storefront() {
+interface StorefrontProps {
+	readonly onOverview?: () => void;
+}
+
+export function Storefront({ onOverview }: StorefrontProps = {}) {
 	const { t } = useTranslation("storefront");
 	const [query, setQuery] = useState("");
 	const debouncedQuery = useDebounced(query, 300);
@@ -585,6 +589,7 @@ export function Storefront() {
 				activeCategory={activeCategory}
 				onSelectCategory={onSelectCategory}
 				cartCount={cartCount}
+				{...(onOverview !== undefined ? { onOverview } : {})}
 			/>
 
 			{storageLimited && (

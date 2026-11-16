@@ -1,6 +1,7 @@
 import { AnimatePresence, motion } from "motion/react";
 import { useTranslation } from "react-i18next";
 import type { RankingProofEvidence, SearchResult } from "../api/types";
+import { STOREFRONT_QUALITY_SUMMARY } from "../metrics/landing-figures";
 
 type ScoreExplanation = NonNullable<SearchResult["score_explanation"]>;
 type ExplainedRow = ScoreExplanation["components"][number];
@@ -81,6 +82,68 @@ function Verification({ evidence }: { evidence: RankingProofEvidence }) {
 	);
 }
 
+function QualityBenchmark() {
+	const { t } = useTranslation("storefront");
+	const q = STOREFRONT_QUALITY_SUMMARY;
+	return (
+		<section className="why__section why__section--quality">
+			<h3 className="why__head">{t("why.qualityHead")}</h3>
+			<p className="why__intro">
+				{t("why.qualityIntro", { queries: q.queryCount, scorer: q.scorer })}
+			</p>
+			<dl className="why__ir">
+				<div className="why__ir-row">
+					<dt className="why__ir-name">
+						{t("why.qualityPrecision", { k: q.k10 })}
+					</dt>
+					<dd className="why__ir-val">
+						{t("why.qualityPrecisionVal", {
+							p10: q.precision10,
+							p24: q.precision24,
+							k24: q.k24,
+						})}
+					</dd>
+				</div>
+				<div className="why__ir-row">
+					<dt className="why__ir-name">
+						{t("why.qualityRecall", { k24: q.k24 })}
+					</dt>
+					<dd className="why__ir-val">
+						{t("why.qualityRecallVal", {
+							r24: q.recall24,
+							share: q.recallShareOfCeiling,
+							ceiling: q.recallCeiling24,
+						})}
+					</dd>
+				</div>
+				<div className="why__ir-row">
+					<dt className="why__ir-name">{t("why.qualityF1", { k24: q.k24 })}</dt>
+					<dd className="why__ir-val">
+						{t("why.qualityF1Val", {
+							f1: q.f1At24,
+							share: q.f1ShareOfCeiling,
+							ceiling: q.f1Ceiling24,
+						})}
+					</dd>
+				</div>
+				<div className="why__ir-row">
+					<dt className="why__ir-name">
+						{t("why.qualityNdcgMrr", { k: q.k10 })}
+					</dt>
+					<dd className="why__ir-val">
+						{t("why.qualityNdcgMrrVal", {
+							ndcg: q.ndcg10,
+							ciLow: q.ndcgCiLow,
+							ciHigh: q.ndcgCiHigh,
+							mrr: q.mrr10,
+						})}
+					</dd>
+				</div>
+			</dl>
+		</section>
+	);
+}
+
 export function WhyPopover({
 	open,
 	explanation,
@@ -133,6 +196,8 @@ export function WhyPopover({
 								<strong>{number(explanation.score)}</strong>
 							</div>
 						</section>
+
+						<QualityBenchmark />
 
 						<section className="why__section why__section--verification">
 							<h3 className="why__head">{t("why.verificationHead")}</h3>

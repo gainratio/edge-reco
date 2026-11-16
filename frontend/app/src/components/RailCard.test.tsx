@@ -150,6 +150,13 @@ describe("RailCard", () => {
 		expect(
 			screen.getByText("0.004", { selector: "strong" }),
 		).toBeInTheDocument();
+		expect(
+			screen.getByRole("heading", { name: "Retrieval quality — Assay" }),
+		).toBeInTheDocument();
+		expect(screen.getByText("Precision@10")).toBeInTheDocument();
+		expect(screen.getByText("94.2% (88.4% @ k=24)")).toBeInTheDocument();
+		expect(screen.getByText("48.8% (90.3% of 54.1% max)")).toBeInTheDocument();
+		expect(screen.getByText("0.61 (89.7% of 0.68 max)")).toBeInTheDocument();
 	});
 
 	it("renders the rank, title and rounded score and picks on click", async () => {
