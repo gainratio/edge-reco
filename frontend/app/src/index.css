@@ -1602,6 +1602,7 @@ input {
    ========================================================================= */
 
 .nimbus-footer {
+	overflow-anchor: none;
 	max-width: 1320px;
 	margin: 0 auto;
 	padding: 28px var(--gut) 56px;
@@ -2383,6 +2384,7 @@ input {
 }
 
 .metrics-strip {
+	position: relative;
 	max-width: 1320px;
 	margin: 0 auto;
 	/* Top padding: without it the pills butt against the sticky header's rule
@@ -2390,14 +2392,15 @@ input {
 	padding: 10px var(--gut) 12px;
 	display: flex;
 	flex-wrap: wrap;
-	gap: 8px;
+	align-items: center;
+	gap: 6px;
 }
 
 .metrics-strip__tile {
 	display: flex;
 	align-items: baseline;
-	gap: 7px;
-	padding: 6px 12px;
+	gap: 5px;
+	padding: 5px 9px;
 	border: 1px solid var(--line);
 	border-radius: 999px;
 	background: var(--paper);
@@ -2406,7 +2409,7 @@ input {
 .metrics-strip__value {
 	font-family: var(--font-display);
 	font-weight: 600;
-	font-size: 14px;
+	font-size: 13px;
 	/* Small text: --signal-ink holds WCAG-AA 4.5:1 on --paper (theme.contrast.test). */
 	color: var(--signal-ink);
 	font-variant-numeric: tabular-nums;
@@ -2419,8 +2422,8 @@ input {
 }
 
 .metrics-strip__label {
-	font-size: 11px;
-	letter-spacing: 0.04em;
+	font-size: 10.5px;
+	letter-spacing: 0.02em;
 	color: var(--muted);
 	text-transform: lowercase;
 }
@@ -2429,13 +2432,13 @@ input {
 	display: inline-flex;
 	align-items: center;
 	gap: 5px;
-	padding: 6px 12px;
+	padding: 5px 10px;
 	border: 1px solid var(--signal-ink);
 	border-radius: 999px;
 	background: var(--paper-raise);
 	color: var(--signal-ink);
 	font-family: var(--font-body);
-	font-size: 11.5px;
+	font-size: 11px;
 	font-weight: 600;
 	letter-spacing: 0.02em;
 	line-height: 1;
@@ -2458,29 +2461,21 @@ input {
 	max-width: 100%;
 }
 
-.metrics-quality[open] {
-	flex-basis: 100%;
-}
-
 .metrics-quality__summary {
-	list-style: none;
 	display: inline-flex;
 	flex-wrap: wrap;
 	align-items: baseline;
-	gap: 4px 7px;
+	gap: 4px 5px;
 	max-width: 100%;
-	padding: 6px 12px;
+	padding: 5px 10px;
 	border: 1px solid var(--line);
 	border-radius: 999px;
 	background: var(--paper-raise);
+	font-family: inherit;
 	cursor: pointer;
 	transition:
 		background 0.15s ease,
 		border-color 0.15s ease;
-}
-
-.metrics-quality__summary::-webkit-details-marker {
-	display: none;
 }
 
 .metrics-quality__summary:hover {
@@ -2496,38 +2491,27 @@ input {
 	display: inline-block;
 }
 
-.metrics-quality[open] > .metrics-quality__summary::before {
+.metrics-quality__summary[aria-expanded="true"]::before {
 	rotate: 90deg;
-}
-
-.metrics-quality::details-content {
-	interpolate-size: allow-keywords;
-	overflow: clip;
-	contain: layout;
-}
-
-.metrics-quality:not([open])::details-content {
-	block-size: 0;
 }
 
 @media (prefers-reduced-motion: no-preference) {
 	.metrics-quality__summary::before {
 		transition: rotate 0.2s ease;
 	}
-
-	.metrics-quality::details-content {
-		transition:
-			block-size 0.24s ease,
-			content-visibility 0.24s ease allow-discrete;
-	}
 }
 
 .metrics-quality__panel {
-	margin-top: 10px;
+	position: absolute;
+	left: var(--gut);
+	right: var(--gut);
+	top: calc(100% + 2px);
+	z-index: 40;
 	padding: 14px 16px;
 	border: 1px solid var(--line);
 	border-radius: var(--radius-sm);
 	background: var(--paper-raise);
+	box-shadow: 0 14px 36px rgba(24, 20, 16, 0.12);
 }
 
 .metrics-quality__caption {

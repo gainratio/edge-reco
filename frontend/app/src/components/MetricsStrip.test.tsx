@@ -3,6 +3,7 @@
 // original snapshot (mirrors the store.test.ts isolation pattern).
 
 import { cleanup, render, screen } from "@testing-library/react";
+import userEvent from "@testing-library/user-event";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { getSnapshot, type MetricsSnapshot, record } from "../metrics/store";
 import { MetricsStrip } from "./MetricsStrip";
@@ -139,12 +140,16 @@ describe("MetricsStrip", () => {
 		).toBeDisabled();
 	});
 
-	it("renders the Assay IR Precision, Recall, and F1 summary pill and expandable scorecard", () => {
+	it("renders the Assay IR Precision, Recall, and F1 summary pill and expandable scorecard", async () => {
 		render(<MetricsStrip />);
-		expect(
-			screen.getByText(/94\.2% P@10 · 48\.8% R@24 · 0\.61 F1/),
-		).toBeInTheDocument();
-		expect(screen.getByText("assay ir")).toBeInTheDocument();
+		const trigger = screen.getByRole("button", {
+			name: /94\.2% P · 48\.8% R · 0\.61 F1/,
+		});
+		expect(trigger).toHaveAttribute("aria-expanded", "false");
+		expect(screen.getByText("assay")).toBeInTheDocument();
+
+		await userEvent.click(trigger);
+		expect(trigger).toHaveAttribute("aria-expanded", "true");
 		expect(screen.getByText("Precision@10")).toBeInTheDocument();
 		expect(screen.getByText("Recall@24")).toBeInTheDocument();
 		expect(screen.getByText("F1@24 harmonic mean")).toBeInTheDocument();
