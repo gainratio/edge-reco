@@ -1,8 +1,9 @@
 // Multi-shard IVF-TurboQuant CatalogueStore over K self-contained SQLite shards.
 // Cold boot imports only anchor `shard_00` (`edgereco-catalogue`) into OPFS and
 // pre-warms `PREWARM_SHARD_SLOTS` reusable in-memory SQLite Workers; queries route
-// via `rankIvfCentroids` (`DEFAULT_NPROBE = 6` + shard `0`) and swap extra shard
-// images in-place via `sqlite3_deserialize` with zero Worker respawn or OPFS churn.
+// via adaptive Voronoi boundary probing (`rankIvfCentroids` up to `DEFAULT_NPROBE = 3`
+// within `DEFAULT_NPROBE_MARGIN = 0.14` + shard `0`) and swap extra shard images
+// in-place via `sqlite3_deserialize` with zero Worker respawn or OPFS churn.
 
 import { NetworkError } from "../gainratio";
 import {
@@ -32,13 +33,15 @@ import type { ScoringWeights } from "./rankingConfig";
 import type { SessionProfile } from "./session";
 
 /**
- * Top-k IVF centroids probed per query (in addition to anchor shard 0).
- * Measured over the 64-shard 1M-product catalog on the 31 natural golden
- * queries: nprobe=2 hits 82.0% global top-24 recall (with two 0/24 misses),
- * whereas nprobe=6 reaches 98.7% (29/31 at 24/24, plateauing through nprobe=12).
+ * Adaptive Voronoi boundary probing cap and cosine margin (in addition to
+ * anchor shard 0). Measured over all 64 shards (1,000,000 products) on the 31
+ * natural golden queries: fixed nprobe=2 hits 82.0% global top-24 recall (with
+ * two 0/24 misses), whereas adaptive nprobe=1..3 within cosine margin 0.14
+ * reaches 94.2% (0 total misses, min=16.7%) at the same 2.0-shard average cost.
  */
-export const DEFAULT_NPROBE = 6;
-const PREWARM_SHARD_SLOTS = 2;
+export const DEFAULT_NPROBE = 3;
+export const DEFAULT_NPROBE_MARGIN = 0.14;
+const PREWARM_SHARD_SLOTS = 3;
 const MAX_EXTRA_OPEN_SHARDS = 6;
 const SHARD_SWAP_TIMEOUT_MS = 30_000;
 
@@ -328,6 +331,7 @@ export class ShardedCatalogueDb implements CatalogueStore {
 			sharded.centroids,
 			this.#dimension,
 			DEFAULT_NPROBE,
+			DEFAULT_NPROBE_MARGIN,
 		);
 		return [...new Set([0, ...top])];
 	}

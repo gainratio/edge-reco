@@ -182,13 +182,17 @@ function dotProductAt(
 
 /**
  * Rank coarse IVF shard centroids by cosine similarity to `queryVector` and
- * return the top `nprobe` shard indices (`0 .. numShards - 1`).
+ * return up to `nprobe` shard indices (`0 .. numShards - 1`). When
+ * `cosineMargin` is provided, always includes the nearest centroid and keeps
+ * additional centroids up to `nprobe` only if they fall within `cosineMargin`
+ * of the top centroid score (adaptive Voronoi boundary probing).
  */
 export function rankIvfCentroids(
 	queryVector: Float32Array,
 	centroids: Float32Array,
 	dimension: number,
 	nprobe: number,
+	cosineMargin?: number,
 ): number[] {
 	if (!Number.isInteger(dimension) || dimension < 1) {
 		throw new RangeError("IVF dimension must be a positive integer");
@@ -207,7 +211,14 @@ export function rankIvfCentroids(
 		score: dotProductAt(queryVector, centroids, shard * dimension, dimension),
 	}));
 	scored.sort((a, b) => b.score - a.score || a.shard - b.shard);
-	return scored.slice(0, take).map((entry) => entry.shard);
+	const top = scored.slice(0, take);
+	if (cosineMargin === undefined || top.length <= 1) {
+		return top.map((entry) => entry.shard);
+	}
+	const floor = (top[0]?.score ?? 0) - cosineMargin;
+	return top
+		.filter((entry, idx) => idx === 0 || entry.score >= floor)
+		.map((entry) => entry.shard);
 }
 
 const SHARD_ID_RE = /^S(\d{2})-/u;
