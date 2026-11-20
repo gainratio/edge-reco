@@ -33,7 +33,7 @@
 		"applyingDelta": "Applying delta…",
 		"applyDeltaTitle": "Apply a signed 4 KiB SQLite page-delta update and hot-swap the catalog in place",
 		"deltaToast": "Delta patch applied — {{fetched}} new · {{reused}} cached chunks",
-		"qualityPillValue": "{{p10}} P · {{r24}} R · {{f1}} F1",
+		"qualityPillValue": "{{p10}} P · {{rShare}} R/max",
 		"qualityPillLabel": "assay",
 		"qualityHeading": "Held-out retrieval quality — {{queries}} natural queries scored by {{scorer}}",
 		"qualityPrecisionLabel": "Precision@{{k}}",

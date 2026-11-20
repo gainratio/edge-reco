@@ -31,7 +31,7 @@ describe("Landing", () => {
 			"inference / 1k recs",
 			"demo products, in-tab",
 			"Precision@10",
-			"Recall@24",
+			"Recall@24 (% of max)",
 			"F1@24 harmonic mean",
 			"nDCG@10",
 			"Mean Reciprocal Rank",

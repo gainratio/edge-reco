@@ -8,8 +8,9 @@
 > hybrid ranking, and session-aware recommendations execute entirely inside the shopper's
 > browser via SQLite WASM and OPFS with zero per-query backend calls and zero
 > shopper-behavior egress. The live storefront showcases EdgeReco on all 1,000,000
-> products across 12 departments, with held-out Precision@10 (94.2%), Recall@24 (48.8%),
-> F1@24 (0.61), nDCG@10 (0.94), and MRR (0.94) scored by Assay (`trec_eval`).
+> products across 12 departments, with held-out Precision@10 (97.4%), Recall@24 (50.8%,
+> 94.0% of k=24 oracle ceiling), F1@24 (0.64), nDCG@10 (0.97), and MRR (0.98) scored by
+> Assay (`trec_eval`), and 98.7% global top-24 IVF-TurboQuant routing recall at nprobe=6.
 
 ## Canonical URLs (edge-reco.com)
 

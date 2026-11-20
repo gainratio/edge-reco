@@ -73,7 +73,7 @@ async function buildShardImage(
 
 describe("ShardedCatalogueDb", () => {
 	it("imports shard 0 on boot, routes queries across shards, fuses RRF, and caps extra open shards via LRU", async () => {
-		const shardCount = 6;
+		const shardCount = 8;
 		const rowsPerShard = 4;
 		const globalTotal = shardCount * rowsPerShard;
 		const built = await Promise.all(
@@ -144,13 +144,15 @@ describe("ShardedCatalogueDb", () => {
 		const zeroHits = await store.vectorSearch(new Float32Array(DIM), 2);
 		expect(zeroHits.length).toBeLessThanOrEqual(2);
 
-		// Sequential + concurrent opens exercise multi-chunk assembly, cached hit, LRU reuse, and overflow cap (>4 extra shards)
+		// Sequential + concurrent opens exercise multi-chunk assembly, cached hit, LRU reuse, and overflow cap (>6 extra shards)
 		await Promise.all([store.nearest("S01-P0", 2), store.nearest("S01-P1", 2)]);
 		await store.nearest("S02-P0", 2);
 		await store.nearest("S03-P0", 2);
 		await store.nearest("S04-P0", 2);
-		const nearS5 = await store.nearest("S05-P0", 2);
-		expect(nearS5.every((n) => n.id.startsWith("S05-"))).toBe(true);
+		await store.nearest("S05-P0", 2);
+		await store.nearest("S06-P0", 2);
+		const nearS7 = await store.nearest("S07-P0", 2);
+		expect(nearS7.every((n) => n.id.startsWith("S07-"))).toBe(true);
 		const hydrated = await store.productsByIds?.([
 			"NB-0001-01",
 			"S01-P0",
@@ -158,8 +160,10 @@ describe("ShardedCatalogueDb", () => {
 			"S03-P0",
 			"S04-P0",
 			"S05-P0",
+			"S06-P0",
+			"S07-P0",
 		]);
-		expect(hydrated?.size).toBe(6);
+		expect(hydrated?.size).toBe(8);
 		expect(hydrated?.get("S02-P0")?.title).toBe("Merino Trail Cardigan");
 
 		// Warm revision activation checks shard 0 revision + global count

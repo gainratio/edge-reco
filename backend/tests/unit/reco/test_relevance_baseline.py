@@ -118,23 +118,39 @@ class Floor(NamedTuple):
 #:     taxonomy-word nDCG@10 1.0000 -> 1.0000  R@10 0.1666 -> 0.0238  P@10 1.0000 -> 1.0000
 #:                   nDCG@24 0.9974 -> 1.0000  R@24 0.3986 -> 0.0571
 #:     negative results 2 -> 6 ("treadmill" returns 6 yoga/exercise mats across the 7 passes)
+#: RAISED 2026-11-20 by weighting hybrid RRF 2:1 semantic-over-lexical
+#: (SEMANTIC_RRF_WEIGHT = 2, LEXICAL_RRF_WEIGHT = 1 in catalogueDb.ts,
+#: shardedCatalogueDb.ts, and edgereco.search.hybrid) so single-word FTS5 OR
+#: coincidences ("purple" -> yoga mats, "door" -> car covers) cannot outvote
+#: top-rank dense semantic hits. Every natural metric jumped sharply (+3.2 to
+#: +3.8 pts across P@10, nDCG@10, nDCG@24, and +2.0 pts R@24 to 94.0% of the
+#: 54.1% k=24 oracle ceiling). taxonomy-word @10 held at 1.0000; taxonomy-word
+#: @24 moved by -0.0048 solely because two Patio, Lawn & Garden hand-tool
+#: loppers (NB-01119, NB-01842) entered ranks 18 and 22 of "tools & home
+#: improvement" — an intentional narrowing of the raw lexical category leak:
+#:     natural       nDCG@10 0.9399 -> 0.9736  R@10 0.2170 -> 0.2236  P@10 0.9419 -> 0.9741
+#:                   F1@10   0.3451 -> 0.3561  nDCG@24 0.9065 -> 0.9439  R@24 0.4880 -> 0.5082
+#:                   F1@24   0.6097 -> 0.6362
+#:     taxonomy-word nDCG@10 1.0000 -> 1.0000  R@10 0.0238 -> 0.0238  P@10 1.0000 -> 1.0000
+#:                   nDCG@24 1.0000 -> 0.9951  R@24 0.0571 -> 0.0567  F1@24 0.1081 -> 0.1073
+#:     negative results 6 -> 6
 BASELINE: Final[tuple[Floor, ...]] = (
     # natural (n=31): wording held out of both retrieval representations.
-    Floor("natural", "mean_ndcg_at_k", 10, 0.9399),
-    Floor("natural", "mean_recall_at_k", 10, 0.2170),
-    Floor("natural", "mean_precision_at_k", 10, 0.9419),
-    Floor("natural", "mean_f1_at_k", 10, 0.3451),
-    Floor("natural", "mean_ndcg_at_k", 24, 0.9065),
-    Floor("natural", "mean_recall_at_k", 24, 0.4880),
-    Floor("natural", "mean_f1_at_k", 24, 0.6097),
+    Floor("natural", "mean_ndcg_at_k", 10, 0.9736),
+    Floor("natural", "mean_recall_at_k", 10, 0.2236),
+    Floor("natural", "mean_precision_at_k", 10, 0.9741),
+    Floor("natural", "mean_f1_at_k", 10, 0.3561),
+    Floor("natural", "mean_ndcg_at_k", 24, 0.9439),
+    Floor("natural", "mean_recall_at_k", 24, 0.5082),
+    Floor("natural", "mean_f1_at_k", 24, 0.6362),
     # taxonomy-word (n=12): the leaky control group, gated so the leak cannot widen.
     Floor("taxonomy-word", "mean_ndcg_at_k", 10, 1.0000),
     Floor("taxonomy-word", "mean_recall_at_k", 10, 0.0238),
     Floor("taxonomy-word", "mean_precision_at_k", 10, 1.0000),
     Floor("taxonomy-word", "mean_f1_at_k", 10, 0.0465),
-    Floor("taxonomy-word", "mean_ndcg_at_k", 24, 1.0000),
-    Floor("taxonomy-word", "mean_recall_at_k", 24, 0.0571),
-    Floor("taxonomy-word", "mean_f1_at_k", 24, 0.1081),
+    Floor("taxonomy-word", "mean_ndcg_at_k", 24, 0.9951),
+    Floor("taxonomy-word", "mean_recall_at_k", 24, 0.0567),
+    Floor("taxonomy-word", "mean_f1_at_k", 24, 0.1073),
 )
 
 #: Not one of the 8 unanswerable queries may come back holding a full page. Was 8

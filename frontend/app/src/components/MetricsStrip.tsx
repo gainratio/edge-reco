@@ -135,8 +135,7 @@ function AssayQualityDisclosure() {
 				<span className="metrics-strip__value metrics-strip__value--steady">
 					{t("metrics.qualityPillValue", {
 						p10: q.precision10,
-						r24: q.recall24,
-						f1: q.f1At24,
+						rShare: q.recallShareOfCeiling,
 					})}
 				</span>
 				<span className="metrics-strip__label">

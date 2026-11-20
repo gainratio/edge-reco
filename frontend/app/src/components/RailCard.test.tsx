@@ -154,9 +154,9 @@ describe("RailCard", () => {
 			screen.getByRole("heading", { name: "Retrieval quality — Assay" }),
 		).toBeInTheDocument();
 		expect(screen.getByText("Precision@10")).toBeInTheDocument();
-		expect(screen.getByText("94.2% (88.4% @ k=24)")).toBeInTheDocument();
-		expect(screen.getByText("48.8% (90.3% of 54.1% max)")).toBeInTheDocument();
-		expect(screen.getByText("0.61 (89.7% of 0.68 max)")).toBeInTheDocument();
+		expect(screen.getByText("97.4% (92.3% @ k=24)")).toBeInTheDocument();
+		expect(screen.getByText("50.8% (94.0% of 54.1% max)")).toBeInTheDocument();
+		expect(screen.getByText("0.64 (93.6% of 0.68 max)")).toBeInTheDocument();
 	});
 
 	it("renders the rank, title and rounded score and picks on click", async () => {

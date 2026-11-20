@@ -1,8 +1,8 @@
 // Multi-shard IVF-TurboQuant CatalogueStore over K self-contained SQLite shards.
 // Cold boot imports only anchor `shard_00` (`edgereco-catalogue`) into OPFS and
-// pre-warms `DEFAULT_NPROBE` reusable in-memory SQLite Workers; queries route
-// via `rankIvfCentroids` (`nprobe = 2` + shard `0`) and swap extra shard images
-// in-place via `sqlite3_deserialize` with zero Worker respawn or OPFS churn.
+// pre-warms `PREWARM_SHARD_SLOTS` reusable in-memory SQLite Workers; queries route
+// via `rankIvfCentroids` (`DEFAULT_NPROBE = 6` + shard `0`) and swap extra shard
+// images in-place via `sqlite3_deserialize` with zero Worker respawn or OPFS churn.
 
 import { NetworkError } from "../gainratio";
 import {
@@ -14,8 +14,10 @@ import {
 	type CatalogueSwapOptions,
 	DEFAULT_LEXICAL_WEIGHTS,
 	type HybridRow,
+	LEXICAL_RRF_WEIGHT,
 	RRF_K,
 	type ScoredId,
+	SEMANTIC_RRF_WEIGHT,
 	type ShardedSqliteInput,
 } from "./catalogueDb";
 import {
@@ -29,8 +31,15 @@ import { rankIvfCentroids, shardForProductId } from "./ivfRouter";
 import type { ScoringWeights } from "./rankingConfig";
 import type { SessionProfile } from "./session";
 
-const DEFAULT_NPROBE = 2;
-const MAX_EXTRA_OPEN_SHARDS = 4;
+/**
+ * Top-k IVF centroids probed per query (in addition to anchor shard 0).
+ * Measured over the 64-shard 1M-product catalog on the 31 natural golden
+ * queries: nprobe=2 hits 82.0% global top-24 recall (with two 0/24 misses),
+ * whereas nprobe=6 reaches 98.7% (29/31 at 24/24, plateauing through nprobe=12).
+ */
+export const DEFAULT_NPROBE = 6;
+const PREWARM_SHARD_SLOTS = 2;
+const MAX_EXTRA_OPEN_SHARDS = 6;
 const SHARD_SWAP_TIMEOUT_MS = 30_000;
 
 export type OpenShardDb = (
@@ -120,8 +129,8 @@ function fuseShardResults(
 		return {
 			id,
 			fused:
-				(l !== undefined ? 1 / (RRF_K + l.rank) : 0) +
-				(s !== undefined ? 1 / (RRF_K + s.rank) : 0),
+				(l !== undefined ? LEXICAL_RRF_WEIGHT / (RRF_K + l.rank) : 0) +
+				(s !== undefined ? SEMANTIC_RRF_WEIGHT / (RRF_K + s.rank) : 0),
 			lexicalScore: l?.score ?? null,
 			lexicalRank: l?.rank ?? null,
 			semanticScore: s?.score ?? null,
@@ -358,7 +367,7 @@ export class ShardedCatalogueDb implements CatalogueStore {
 	}
 
 	async #prewarmSlots(shardCount: number): Promise<void> {
-		const target = Math.min(Math.max(0, shardCount - 1), DEFAULT_NPROBE);
+		const target = Math.min(Math.max(0, shardCount - 1), PREWARM_SHARD_SLOTS);
 		const needed = Math.max(0, target - this.#allocatedSlots);
 		if (needed === 0) return;
 		this.#allocatedSlots += needed;

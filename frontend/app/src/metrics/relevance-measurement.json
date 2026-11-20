@@ -7,30 +7,30 @@
 		"k10": {
 			"k": 10,
 			"queryCount": 31,
-			"precision": 0.9419,
-			"recall": 0.2171,
+			"precision": 0.9742,
+			"recall": 0.2236,
 			"oracleRecallCeiling": 0.2292,
-			"f1": 0.3452,
+			"f1": 0.3562,
 			"oracleF1Ceiling": 0.3653,
-			"ndcg": 0.94,
-			"mrr": 0.9446,
-			"map": 0.4769,
-			"ndcgCiLow": 0.8505,
+			"ndcg": 0.9737,
+			"mrr": 0.9839,
+			"map": 0.4986,
+			"ndcgCiLow": 0.9369,
 			"ndcgCiHigh": 1.0
 		},
 		"k24": {
 			"k": 24,
 			"queryCount": 31,
-			"precision": 0.8844,
-			"recall": 0.4881,
+			"precision": 0.9234,
+			"recall": 0.5082,
 			"oracleRecallCeiling": 0.5408,
-			"f1": 0.6098,
+			"f1": 0.6362,
 			"oracleF1Ceiling": 0.6799,
-			"ndcg": 0.9066,
-			"mrr": 0.9446,
-			"map": 0.4769,
-			"ndcgCiLow": 0.833,
-			"ndcgCiHigh": 0.9647
+			"ndcg": 0.944,
+			"mrr": 0.9839,
+			"map": 0.4986,
+			"ndcgCiLow": 0.9012,
+			"ndcgCiHigh": 0.9785
 		}
 	},
 	"taxonomyWord": {
@@ -44,19 +44,19 @@
 			"oracleF1Ceiling": 0.0465,
 			"ndcg": 1.0,
 			"mrr": 1.0,
-			"map": 0.0571
+			"map": 0.0567
 		},
 		"k24": {
 			"k": 24,
 			"queryCount": 12,
-			"precision": 1.0,
-			"recall": 0.0571,
+			"precision": 0.9931,
+			"recall": 0.0567,
 			"oracleRecallCeiling": 0.0571,
-			"f1": 0.1081,
+			"f1": 0.1074,
 			"oracleF1Ceiling": 0.1081,
-			"ndcg": 1.0,
+			"ndcg": 0.9952,
 			"mrr": 1.0,
-			"map": 0.0571
+			"map": 0.0567
 		}
 	},
 	"negatives": {

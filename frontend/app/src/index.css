@@ -2569,33 +2569,33 @@ input {
    the last tiles off the right edge with no hint that more existed. */
 @media (max-width: 720px) {
 	.metrics-strip {
-		gap: 6px;
-		padding-top: 8px;
-		padding-bottom: 10px;
+		gap: 5px;
+		padding-top: 6px;
+		padding-bottom: 6px;
 	}
 
 	.metrics-strip__tile {
-		gap: 5px;
-		padding: 4px 9px;
+		gap: 4px;
+		padding: 3px 8px;
 	}
 
 	.metrics-strip__value {
-		font-size: 13px;
+		font-size: 12.5px;
 	}
 
 	.metrics-strip__label {
-		font-size: 10.5px;
+		font-size: 10px;
 		letter-spacing: 0.02em;
 	}
 
 	.metrics-strip__action {
-		padding: 4px 9px;
+		padding: 3px 8px;
 		font-size: 10.5px;
 	}
 
 	.metrics-quality__summary {
-		padding: 4px 9px;
-		gap: 3px 5px;
+		padding: 3px 8px;
+		gap: 3px 4px;
 	}
 }
 

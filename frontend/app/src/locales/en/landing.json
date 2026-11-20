@@ -58,8 +58,8 @@
 			"sub": "{{p24}} at k={{k24}} · held-out wording"
 		},
 		"recall": {
-			"label": "Recall@{{k24}}",
-			"sub": "{{shareOfCeiling}} of {{ceiling}} max @ {{k24}} slots"
+			"label": "Recall@{{k24}} (% of max)",
+			"sub": "{{r24}} raw · {{ceiling}} oracle ceiling"
 		},
 		"f1": {
 			"label": "F1@{{k24}} harmonic mean",

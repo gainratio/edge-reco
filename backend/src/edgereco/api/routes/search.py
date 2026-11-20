@@ -13,7 +13,7 @@ from edgereco.api.deps import Container, ServiceContainer
 from edgereco.api.models import SearchResponse
 from edgereco.catalog.models import SearchResult, SessionProfile
 from edgereco.reco.reranker import RetrievalEvidence, rerank_search, retrieval_evidence
-from edgereco.search.hybrid import reciprocal_rank_fusion
+from edgereco.search.hybrid import weighted_reciprocal_rank_fusion
 
 router = APIRouter()
 
@@ -31,7 +31,7 @@ def _fused_results(container: ServiceContainer, q: str, k: int) -> _Fused:
     query_vec = container.encoder.encode_query(q)
     vector_hits = container.vector.search(query_vec, k=k)
     results: list[SearchResult] = []
-    for pid, score in reciprocal_rank_fusion(keyword_hits, vector_hits):
+    for pid, score in weighted_reciprocal_rank_fusion(keyword_hits, vector_hits):
         product = container.by_id.get(pid)
         if product is not None:
             results.append(SearchResult(product=product, score=score))
