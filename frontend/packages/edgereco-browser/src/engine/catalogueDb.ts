@@ -147,6 +147,16 @@ export const DEFAULT_LEXICAL_WEIGHTS: LexicalWeights = Object.freeze({
 /** The standard RRF constant (Cormack et al. 2009), unchanged from the JS port. */
 export const RRF_K = 60;
 
+/**
+ * Semantic-weighted RRF weights. FTS5 OR matching can surface single-word
+ * lexical coincidences ("purple" -> yoga mats, "door" -> car covers) that
+ * otherwise tie top-rank dense hits at 1:1. Weighting semantic 2:1 over
+ * lexical keeps exact multi-term + vector agreement at rank 1 (3/(k+r)) while
+ * ensuring strong dense matches (2/(k+r)) outrank single-word BM25 noise (1/(k+r)).
+ */
+export const LEXICAL_RRF_WEIGHT = 1;
+export const SEMANTIC_RRF_WEIGHT = 2;
+
 const SCHEMA = `
 	CREATE TABLE IF NOT EXISTS products(
 		rowid INTEGER PRIMARY KEY,
@@ -249,8 +259,12 @@ const HYBRID_SQL = `
 		ORDER BY distance, rowid LIMIT ?6
 	),
 	fused AS (
-		SELECT rowid, SUM(1.0 / (?8 + rank)) AS fused
-		FROM (SELECT rowid, rank FROM keyword UNION ALL SELECT rowid, rank FROM semantic)
+		SELECT rowid, SUM(weight / (?8 + rank)) AS fused
+		FROM (
+			SELECT rowid, rank, CAST(${LEXICAL_RRF_WEIGHT} AS REAL) AS weight FROM keyword
+			UNION ALL
+			SELECT rowid, rank, CAST(${SEMANTIC_RRF_WEIGHT} AS REAL) AS weight FROM semantic
+		)
 		GROUP BY rowid
 	)
 	SELECT p.id AS id, p.title AS title, p.description AS description,

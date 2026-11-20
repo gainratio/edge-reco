@@ -31,6 +31,20 @@ describe("rankIvfCentroids", () => {
 		expect(rankIvfCentroids(query, centroids, 4, 99)).toEqual([2, 0, 1, 3]);
 	});
 
+	it("supports adaptive Voronoi boundary probing via cosineMargin", () => {
+		const centroids = new Float32Array([
+			1, 0, 0, 0, 0, 1, 0, 0, 0.7, 0.7, 0, 0, 0, 0, 1, 0,
+		]);
+		// scores: shard 2 = 0.98, shard 0 = 0.80 (d=0.18), shard 1 = 0.60 (d=0.38), shard 3 = 0
+		const query = new Float32Array([0.8, 0.6, 0, 0]);
+		// Tight margin (0.14): interior query probes only shard 2
+		expect(rankIvfCentroids(query, centroids, 4, 3, 0.14)).toEqual([2]);
+		// Wider margin (0.20): boundary query expands to shard 2 + shard 0
+		expect(rankIvfCentroids(query, centroids, 4, 3, 0.2)).toEqual([2, 0]);
+		// Single-probe cap still returns top centroid
+		expect(rankIvfCentroids(query, centroids, 4, 1, 0.14)).toEqual([2]);
+	});
+
 	it("breaks equal-similarity ties by ascending shard index and validates inputs", () => {
 		const centroids = new Float32Array([1, 0, 1, 0]);
 		const query = new Float32Array([1, 0]);

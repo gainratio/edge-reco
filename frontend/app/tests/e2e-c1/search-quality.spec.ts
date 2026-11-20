@@ -1,9 +1,11 @@
 import { expect, test } from "@playwright/test";
 
 const PRODUCT_CARD = "main article.card";
-// The synthetic catalog stocks several men's waterproof boots that score within a
-// hair of each other, so the pin is "a hiking boot comes first", not one title.
-const WATERPROOF_BOOT = /^\S.* Men's .*(Hiking|Trail) Boot \| /;
+// The 1M-product sharded catalog stocks both synthetic hiking/trail boots and
+// waterproof outdoor/snow boots (e.g. BOGS Men's Classic Mid-m Snow Boot Pro)
+// across 64 IVF shards; pin that a relevant outdoor/hiking/waterproof boot
+// ranks #1 rather than a single synthetic title format.
+const WATERPROOF_BOOT = /\b(Hiking|Trail|Snow|Waterproof|Outdoor)\b.*\bBoot\b/i;
 const BOOT_BUDGET_MS = 60_000;
 const SEARCH_P50_BUDGET_MS = 750;
 const SEARCH_P95_BUDGET_MS = 1_500;

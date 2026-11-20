@@ -18,7 +18,7 @@ from numpy.typing import NDArray
 
 from edgereco.catalog.models import Product, SearchResult, SessionProfile
 from edgereco.reco.reranker import rerank_search, retrieval_evidence
-from edgereco.search.hybrid import reciprocal_rank_fusion
+from edgereco.search.hybrid import weighted_reciprocal_rank_fusion
 
 _SCRIPT = Path(__file__).parents[3] / "scripts" / "gen_hybrid_fixture.py"
 
@@ -90,7 +90,7 @@ def test_search_replays_the_route_reranker() -> None:
     )
 
     by_id = {p.id: p for p in products}
-    fused = reciprocal_rank_fusion(keyword_hits, vector_hits)
+    fused = weighted_reciprocal_rank_fusion(keyword_hits, vector_hits)
     pool = [SearchResult(product=by_id[pid], score=score) for pid, score in fused]
     evidence = retrieval_evidence(keyword_hits, vector_hits)
     expected = rerank_search(pool, SessionProfile(), evidence)[: script.LIMIT]

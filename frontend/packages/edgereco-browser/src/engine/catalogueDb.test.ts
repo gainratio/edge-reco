@@ -10,9 +10,11 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 import {
 	CatalogueDb,
 	type CatalogueProduct,
+	LEXICAL_RRF_WEIGHT,
 	matchExpression,
 	openCatalogueStore,
 	RRF_K,
+	SEMANTIC_RRF_WEIGHT,
 	SqlSwapTimeoutError,
 } from "./catalogueDb";
 import { importCatalogueSqlFromChunks, openCatalogueSql } from "./catalogueSql";
@@ -183,34 +185,36 @@ describe("hybrid fusion (RRF in SQL)", () => {
 		db = await openCatalogue();
 	});
 
-	it("uses the standard RRF constant k = 60", () => {
+	it("uses the standard RRF constant k = 60 and 2:1 semantic-to-lexical weights", () => {
 		expect(RRF_K).toBe(60);
+		expect(LEXICAL_RRF_WEIGHT).toBe(1);
+		expect(SEMANTIC_RRF_WEIGHT).toBe(2);
 	});
 
-	it("sums 1/(60 + rank) over both lists and explains every input", async () => {
+	it("sums weight/(60 + rank) over both lists and explains every input", async () => {
 		const rows = await db.hybrid("polo", FAR, 2);
 		// keyword: [a]; semantic top-2 from 180°: [c, b] (b and d tie; row order).
 		const a = rows.find((row) => row.id === "a");
 		expect(a).toMatchObject({ lexicalRank: 1, semanticRank: null });
-		// Pin the literal k=60 the docs promise: 1/61, not 1/(RRF_K + 1), which
-		// would pass at any k.
+		// Pin the literal k=60 and weights (1 lexical, 2 semantic) the docs promise.
 		expect(a?.fused).toBeCloseTo(1 / 61, 12);
 		const c = rows.find((row) => row.id === "c");
 		expect(c).toMatchObject({ lexicalRank: null, semanticRank: 1 });
 		expect(c?.semanticScore).toBeCloseTo(1, 6);
+		expect(c?.fused).toBeCloseTo(2 / 61, 12);
 	});
 
 	it("ranks a document found by both retrievers above single-list hits", async () => {
 		const towardC = new Float32Array([-1, 0.01]);
 		const rows = await db.hybrid("cotton", towardC, 3);
 		expect(rows[0]?.id).toBe("c");
-		expect(rows[0]?.fused).toBeCloseTo(2 / 61, 12);
+		expect(rows[0]?.fused).toBeCloseTo(3 / 61, 12);
 	});
 
-	it("puts the keyword list first when fused scores tie", async () => {
-		// keyword [a], semantic [c]: both 1/61; keyword wins the tie.
+	it("ranks a rank-1 semantic hit above a rank-1 single-word lexical hit", async () => {
+		// keyword [a] gets 1/61; semantic [c] gets 2/61 so semantic wins over single-word BM25 noise.
 		const rows = await db.hybrid("polo", FAR, 1);
-		expect(rows.map((row) => row.id)).toEqual(["a", "c"]);
+		expect(rows.map((row) => row.id)).toEqual(["c", "a"]);
 	});
 
 	it("returns only semantic rows for a blank query and nothing at k=0", async () => {

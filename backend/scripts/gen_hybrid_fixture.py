@@ -34,7 +34,7 @@ from edgereco.catalog.models import Product, SearchResult, SessionProfile
 from edgereco.embeddings.encoder import ProductEncoder
 from edgereco.embeddings.index import VectorIndex
 from edgereco.reco.reranker import rerank_search, retrieval_evidence
-from edgereco.search.hybrid import reciprocal_rank_fusion
+from edgereco.search.hybrid import weighted_reciprocal_rank_fusion
 from edgereco.search.keyword import KeywordSearcher
 from edgereco.search.vector import VectorSearcher
 
@@ -92,7 +92,7 @@ def _search(
     k = max(LIMIT * 3, 30)
     keyword_hits = keyword.search(query, k=k)
     vector_hits = vector.search(encoder.encode_query(query), k=k)
-    fused = reciprocal_rank_fusion(keyword_hits, vector_hits)
+    fused = weighted_reciprocal_rank_fusion(keyword_hits, vector_hits)
     results = [
         SearchResult(product=by_id[pid], score=score) for pid, score in fused if pid in by_id
     ]

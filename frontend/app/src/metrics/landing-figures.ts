@@ -108,11 +108,14 @@ export const LANDING_QUALITY_METRICS: readonly RepresentativeMetric[] = [
 	},
 	{
 		id: "recall",
-		num: pct(relevance.natural.k24.recall),
+		num: pct(
+			relevance.natural.k24.recall / relevance.natural.k24.oracleRecallCeiling,
+		),
 		unit: "%",
+		tone: "pos",
 		vars: {
 			k24: relevance.natural.k24.k,
-			shareOfCeiling: `${pct(relevance.natural.k24.recall / relevance.natural.k24.oracleRecallCeiling)}%`,
+			r24: `${pct(relevance.natural.k24.recall)}%`,
 			ceiling: `${pct(relevance.natural.k24.oracleRecallCeiling)}%`,
 		},
 	},

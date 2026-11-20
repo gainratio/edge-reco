@@ -203,13 +203,13 @@ def _fused_search_results(
     """Fused candidates plus the absolute retrieval scores RRF discards."""
     from edgereco.catalog.models import SearchResult
     from edgereco.reco.reranker import retrieval_evidence
-    from edgereco.search.hybrid import reciprocal_rank_fusion
+    from edgereco.search.hybrid import weighted_reciprocal_rank_fusion
 
     keyword_hits = container.keyword.search(query, k=k)
     query_vec = container.encoder.encode_query(query)
     vector_hits = container.vector.search(query_vec, k=k)
     results: list[SearchResult] = []
-    for pid, score in reciprocal_rank_fusion(keyword_hits, vector_hits):
+    for pid, score in weighted_reciprocal_rank_fusion(keyword_hits, vector_hits):
         product = container.by_id.get(pid)
         if product is not None:
             results.append(SearchResult(product=product, score=score))

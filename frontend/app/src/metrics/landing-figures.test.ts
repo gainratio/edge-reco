@@ -205,7 +205,14 @@ describe("landing search-quality tiles quote the Assay relevance measurement", (
 			(relevance.natural.k10.precision * 100).toFixed(1),
 		);
 		expect(qTile("recall").num).toBe(
-			(relevance.natural.k24.recall * 100).toFixed(1),
+			(
+				(relevance.natural.k24.recall /
+					relevance.natural.k24.oracleRecallCeiling) *
+				100
+			).toFixed(1),
+		);
+		expect(qTile("recall").vars?.r24).toBe(
+			`${(relevance.natural.k24.recall * 100).toFixed(1)}%`,
 		);
 		expect(qTile("recall").vars?.ceiling).toBe(
 			`${(relevance.natural.k24.oracleRecallCeiling * 100).toFixed(1)}%`,
