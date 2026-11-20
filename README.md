@@ -26,6 +26,17 @@ and inference cost does not grow with traffic, and cached shards keep working of
 
 **[Watch the 1080p walkthrough](https://open-source.gainratio.com/edge-reco/)** · **[Launch the live store](https://edge-reco.com)**
 
+### Measured scale & retrieval quality (live storefront, Assay `trec_eval`)
+
+| Metric | Measured value | Notes |
+|---|---|---|
+| Live catalog scale | **1,000,000 products** | 64 SQLite shards routed by a 96 KiB centroid table (`adaptive nprobe = 1..3`, cosine margin `0.14`) |
+| Signed bundle / delta size | **~79.0 MB** full / **~42.9 KB** delta | 3,331 content-addressed chunks; price updates download only 2 changed chunks |
+| Backend search & reco calls | **0** | Hybrid FTS5 BM25 + 2-bit TurboQuant MiniLM-L6-v2 runs in a browser Web Worker + OPFS |
+| Precision@10 (`natural`, 31 queries) | **97.4%** | 2:1 semantic-over-lexical Reciprocal Rank Fusion (`RRF`) |
+| nDCG@10 / MRR | **0.974** / **0.984** | 95% bootstrap CI `[0.937, 1.000]` |
+| Recall@24 (ceiling-normalized) | **94.0%** (`50.8%` raw / `54.1%` k=24 oracle max) | `0.636` F1@24 (`93.6%` of `0.680` oracle ceiling) |
+
 **Technical docs:** [Architecture](docs/ARCHITECTURE.md) · [Getting started for developers](docs/GETTING_STARTED.md) · [Python library and CLI](docs/USAGE.md) · [Security and privacy](docs/SECURITY-PRIVACY.md) · [Deploy](docs/DEPLOY.md)
 
 ## The Black Friday problem
